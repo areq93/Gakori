@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pragma - Analiza</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="shortcut icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f4f4f9; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        
+        /* Panel debugowania - pomoże nam znaleźć błąd */
+        #debug { margin-top: 20px; padding: 10px; background: #eee; border-radius: 5px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed #ccc; }
+        .status-ok { color: green; font-weight: bold; }
+        .status-err { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1 style="margin-top:0">Pragma</h1>
+        <p>Wklej link do analizy:</p>
+        <input type="url" id="urlInput" placeholder="https://...">
+        <button id="analyzeBtn">Analizuj stronę</button>
+        <div id="status" style="margin-top:10px"></div>
+    </div>
+
+    <div id="debug">
+        <strong>Status PWA:</strong>
+        <div id="sw-status">Sprawdzanie Service Workera...</div>
+        <hr>
+        <strong>Otrzymane dane (Share Target):</strong>
+        <div id="share-data">Brak danych z udostępniania.</div>
+    </div>
+
+    <script>
+        // 1. Rejestracja Service Workera i debugowanie
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js?v=2') // ścieżka względna - działa też w podkatalogu (np. GitHub Pages)
+                .then(reg => {
+                    document.getElementById('sw-status').innerHTML = '<span class="status-ok">✅ SW zarejestrowany!</span>';
+                })
+                .catch(err => {
+                    document.getElementById('sw-status').innerHTML = '<span class="status-err">❌ Błąd SW: ' + err + '</span>';
+                });
+        } else {
+            document.getElementById('sw-status').innerHTML = '<span class="status-err">❌ Twoja przeglądarka nie wspiera PWA</span>';
+        }
+
+        // 2. Przechwytywanie udostępnionego URL
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const sharedUrl = params.get('url') || params.get('text') || params.get('title');
+            
+            if (sharedUrl) {
+                document.getElementById('share-data').innerHTML = '<span class="status-ok">✅ Otrzymano: ' + sharedUrl + '</span>';
+                
+                // Wyciąganie czystego URL (jeśli w tekście jest coś więcej)
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                const found = sharedUrl.match(urlRegex);
+                if (found) {
+                    document.getElementById('urlInput').value = found[0];
+                } else {
+                    document.getElementById('urlInput').value = sharedUrl;
+                }
+            }
+        });
+
+        // 3. Przycisk analizy
+        document.getElementById('analyzeBtn').addEventListener('click', () => {
+            const url = document.getElementById('urlInput').value;
+            if(!url) return alert("Wpisz link!");
+            document.getElementById('status').innerText = "Analizowanie: " + url + "...";
+            // Tutaj wejdzie backend n8n
+        });
+    </script>
+</body>
+</html>
