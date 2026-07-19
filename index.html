@@ -13,9 +13,25 @@
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f4f4f9; color: #333; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; font-family: inherit; }
+        textarea { resize: vertical; min-height: 100px; }
         button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
-        
+
+        /* Zakładki wyboru typu analizy */
+        .tabs { display: flex; gap: 6px; margin: 10px 0; }
+        .tab-btn {
+            flex: 1; padding: 10px 4px; font-size: 13px; font-weight: bold;
+            background: #eef1f8; color: #555; border: 1px solid #dde2ee; border-radius: 6px;
+            cursor: pointer; width: auto; margin: 0;
+        }
+        .tab-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+        .mode-panel { display: none; }
+        .mode-panel.active { display: block; }
+
+        #imagePreview { max-width: 100%; border-radius: 6px; margin-top: 8px; display: none; }
+        #fileName { font-size: 13px; color: #666; margin-top: 4px; }
+
         /* Panel debugowania - pomoże nam znaleźć błąd */
         #debug { margin-top: 20px; padding: 10px; background: #eee; border-radius: 5px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed #ccc; }
         .status-ok { color: green; font-weight: bold; }
@@ -26,9 +42,31 @@
 
     <div class="card">
         <h1 style="margin-top:0">Pragma</h1>
-        <p>Wklej link do analizy:</p>
-        <input type="url" id="urlInput" placeholder="https://...">
-        <button id="analyzeBtn">Analizuj stronę</button>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-mode="url">🔗 Link</button>
+            <button class="tab-btn" data-mode="text">📝 Tekst</button>
+            <button class="tab-btn" data-mode="image">🖼️ Obraz</button>
+        </div>
+
+        <div class="mode-panel active" id="panel-url">
+            <p>Wklej link do analizy:</p>
+            <input type="url" id="urlInput" placeholder="https://...">
+        </div>
+
+        <div class="mode-panel" id="panel-text">
+            <p>Wklej tekst do analizy:</p>
+            <textarea id="textInput" placeholder="Wklej treść, którą chcesz przeanalizować..."></textarea>
+        </div>
+
+        <div class="mode-panel" id="panel-image">
+            <p>Wybierz zdjęcie do analizy:</p>
+            <input type="file" id="imageInput" accept="image/*">
+            <div id="fileName"></div>
+            <img id="imagePreview" alt="podgląd">
+        </div>
+
+        <button id="analyzeBtn">Analizuj</button>
         <div id="status" style="margin-top:10px"></div>
     </div>
 
@@ -38,6 +76,9 @@
         <hr>
         <strong>Otrzymane dane (Share Target):</strong>
         <div id="share-data">Brak danych z udostępniania.</div>
+        <hr>
+        <strong>Ostatni payload:</strong>
+        <div id="payload-data">Brak.</div>
     </div>
 
     <script>
@@ -54,31 +95,108 @@
             document.getElementById('sw-status').innerHTML = '<span class="status-err">❌ Twoja przeglądarka nie wspiera PWA</span>';
         }
 
-        // 2. Przechwytywanie udostępnionego URL
+        // 2. Przechwytywanie udostępnionego URL (Share Target zawsze trafia w zakładkę "Link")
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const sharedUrl = params.get('url') || params.get('text') || params.get('title');
-            
+
             if (sharedUrl) {
                 document.getElementById('share-data').innerHTML = '<span class="status-ok">✅ Otrzymano: ' + sharedUrl + '</span>';
-                
-                // Wyciąganie czystego URL (jeśli w tekście jest coś więcej)
+
                 const urlRegex = /(https?:\/\/[^\s]+)/g;
                 const found = sharedUrl.match(urlRegex);
-                if (found) {
-                    document.getElementById('urlInput').value = found[0];
-                } else {
-                    document.getElementById('urlInput').value = sharedUrl;
-                }
+                document.getElementById('urlInput').value = found ? found[0] : sharedUrl;
+                setMode('url');
             }
         });
 
-        // 3. Przycisk analizy
-        document.getElementById('analyzeBtn').addEventListener('click', () => {
-            const url = document.getElementById('urlInput').value;
-            if(!url) return alert("Wpisz link!");
-            document.getElementById('status').innerText = "Analizowanie: " + url + "...";
-            // Tutaj wejdzie backend n8n
+        // 3. Przełączanie zakładek (Link / Tekst / Obraz)
+        let currentMode = 'url';
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === mode);
+            });
+            document.querySelectorAll('.mode-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === 'panel-' + mode);
+            });
+            const labels = { url: 'Analizuj stronę', text: 'Analizuj tekst', image: 'Analizuj obraz' };
+            document.getElementById('analyzeBtn').innerText = labels[mode];
+            document.getElementById('status').innerText = '';
+        }
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => setMode(btn.dataset.mode));
+        });
+
+        // 4. Podgląd wybranego obrazu
+        document.getElementById('imageInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const preview = document.getElementById('imagePreview');
+            const fileNameEl = document.getElementById('fileName');
+            if (!file) {
+                preview.style.display = 'none';
+                fileNameEl.innerText = '';
+                return;
+            }
+            fileNameEl.innerText = file.name + ' (' + Math.round(file.size / 1024) + ' KB)';
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                preview.src = ev.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 5. Hashowanie SHA-256 (klucz do cache'u społecznościowego - patrz Supabase "scans.content_hash")
+        async function sha256Hex(buffer) {
+            const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+            return Array.from(new Uint8Array(hashBuffer))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+        }
+
+        // 6. Przycisk analizy - buduje payload gotowy do wysłania do n8n
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            const statusEl = document.getElementById('status');
+            const payloadEl = document.getElementById('payload-data');
+            let payload = null;
+
+            try {
+                if (currentMode === 'url') {
+                    const url = document.getElementById('urlInput').value.trim();
+                    if (!url) return alert('Wpisz link!');
+                    const hash = await sha256Hex(new TextEncoder().encode(url));
+                    payload = { input_type: 'url', content_hash: hash, source_url: url };
+
+                } else if (currentMode === 'text') {
+                    const text = document.getElementById('textInput').value.trim();
+                    if (!text) return alert('Wklej jakiś tekst!');
+                    const hash = await sha256Hex(new TextEncoder().encode(text));
+                    payload = { input_type: 'text', content_hash: hash, char_count: text.length, text_preview: text.slice(0, 200) };
+
+                } else if (currentMode === 'image') {
+                    const file = document.getElementById('imageInput').files[0];
+                    if (!file) return alert('Wybierz obraz!');
+                    const buffer = await file.arrayBuffer();
+                    const hash = await sha256Hex(buffer);
+                    payload = { input_type: 'image', content_hash: hash, file_name: file.name, size_kb: Math.round(file.size / 1024) };
+                    // Uwaga: docelowo trzeba będzie wysłać same bajty obrazu (base64 albo multipart)
+                    // do n8n razem z tym payloadem - tu tylko liczymy hash po stronie klienta.
+                }
+
+                statusEl.innerText = 'Hash wyliczony, gotowe do wysłania: ' + payload.content_hash.slice(0, 16) + '...';
+                payloadEl.innerText = JSON.stringify(payload, null, 2);
+
+                // TODO: tu wejdzie prawdziwe wywołanie backendu n8n, np.:
+                // const res = await fetch('https://TWOJ-WEBHOOK-N8N', {
+                //     method: 'POST',
+                //     headers: { 'Content-Type': 'application/json' },
+                //     body: JSON.stringify(payload)
+                // });
+
+            } catch (err) {
+                statusEl.innerHTML = '<span class="status-err">❌ Błąd: ' + err + '</span>';
+            }
         });
     </script>
 </body>
