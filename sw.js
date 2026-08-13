@@ -29,7 +29,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Ignoruj żądania POST (np. do API), cache'ujemy tylko GET
+  // Ignoruj żądania POST (np. do naszej funkcji analyze), cache'ujemy tylko GET
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
