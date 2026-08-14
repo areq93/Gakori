@@ -360,7 +360,7 @@
         let currentMode = 'url';
         function setMode(mode) {
             currentMode = mode;
-            document.querySelectorAll('.tab-btn').forEach(btn => {
+            document.querySelectorAll('.tab-btn[data-mode]').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.mode === mode);
             });
             document.querySelectorAll('.mode-panel').forEach(panel => {
@@ -371,7 +371,7 @@
             document.getElementById('status').innerText = '';
             document.getElementById('resultCard').style.display = 'none';
         }
-        document.querySelectorAll('.tab-btn').forEach(btn => {
+        document.querySelectorAll('.tab-btn[data-mode]').forEach(btn => {
             btn.addEventListener('click', () => setMode(btn.dataset.mode));
         });
 
