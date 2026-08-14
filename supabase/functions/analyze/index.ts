@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json()
-    const { content_hash, input_type, text_content, char_count, user_id } = body
+    const { content_hash, input_type, text_content, char_count } = body
 
     // Na razie obsługujemy tylko tekst — link/obraz/pdf wracają w kolejnym kroku.
     if (input_type !== 'text') {
@@ -78,10 +78,17 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // 2. UWIERZYTELNIENIE (TYMCZASOWE)
-    // Na razie ufamy user_id przesłanemu wprost z apki — to działa tylko,
-    // dopóki testujemy sami, na testowym koncie. Gdy zbudujemy prawdziwe
-    // logowanie w PWA, zastąpimy to weryfikacją tokenu z nagłówka Authorization.
+    // 2. UWIERZYTELNIENIE — weryfikacja tokenu JWT z nagłówka Authorization (Supabase Auth)
+    let user_id: string | null = null
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      if (!authError && user) {
+        user_id = user.id
+      }
+    }
+
     let profile = null
     if (user_id) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user_id).single()
