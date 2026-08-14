@@ -49,9 +49,46 @@
 </head>
 <body>
 
-    <div class="card">
+    <div class="card" id="authCard">
         <h1 style="margin-top:0">Pragma</h1>
 
+        <div id="authLoggedOut">
+            <div class="tabs">
+                <button class="tab-btn active" data-authmode="login" type="button">Zaloguj</button>
+                <button class="tab-btn" data-authmode="signup" type="button">Zarejestruj</button>
+            </div>
+            <input type="email" id="authEmail" placeholder="e-mail" autocomplete="email">
+            <input type="password" id="authPassword" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
+            <button id="authSubmitBtn" type="button">Zaloguj się</button>
+            <div style="text-align:center; margin-top:8px;">
+                <a href="#" id="forgotPasswordLink" style="font-size:13px; color:#2563eb;">Zapomniałeś hasła?</a>
+            </div>
+            <div style="text-align:center; color:#999; font-size:12px; margin:12px 0;">— lub —</div>
+            <button id="googleLoginBtn" type="button" style="background:#fff; color:#333; border:1px solid #ccc;">Zaloguj przez Google</button>
+            <div id="authStatus" style="margin-top:10px; font-size:13px;"></div>
+        </div>
+
+        <div id="authLoggedIn" style="display:none;">
+            <p style="margin:0 0 10px 0;">Zalogowano jako: <strong id="authUserEmail"></strong></p>
+            <button id="logoutBtn" type="button" style="background:#eee; color:#333;">Wyloguj</button>
+            <div style="text-align:center; margin-top:10px;">
+                <a href="#" id="changePasswordLink" style="font-size:13px; color:#2563eb;">Zmień hasło</a>
+            </div>
+            <div id="changePasswordForm" style="display:none; margin-top:10px;">
+                <input type="password" id="newPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
+                <button id="changePasswordBtn" type="button">Zapisz nowe hasło</button>
+            </div>
+        </div>
+
+        <div id="authRecovery" style="display:none;">
+            <p style="margin:0 0 10px 0;">Ustaw nowe hasło do konta:</p>
+            <input type="password" id="recoveryPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
+            <button id="recoverySubmitBtn" type="button">Ustaw nowe hasło</button>
+            <div id="recoveryStatus" style="margin-top:10px; font-size:13px;"></div>
+        </div>
+    </div>
+
+    <div class="card">
         <div class="tabs">
             <button class="tab-btn active" data-mode="url">🔗 Link</button>
             <button class="tab-btn" data-mode="text">📝 Tekst</button>
@@ -96,10 +133,200 @@
         <div id="payload-data">Brak.</div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script>
         // ===== KONFIGURACJA POŁĄCZENIA Z BACKENDEM =====
-        const SUPABASE_FUNCTION_URL = 'https://daulljwdoerclborpctb.supabase.co/functions/v1/analyze';
+        const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
+        const SUPABASE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/analyze';
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd'; // Project Settings -> API Keys -> Publishable key
+
+        // Logowanie zależy od zewnętrznej biblioteki (CDN) — jeśli się nie wczyta
+        // (offline, awaria CDN), reszta aplikacji (darmowa analiza bez konta) MA DALEJ DZIAŁAĆ.
+        let sb = null;
+        try {
+            if (typeof supabase === 'undefined') throw new Error('Biblioteka Supabase nie wczytała się.');
+            sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch (e) {
+            console.error(e);
+        }
+        let currentSession = null;
+
+        // 0. Tłumaczenie typowych błędów Supabase Auth na przyjazny polski komunikat
+        function translateAuthError(err) {
+            const msg = (err && err.message) || String(err);
+            if (msg.includes('Invalid login credentials')) return 'Nieprawidłowy e-mail lub hasło.';
+            if (msg.includes('User already registered')) return 'To konto już istnieje — zaloguj się zamiast rejestrować.';
+            if (msg.includes('Password should be at least')) return 'Hasło musi mieć co najmniej 6 znaków.';
+            if (msg.includes('Email not confirmed')) return 'Potwierdź adres e-mail — sprawdź skrzynkę i kliknij link, który wysłaliśmy.';
+            if (msg.includes('Unable to validate email')) return 'Nieprawidłowy format adresu e-mail.';
+            return msg;
+        }
+
+        if (!sb) {
+            document.getElementById('authLoggedOut').innerHTML =
+                '<p style="color:#991b1b; margin:0;">⚠️ Logowanie chwilowo niedostępne (sprawdź połączenie z internetem i odśwież stronę). Możesz nadal skorzystać z jednej bezpłatnej analizy bez konta poniżej.</p>';
+        } else {
+        // (Cała logika logowania działa tylko, gdy biblioteka Supabase faktycznie się wczytała.)
+
+        // 0b. Pokazanie właściwego widoku (wylogowany / zalogowany / ustawianie nowego hasła)
+        function renderAuthUI() {
+            const loggedOut = document.getElementById('authLoggedOut');
+            const loggedIn = document.getElementById('authLoggedIn');
+            const recovery = document.getElementById('authRecovery');
+            if (recovery.style.display === 'block') return; // ekran ustawiania nowego hasła ma pierwszeństwo
+            if (currentSession) {
+                loggedOut.style.display = 'none';
+                loggedIn.style.display = 'block';
+                document.getElementById('authUserEmail').innerText = currentSession.user.email;
+            } else {
+                loggedOut.style.display = 'block';
+                loggedIn.style.display = 'none';
+            }
+        }
+
+        function showRecoveryForm() {
+            document.getElementById('authLoggedOut').style.display = 'none';
+            document.getElementById('authLoggedIn').style.display = 'none';
+            document.getElementById('authRecovery').style.display = 'block';
+        }
+
+        // 0c. Przełączanie Zaloguj / Zarejestruj
+        let authFormMode = 'login';
+        function setAuthMode(mode) {
+            authFormMode = mode;
+            document.querySelectorAll('[data-authmode]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.authmode === mode);
+            });
+            document.getElementById('authSubmitBtn').innerText = mode === 'login' ? 'Zaloguj się' : 'Zarejestruj się';
+            document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+            document.getElementById('authStatus').innerText = '';
+        }
+        document.querySelectorAll('[data-authmode]').forEach(btn => {
+            btn.addEventListener('click', () => setAuthMode(btn.dataset.authmode));
+        });
+
+        // 0d. Logowanie / Rejestracja e-mailem i hasłem
+        document.getElementById('authSubmitBtn').addEventListener('click', async () => {
+            const statusEl = document.getElementById('authStatus');
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value;
+            if (!email || !password) {
+                statusEl.innerHTML = '<span class="status-err">Podaj e-mail i hasło.</span>';
+                return;
+            }
+            statusEl.innerText = 'Chwileczkę...';
+            try {
+                if (authFormMode === 'login') {
+                    const { error } = await sb.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                    statusEl.innerText = '';
+                } else {
+                    const { error } = await sb.auth.signUp({
+                        email, password,
+                        options: { emailRedirectTo: window.location.origin + window.location.pathname }
+                    });
+                    if (error) throw error;
+                    statusEl.innerHTML = '<span class="status-ok">Sprawdź skrzynkę e-mail i kliknij link potwierdzający, aby dokończyć rejestrację.</span>';
+                }
+            } catch (err) {
+                statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
+            }
+        });
+
+        // 0e. Reset hasła (link na e-mail)
+        document.getElementById('forgotPasswordLink').addEventListener('click', async (e) => {
+            e.preventDefault();
+            const statusEl = document.getElementById('authStatus');
+            const email = document.getElementById('authEmail').value.trim();
+            if (!email) {
+                statusEl.innerHTML = '<span class="status-err">Najpierw wpisz swój e-mail powyżej.</span>';
+                return;
+            }
+            try {
+                const { error } = await sb.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.origin + window.location.pathname
+                });
+                if (error) throw error;
+                statusEl.innerHTML = '<span class="status-ok">Wysłaliśmy link do zresetowania hasła na Twój e-mail.</span>';
+            } catch (err) {
+                statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
+            }
+        });
+
+        // 0f. Logowanie przez Google
+        document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+            const { error } = await sb.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: window.location.origin + window.location.pathname }
+            });
+            if (error) {
+                document.getElementById('authStatus').innerHTML = '<span class="status-err">' + translateAuthError(error) + '</span>';
+            }
+        });
+
+        // 0g. Wylogowanie
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await sb.auth.signOut();
+        });
+
+        // 0h. Zmiana hasła (dla zalogowanego użytkownika)
+        document.getElementById('changePasswordLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            const form = document.getElementById('changePasswordForm');
+            form.style.display = form.style.display === 'block' ? 'none' : 'block';
+        });
+        document.getElementById('changePasswordBtn').addEventListener('click', async () => {
+            const statusEl = document.getElementById('authStatus');
+            const newPassword = document.getElementById('newPassword').value;
+            if (!newPassword || newPassword.length < 6) {
+                statusEl.innerHTML = '<span class="status-err">Hasło musi mieć co najmniej 6 znaków.</span>';
+                return;
+            }
+            try {
+                const { error } = await sb.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+                statusEl.innerHTML = '<span class="status-ok">Hasło zmienione.</span>';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('changePasswordForm').style.display = 'none';
+            } catch (err) {
+                statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
+            }
+        });
+
+        // 0i. Ustawienie nowego hasła po kliknięciu linku resetującego (z e-maila)
+        document.getElementById('recoverySubmitBtn').addEventListener('click', async () => {
+            const statusEl = document.getElementById('recoveryStatus');
+            const newPassword = document.getElementById('recoveryPassword').value;
+            if (!newPassword || newPassword.length < 6) {
+                statusEl.innerHTML = '<span class="status-err">Hasło musi mieć co najmniej 6 znaków.</span>';
+                return;
+            }
+            try {
+                const { error } = await sb.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+                statusEl.innerHTML = '<span class="status-ok">Hasło ustawione! Możesz teraz korzystać z aplikacji.</span>';
+                document.getElementById('authRecovery').style.display = 'none';
+                renderAuthUI();
+            } catch (err) {
+                statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
+            }
+        });
+
+        // 0j. Śledzenie stanu sesji Supabase Auth (login/logout/odzyskiwanie hasła)
+        sb.auth.onAuthStateChange((event, session) => {
+            currentSession = session;
+            if (event === 'PASSWORD_RECOVERY') {
+                showRecoveryForm();
+            } else {
+                renderAuthUI();
+            }
+        });
+        sb.auth.getSession().then(({ data: { session } }) => {
+            currentSession = session;
+            renderAuthUI();
+        });
+
+        } // koniec bloku "if (sb)" — od tego miejsca kod działa niezależnie od logowania
 
         // 1. Rejestracja Service Workera i debugowanie
         if ('serviceWorker' in navigator) {
@@ -242,11 +469,15 @@
                 statusEl.innerText = 'Analizuję...';
                 document.getElementById('resultCard').style.display = 'none';
 
+                // Zalogowany użytkownik: prawdziwy token sesji (serwer sam rozpozna, kim jest).
+                // Niezalogowany: publiczny klucz projektu — serwer potraktuje to jak anonima.
+                const authToken = currentSession ? currentSession.access_token : SUPABASE_ANON_KEY;
+
                 const res = await fetch(SUPABASE_FUNCTION_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + authToken,
                         'apikey': SUPABASE_ANON_KEY
                     },
                     body: JSON.stringify(payload)
