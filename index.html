@@ -258,7 +258,12 @@
         document.getElementById('googleLoginBtn').addEventListener('click', async () => {
             const { error } = await sb.auth.signInWithOAuth({
                 provider: 'google',
-                options: { redirectTo: window.location.origin + window.location.pathname }
+                options: {
+                    redirectTo: window.location.origin + window.location.pathname,
+                    // Zawsze pokaż ekran wyboru konta Google zamiast po cichu
+                    // logować na ostatnio użyte konto.
+                    queryParams: { prompt: 'select_account' }
+                }
             });
             if (error) {
                 document.getElementById('authStatus').innerHTML = '<span class="status-err">' + translateAuthError(error) + '</span>';
