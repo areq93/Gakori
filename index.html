@@ -198,6 +198,7 @@
                 btn.classList.toggle('active', btn.dataset.authmode === mode);
             });
             document.getElementById('authSubmitBtn').innerText = mode === 'login' ? 'Zaloguj się' : 'Zarejestruj się';
+            document.getElementById('googleLoginBtn').innerText = mode === 'login' ? 'Zaloguj przez Google' : 'Zarejestruj przez Google';
             document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
             document.getElementById('authStatus').innerText = '';
         }
