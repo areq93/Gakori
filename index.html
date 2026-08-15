@@ -8,49 +8,114 @@
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="shortcut icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#241f18">
     <meta name="mobile-web-app-capable" content="yes">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f4f4f9; color: #333; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; box-sizing: border-box; }
-        input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; font-family: inherit; }
+        :root {
+            --ink: #241f18;
+            --ink-soft: #6b6152;
+            --paper: #ece3d1;
+            --card: #f8f2e4;
+            --card-border: #d6c9ab;
+            --accent: #b8502f;
+            --accent-dark: #96401f;
+            --primary: #241f18;
+            --primary-dark: #100d09;
+        }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; padding: 20px;
+            background-color: var(--paper);
+            background-image:
+                radial-gradient(circle at 12% 18%, rgba(60,45,20,0.13) 0px, rgba(60,45,20,0.13) 1px, transparent 1.6px),
+                radial-gradient(circle at 78% 8%, rgba(60,45,20,0.10) 0px, rgba(60,45,20,0.10) 1px, transparent 1.4px),
+                radial-gradient(circle at 34% 62%, rgba(60,45,20,0.12) 0px, rgba(60,45,20,0.12) 1.2px, transparent 1.8px),
+                radial-gradient(circle at 90% 55%, rgba(60,45,20,0.09) 0px, rgba(60,45,20,0.09) 1px, transparent 1.4px),
+                radial-gradient(circle at 55% 85%, rgba(60,45,20,0.10) 0px, rgba(60,45,20,0.10) 1.1px, transparent 1.6px),
+                radial-gradient(circle at 20% 92%, rgba(60,45,20,0.08) 0px, rgba(60,45,20,0.08) 1px, transparent 1.4px),
+                radial-gradient(circle at 65% 32%, rgba(60,45,20,0.08) 0px, rgba(60,45,20,0.08) 1px, transparent 1.4px),
+                radial-gradient(circle at 8% 70%, rgba(60,45,20,0.09) 0px, rgba(60,45,20,0.09) 1px, transparent 1.4px),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+            color: var(--ink);
+            line-height: 1.5;
+        }
+        h1 {
+            font-family: 'Lora', Georgia, 'Iowan Old Style', serif;
+            font-size: 2.2rem; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
+            text-align: center; margin: 0 0 4px 0;
+        }
+        .tagline { margin: 0 0 20px 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.45; text-align: center; }
+        .card {
+            background: var(--card); padding: 22px; border-radius: 8px;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 22px rgba(36, 31, 24, 0.10), 0 1px 3px rgba(36, 31, 24, 0.08);
+            width: 100%; max-width: 400px; box-sizing: border-box;
+        }
+        input, textarea {
+            width: 100%; padding: 13px 14px; margin: 10px 0;
+            border: 1.5px solid #cfc0a0; border-radius: 4px; box-sizing: border-box;
+            font-size: 16px; font-family: inherit; color: var(--ink); background: #fffdf7;
+            transition: border-color .15s ease;
+        }
+        input:focus, textarea:focus { outline: none; border-color: var(--accent); }
         textarea { resize: vertical; min-height: 100px; }
-        button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
-        button:disabled { background: #93c5fd; cursor: default; }
+        button {
+            width: 100%; padding: 13px; background: var(--primary); color: #f7f1e4; border: none;
+            border-radius: 4px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer; font-size: 16px;
+            font-family: 'Inter', inherit;
+            box-shadow: 3px 3px 0 rgba(36,31,24,0.2);
+            transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
+        }
+        button:hover { background: var(--primary-dark); }
+        button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(36,31,24,0.2); }
+        button:disabled { background: #a89e88; box-shadow: none; cursor: default; transform: none; }
 
         .tabs { display: flex; gap: 6px; margin: 10px 0; }
         .tab-btn {
-            flex: 1; padding: 10px 4px; font-size: 13px; font-weight: bold;
-            background: #eef1f8; color: #555; border: 1px solid #dde2ee; border-radius: 6px;
-            cursor: pointer; width: auto; margin: 0;
+            flex: 1; padding: 11px 4px; font-size: 13.5px; font-weight: 700;
+            background: #ece3ce; color: #6b6152; border: 1.5px solid #d6c9ab; border-radius: 4px;
+            cursor: pointer; width: auto; margin: 0; box-shadow: none;
         }
-        .tab-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+        .tab-btn.active { background: var(--accent); color: #fdf6ee; border-color: var(--accent); box-shadow: 3px 3px 0 rgba(184,80,47,0.25); }
 
         .mode-panel { display: none; }
         .mode-panel.active { display: block; }
 
-        #imagePreview { max-width: 100%; border-radius: 6px; margin-top: 8px; display: none; }
-        #fileName { font-size: 13px; color: #666; margin-top: 4px; }
+        #imagePreview { max-width: 100%; border-radius: 4px; margin-top: 8px; display: none; }
+        #fileName { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+
+        a { color: var(--accent); }
 
         /* Karta wyniku */
-        .result-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; margin-top: 16px; box-sizing: border-box; display: none; }
-        .result-badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-bottom: 14px; }
+        .result-card {
+            background: var(--card); padding: 22px; border-radius: 8px;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 22px rgba(36, 31, 24, 0.10), 0 1px 3px rgba(36, 31, 24, 0.08);
+            width: 100%; max-width: 400px; margin-top: 16px; box-sizing: border-box; display: none;
+        }
+        .result-badge { display: inline-block; padding: 6px 14px; border-radius: 4px; font-weight: bold; font-size: 14px; margin-bottom: 14px; }
         .badge-green { background: #dcfce7; color: #166534; }
         .badge-yellow { background: #fef9c3; color: #854d0e; }
         .badge-red { background: #fee2e2; color: #991b1b; }
-        .result-quote { border-left: 3px solid #2563eb; padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: #555; line-height: 1.4; }
-        .result-summary { margin: 0; line-height: 1.5; }
+        .result-quote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: #55503f; line-height: 1.5; }
+        .result-summary { margin: 0; line-height: 1.6; }
 
-        /* Panel debugowania */
-        #debug { margin-top: 20px; padding: 10px; background: #eee; border-radius: 5px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed #ccc; box-sizing: border-box; }
-        .status-ok { color: green; font-weight: bold; }
-        .status-err { color: red; font-weight: bold; }
+        /* Panel debugowania — tylko dla developera, patrz sekcja 1 w skrypcie (?debug=1) */
+        #debug { display: none; margin-top: 20px; padding: 10px; background: #ded2b4; border-radius: 4px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed #c3b48c; box-sizing: border-box; color: var(--ink-soft); }
+        .status-ok { color: #166534; font-weight: bold; }
+        .status-err { color: #991b1b; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="card" id="authCard">
         <h1 style="margin-top:0">Pragma</h1>
+        <p class="tagline">Wklej tekst, a my pokażemy Ci, czy ktoś próbuje Tobą manipulować.</p>
 
         <div id="authLoggedOut">
             <div class="tabs">
@@ -61,7 +126,7 @@
             <input type="password" id="authPassword" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
             <button id="authSubmitBtn" type="button">Zaloguj się</button>
             <div style="text-align:center; margin-top:8px;">
-                <a href="#" id="forgotPasswordLink" style="font-size:13px; color:#2563eb;">Zapomniałeś hasła?</a>
+                <a href="#" id="forgotPasswordLink" style="font-size:13px; color:#b8502f;">Zapomniałeś hasła?</a>
             </div>
             <div style="text-align:center; color:#999; font-size:12px; margin:12px 0;">— lub —</div>
             <button id="googleLoginBtn" type="button" style="background:#fff; color:#333; border:1px solid #ccc;">Zaloguj przez Google</button>
@@ -72,7 +137,7 @@
             <p style="margin:0 0 10px 0;">Zalogowano jako: <strong id="authUserEmail"></strong></p>
             <button id="logoutBtn" type="button" style="background:#eee; color:#333;">Wyloguj</button>
             <div style="text-align:center; margin-top:10px;">
-                <a href="#" id="changePasswordLink" style="font-size:13px; color:#2563eb;">Zmień hasło</a>
+                <a href="#" id="changePasswordLink" style="font-size:13px; color:#b8502f;">Zmień hasło</a>
             </div>
             <div id="changePasswordForm" style="display:none; margin-top:10px;">
                 <input type="password" id="newPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
@@ -341,6 +406,12 @@
         });
 
         } // koniec bloku "if (sb)" — od tego miejsca kod działa niezależnie od logowania
+
+        // 0k. Panel debugowania jest domyślnie ukryty przed odbiorcami — dopisz ?debug=1
+        // do adresu strony, żeby go zobaczyć przy testach.
+        if (new URLSearchParams(window.location.search).get('debug') === '1') {
+            document.getElementById('debug').style.display = 'block';
+        }
 
         // 1. Rejestracja Service Workera i debugowanie
         if ('serviceWorker' in navigator) {
