@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pragma - Twoje konto</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="shortcut icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#241f18">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="card" style="max-width:400px; width:100%;">
+        <a href="index.html" class="back-link">← Wróć do Pragmy</a>
+        <h2>Twoje konto</h2>
+
+        <div id="accountLoading">
+            <p style="color:var(--ink-soft); margin:0;">Ładowanie...</p>
+        </div>
+
+        <div id="accountContent" style="display:none;">
+            <p style="margin:0 0 10px 0;">Zalogowano jako:<br><strong id="accountEmail"></strong></p>
+            <button id="logoutBtn" type="button" style="background:#eee; color:#333; box-shadow:none;">Wyloguj</button>
+            <div style="text-align:center; margin-top:14px;">
+                <a href="#" id="changePasswordLink" style="font-size:13px;">Zmień hasło</a>
+            </div>
+            <div id="changePasswordForm" style="display:none; margin-top:10px;">
+                <input type="password" id="newPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
+                <button id="changePasswordBtn" type="button">Zapisz nowe hasło</button>
+            </div>
+            <div id="accountStatus" style="margin-top:10px; font-size:13px;"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script>
+        const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd';
+
+        function translateAuthError(err) {
+            const msg = (err && err.message) || String(err);
+            if (msg.includes('Password should be at least')) return 'Hasło musi mieć co najmniej 6 znaków.';
+            return msg;
+        }
+
+        let sb = null;
+        try {
+            if (typeof supabase === 'undefined') throw new Error('Biblioteka Supabase nie wczytała się.');
+            sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch (e) {
+            console.error(e);
+        }
+
+        if (!sb) {
+            document.getElementById('accountLoading').innerHTML =
+                '<p class="status-err">Nie udało się wczytać danych konta (sprawdź połączenie z internetem i odśwież stronę).</p>';
+        } else {
+            // Ta podstrona wymaga zalogowania — jeśli sesji nie ma (albo wygaśnie),
+            // od razu wracamy na stronę główną.
+            sb.auth.onAuthStateChange((event, session) => {
+                if (!session) {
+                    window.location.href = 'index.html';
+                }
+            });
+
+            sb.auth.getSession().then(({ data: { session } }) => {
+                if (!session) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+                document.getElementById('accountEmail').innerText = session.user.email;
+                document.getElementById('accountLoading').style.display = 'none';
+                document.getElementById('accountContent').style.display = 'block';
+            });
+
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                await sb.auth.signOut();
+                window.location.href = 'index.html';
+            });
+
+            document.getElementById('changePasswordLink').addEventListener('click', (e) => {
+                e.preventDefault();
+                const form = document.getElementById('changePasswordForm');
+                form.style.display = form.style.display === 'block' ? 'none' : 'block';
+            });
+
+            document.getElementById('changePasswordBtn').addEventListener('click', async () => {
+                const statusEl = document.getElementById('accountStatus');
+                const newPassword = document.getElementById('newPassword').value;
+                if (!newPassword || newPassword.length < 6) {
+                    statusEl.innerHTML = '<span class="status-err">Hasło musi mieć co najmniej 6 znaków.</span>';
+                    return;
+                }
+                try {
+                    const { error } = await sb.auth.updateUser({ password: newPassword });
+                    if (error) throw error;
+                    statusEl.innerHTML = '<span class="status-ok">Hasło zmienione.</span>';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('changePasswordForm').style.display = 'none';
+                } catch (err) {
+                    statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
