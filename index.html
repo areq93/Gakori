@@ -109,9 +109,36 @@
         #debug { display: none; margin-top: 20px; padding: 10px; background: #ded2b4; border-radius: 4px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed #c3b48c; box-sizing: border-box; color: var(--ink-soft); }
         .status-ok { color: #166534; font-weight: bold; }
         .status-err { color: #991b1b; font-weight: bold; }
+
+        /* Ikona / panel użytkownika */
+        #userMenuBtn {
+            display: none; position: fixed; top: 16px; right: 16px; z-index: 50;
+            width: 44px; height: 44px; padding: 0; border-radius: 50%;
+            background: var(--primary); color: #f7f1e4; font-size: 20px;
+            align-items: center; justify-content: center;
+            box-shadow: 3px 3px 0 rgba(36,31,24,0.2);
+        }
+        #userPanelOverlay {
+            display: none; position: fixed; inset: 0; background: rgba(36,31,24,0.45);
+            z-index: 100; align-items: flex-start; justify-content: flex-end;
+        }
+        #userPanel {
+            width: 100%; max-width: 320px; min-height: 100vh; margin: 0;
+            border-radius: 0; box-shadow: -8px 0 24px rgba(36,31,24,0.18);
+            position: relative;
+        }
+        #closeUserPanelBtn {
+            width: auto; padding: 6px 10px; position: absolute; top: 14px; right: 14px;
+            background: transparent; color: var(--ink-soft); box-shadow: none; font-size: 20px;
+        }
+        #closeUserPanelBtn:hover { background: transparent; color: var(--ink); }
+        #closeUserPanelBtn:active { transform: none; }
+        #userPanel h2 { font-family: 'Lora', Georgia, serif; font-size: 1.3rem; margin: 0 0 16px 0; }
     </style>
 </head>
 <body>
+
+    <button id="userMenuBtn" type="button" aria-label="Panel użytkownika">👤</button>
 
     <div class="card" id="authCard">
         <h1 style="margin-top:0">Pragma</h1>
@@ -133,23 +160,28 @@
             <div id="authStatus" style="margin-top:10px; font-size:13px;"></div>
         </div>
 
-        <div id="authLoggedIn" style="display:none;">
-            <p style="margin:0 0 10px 0;">Zalogowano jako: <strong id="authUserEmail"></strong></p>
-            <button id="logoutBtn" type="button" style="background:#eee; color:#333;">Wyloguj</button>
-            <div style="text-align:center; margin-top:10px;">
+        <div id="authRecovery" style="display:none;">
+            <p style="margin:0 0 10px 0;">Ustaw nowe hasło do konta:</p>
+            <input type="password" id="recoveryPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
+            <button id="recoverySubmitBtn" type="button">Ustaw nowe hasło</button>
+            <div id="recoveryStatus" style="margin-top:10px; font-size:13px;"></div>
+        </div>
+    </div>
+
+    <div id="userPanelOverlay">
+        <div id="userPanel" class="card">
+            <button id="closeUserPanelBtn" type="button" aria-label="Zamknij">✕</button>
+            <h2>Twoje konto</h2>
+            <p style="margin:0 0 10px 0;">Zalogowano jako:<br><strong id="authUserEmail"></strong></p>
+            <button id="logoutBtn" type="button" style="background:#eee; color:#333; box-shadow:none;">Wyloguj</button>
+            <div style="text-align:center; margin-top:14px;">
                 <a href="#" id="changePasswordLink" style="font-size:13px; color:#b8502f;">Zmień hasło</a>
             </div>
             <div id="changePasswordForm" style="display:none; margin-top:10px;">
                 <input type="password" id="newPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
                 <button id="changePasswordBtn" type="button">Zapisz nowe hasło</button>
             </div>
-        </div>
-
-        <div id="authRecovery" style="display:none;">
-            <p style="margin:0 0 10px 0;">Ustaw nowe hasło do konta:</p>
-            <input type="password" id="recoveryPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
-            <button id="recoverySubmitBtn" type="button">Ustaw nowe hasło</button>
-            <div id="recoveryStatus" style="margin-top:10px; font-size:13px;"></div>
+            <div id="userPanelStatus" style="margin-top:10px; font-size:13px;"></div>
         </div>
     </div>
 
@@ -234,26 +266,44 @@
         // (Cała logika logowania działa tylko, gdy biblioteka Supabase faktycznie się wczytała.)
 
         // 0b. Pokazanie właściwego widoku (wylogowany / zalogowany / ustawianie nowego hasła)
+        // Po zalogowaniu cała karta logowania znika — zostaje tylko ikona profilu w rogu,
+        // która otwiera osobny, wysuwany panel użytkownika (mniej bałaganu na stronie).
         function renderAuthUI() {
-            const loggedOut = document.getElementById('authLoggedOut');
-            const loggedIn = document.getElementById('authLoggedIn');
+            const authCard = document.getElementById('authCard');
             const recovery = document.getElementById('authRecovery');
+            const userMenuBtn = document.getElementById('userMenuBtn');
             if (recovery.style.display === 'block') return; // ekran ustawiania nowego hasła ma pierwszeństwo
             if (currentSession) {
-                loggedOut.style.display = 'none';
-                loggedIn.style.display = 'block';
+                authCard.style.display = 'none';
+                userMenuBtn.style.display = 'flex';
                 document.getElementById('authUserEmail').innerText = currentSession.user.email;
             } else {
-                loggedOut.style.display = 'block';
-                loggedIn.style.display = 'none';
+                authCard.style.display = 'block';
+                userMenuBtn.style.display = 'none';
+                closeUserPanel();
             }
         }
 
         function showRecoveryForm() {
+            closeUserPanel();
+            document.getElementById('userMenuBtn').style.display = 'none';
+            document.getElementById('authCard').style.display = 'block';
             document.getElementById('authLoggedOut').style.display = 'none';
-            document.getElementById('authLoggedIn').style.display = 'none';
             document.getElementById('authRecovery').style.display = 'block';
         }
+
+        // 0b-bis. Otwieranie / zamykanie panelu użytkownika
+        function openUserPanel() {
+            document.getElementById('userPanelOverlay').style.display = 'flex';
+        }
+        function closeUserPanel() {
+            document.getElementById('userPanelOverlay').style.display = 'none';
+        }
+        document.getElementById('userMenuBtn').addEventListener('click', openUserPanel);
+        document.getElementById('closeUserPanelBtn').addEventListener('click', closeUserPanel);
+        document.getElementById('userPanelOverlay').addEventListener('click', (e) => {
+            if (e.target.id === 'userPanelOverlay') closeUserPanel();
+        });
 
         // 0c. Przełączanie Zaloguj / Zarejestruj
         let authFormMode = 'login';
@@ -355,7 +405,7 @@
             form.style.display = form.style.display === 'block' ? 'none' : 'block';
         });
         document.getElementById('changePasswordBtn').addEventListener('click', async () => {
-            const statusEl = document.getElementById('authStatus');
+            const statusEl = document.getElementById('userPanelStatus');
             const newPassword = document.getElementById('newPassword').value;
             if (!newPassword || newPassword.length < 6) {
                 statusEl.innerHTML = '<span class="status-err">Hasło musi mieć co najmniej 6 znaków.</span>';
