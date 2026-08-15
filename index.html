@@ -222,12 +222,20 @@
                     if (error) throw error;
                     statusEl.innerText = '';
                 } else {
-                    const { error } = await sb.auth.signUp({
+                    const { data, error } = await sb.auth.signUp({
                         email, password,
                         options: { emailRedirectTo: window.location.origin + window.location.pathname }
                     });
                     if (error) throw error;
-                    statusEl.innerHTML = '<span class="status-ok">Sprawdź skrzynkę e-mail i kliknij link potwierdzający, aby dokończyć rejestrację.</span>';
+                    // Supabase celowo nie zwraca błędu dla już istniejącego, potwierdzonego
+                    // konta (ochrona przed sprawdzaniem cudzych adresów e-mail) — ale w tym
+                    // przypadku data.user.identities jest puste, więc możemy to rozpoznać
+                    // i pokazać właściwy komunikat zamiast mylącego "sprawdź skrzynkę".
+                    if (data.user && data.user.identities && data.user.identities.length === 0) {
+                        statusEl.innerHTML = '<span class="status-err">Konto z tym adresem e-mail już istnieje. Spróbuj się zalogować.</span>';
+                    } else {
+                        statusEl.innerHTML = '<span class="status-ok">Sprawdź skrzynkę e-mail i kliknij link potwierdzający, aby dokończyć rejestrację.</span>';
+                    }
                 }
             } catch (err) {
                 statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
