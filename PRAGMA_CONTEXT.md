@@ -9,6 +9,31 @@ tym samym PR-ze co reszta zmian.
 Jeśli zaczynasz nową rozmowę z Claude o tym projekcie — zacznij od
 przeczytania tego pliku w całości, zanim zaczniesz cokolwiek zmieniać.
 
+## Komenda: „zaktualizuj PRAGMA_CONTEXT.md”
+
+Gdy użytkownik napisze tę frazę (np. widząc, że pasek kontekstu rozmowy
+się zapełnia, albo po prostu chcąc zrobić checkpoint) — to sygnał do
+wykonania, bez dodatkowych pytań, następujących kroków:
+
+1. Przejrzyj historię commitów od czasu ostatniej aktualizacji tego pliku
+   (`git log` na branchu roboczym i na `main`) oraz przebieg bieżącej
+   rozmowy — wypisz, co zmieniło się w projekcie: nowe funkcje, nowe
+   decyzje, nowy dług techniczny, nowe pułapki, zmiany w schemacie bazy.
+2. Zaktualizuj odpowiednie sekcje tego pliku (punktowo, nie przepisuj
+   całości od zera) tak, żeby dokładnie odzwierciedlał obecny stan
+   projektu.
+3. Commit, push na branch roboczy, PR do `main`, merge — dokładnie tak
+   samo jak przy każdej innej zmianie w repo (to plik jak każdy inny,
+   zmiana czysto dokumentacyjna, niskie ryzyko).
+4. Krótko potwierdź użytkownikowi, co zaktualizowałeś (kilka zdań, nie
+   cała treść pliku).
+
+Nie czekaj na tę komendę, żeby aktualizować plik przy okazji naturalnych
+punktów kontrolnych (koniec większej funkcji) — patrz "Zasady
+współpracy" niżej. Komenda jest na wypadek, gdy użytkownik chce
+świadomego checkpointu w dowolnym momencie, niezależnie od tego, czy coś
+większego właśnie się skończyło.
+
 ## Co to jest Pragma
 
 PWA (aplikacja webowa instalowalna jak apka), która analizuje tekst, link
