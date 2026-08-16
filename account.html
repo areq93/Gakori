@@ -18,36 +18,57 @@
 <body>
 
     <div class="card" style="max-width:400px; width:100%;">
-        <a href="index.html" class="back-link">← Wróć do Pragmy</a>
-        <h2>Twoje konto</h2>
+        <a href="index.html" class="back-link" data-i18n="account_back">← Wróć do Pragmy</a>
+        <h2 data-i18n="account_title">Twoje konto</h2>
 
         <div id="accountLoading">
-            <p style="color:var(--ink-soft); margin:0;">Ładowanie...</p>
+            <p style="color:var(--ink-soft); margin:0;" data-i18n="loading">Ładowanie...</p>
         </div>
 
         <div id="accountContent" style="display:none;">
-            <p style="margin:0 0 10px 0;">Zalogowano jako:<br><strong id="accountEmail"></strong></p>
-            <button id="logoutBtn" type="button" style="background:#eee; color:#333; box-shadow:none;">Wyloguj</button>
+            <p style="margin:0 0 10px 0;"><span data-i18n="account_logged_in_as">Zalogowano jako:</span><br><strong id="accountEmail"></strong></p>
+            <button id="logoutBtn" type="button" style="background:#eee; color:#333; box-shadow:none;" data-i18n="btn_logout">Wyloguj</button>
+
+            <div style="margin-top:16px;">
+                <label for="languageSelect" style="display:block; font-size:13px; color:var(--ink-soft); margin-bottom:6px;" data-i18n="language_label">Język aplikacji</label>
+                <select id="languageSelect" style="width:100%; padding:11px 12px; border:1.5px solid #cfc0a0; border-radius:4px; font-size:16px; font-family:inherit; color:var(--ink); background:#fffdf7;"></select>
+            </div>
+
             <div style="text-align:center; margin-top:14px;">
-                <a href="#" id="changePasswordLink" style="font-size:13px;">Zmień hasło</a>
+                <a href="#" id="changePasswordLink" style="font-size:13px;" data-i18n="link_change_password">Zmień hasło</a>
             </div>
             <div id="changePasswordForm" style="display:none; margin-top:10px;">
-                <input type="password" id="newPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
-                <button id="changePasswordBtn" type="button">Zapisz nowe hasło</button>
+                <input type="password" id="newPassword" data-i18n-placeholder="placeholder_new_password" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
+                <button id="changePasswordBtn" type="button" data-i18n="btn_save_password">Zapisz nowe hasło</button>
             </div>
             <div id="accountStatus" style="margin-top:10px; font-size:13px;"></div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="i18n.js"></script>
     <script>
+        applyTranslations();
+
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd';
 
         function translateAuthError(err) {
             const msg = (err && err.message) || String(err);
-            if (msg.includes('Password should be at least')) return 'Hasło musi mieć co najmniej 6 znaków.';
+            if (msg.includes('Password should be at least')) return t('err_password_min');
             return msg;
+        }
+
+        function populateLanguageSelect() {
+            const select = document.getElementById('languageSelect');
+            select.innerHTML = '';
+            SUPPORTED_LANGUAGES.forEach((lang) => {
+                const opt = document.createElement('option');
+                opt.value = lang.code;
+                opt.innerText = lang.name;
+                if (lang.code === getCurrentLanguage()) opt.selected = true;
+                select.appendChild(opt);
+            });
         }
 
         let sb = null;
@@ -60,7 +81,7 @@
 
         if (!sb) {
             document.getElementById('accountLoading').innerHTML =
-                '<p class="status-err">Nie udało się wczytać danych konta (sprawdź połączenie z internetem i odśwież stronę).</p>';
+                '<p class="status-err">' + t('account_load_error') + '</p>';
         } else {
             // Ta podstrona wymaga zalogowania — jeśli sesji nie ma (albo wygaśnie),
             // od razu wracamy na stronę główną.
@@ -75,6 +96,11 @@
                     window.location.href = 'index.html';
                     return;
                 }
+                syncLanguageFromProfile(sb, session.user.id);
+                populateLanguageSelect();
+                document.getElementById('languageSelect').addEventListener('change', (e) => {
+                    setLanguage(e.target.value, sb, session.user.id);
+                });
                 document.getElementById('accountEmail').innerText = session.user.email;
                 document.getElementById('accountLoading').style.display = 'none';
                 document.getElementById('accountContent').style.display = 'block';
@@ -95,13 +121,13 @@
                 const statusEl = document.getElementById('accountStatus');
                 const newPassword = document.getElementById('newPassword').value;
                 if (!newPassword || newPassword.length < 6) {
-                    statusEl.innerHTML = '<span class="status-err">Hasło musi mieć co najmniej 6 znaków.</span>';
+                    statusEl.innerHTML = '<span class="status-err">' + t('err_password_min') + '</span>';
                     return;
                 }
                 try {
                     const { error } = await sb.auth.updateUser({ password: newPassword });
                     if (error) throw error;
-                    statusEl.innerHTML = '<span class="status-ok">Hasło zmienione.</span>';
+                    statusEl.innerHTML = '<span class="status-ok">' + t('password_changed') + '</span>';
                     document.getElementById('newPassword').value = '';
                     document.getElementById('changePasswordForm').style.display = 'none';
                 } catch (err) {

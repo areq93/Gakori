@@ -1,10 +1,11 @@
-const CACHE_NAME = 'pragma-v7';
+const CACHE_NAME = 'pragma-v8';
 const ASSETS = [
   './',
   './index.html',
   './account.html',
   './scan.html',
   './style.css',
+  './i18n.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
@@ -40,7 +41,8 @@ self.addEventListener('fetch', (event) => {
     event.request.mode === 'navigate' ||
     url.pathname.endsWith('.html') ||
     url.pathname.endsWith('manifest.json') ||
-    url.pathname.endsWith('.css');
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.js');
 
   if (needsFreshContent) {
     // NETWORK-FIRST: HTML, manifest i style muszą zawsze być świeże, inaczej

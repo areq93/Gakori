@@ -17,68 +17,69 @@
 </head>
 <body>
 
-    <a id="userMenuBtn" href="account.html" aria-label="Twoje konto">👤</a>
+    <a id="userMenuBtn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto">👤</a>
 
     <div class="card" id="authCard">
         <h1 style="margin-top:0">Pragma</h1>
-        <p class="tagline">Wklej tekst, a my pokażemy Ci, czy ktoś próbuje Tobą manipulować.</p>
+        <p class="tagline" data-i18n="tagline">Wklej tekst, a my pokażemy Ci, czy ktoś próbuje Tobą manipulować.</p>
 
         <div id="authLoggedOut">
+            <select id="authLanguageSelect" style="margin-bottom:10px;"></select>
             <div class="tabs">
-                <button class="tab-btn active" data-authmode="login" type="button">Zaloguj</button>
-                <button class="tab-btn" data-authmode="signup" type="button">Zarejestruj</button>
+                <button class="tab-btn active" data-authmode="login" type="button" data-i18n="tab_login">Zaloguj</button>
+                <button class="tab-btn" data-authmode="signup" type="button" data-i18n="tab_signup">Zarejestruj</button>
             </div>
-            <input type="email" id="authEmail" placeholder="e-mail" autocomplete="email">
-            <input type="password" id="authPassword" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
+            <input type="email" id="authEmail" data-i18n-placeholder="placeholder_email" placeholder="e-mail" autocomplete="email">
+            <input type="password" id="authPassword" data-i18n-placeholder="placeholder_password" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
             <div class="cf-turnstile" data-sitekey="0x4AAAAAAERY10ded3P_8tNf" data-size="flexible" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin:10px 0;"></div>
-            <button id="authSubmitBtn" type="button">Zaloguj się</button>
+            <button id="authSubmitBtn" type="button" data-i18n="btn_login">Zaloguj się</button>
             <div style="text-align:center; margin-top:8px;">
-                <a href="#" id="forgotPasswordLink" style="font-size:13px; color:#b8502f;">Zapomniałeś hasła?</a>
+                <a href="#" id="forgotPasswordLink" style="font-size:13px; color:#b8502f;" data-i18n="link_forgot_password">Zapomniałeś hasła?</a>
             </div>
-            <div style="text-align:center; color:#999; font-size:12px; margin:12px 0;">— lub —</div>
-            <button id="googleLoginBtn" type="button" style="background:#fff; color:#333; border:1px solid #ccc;">Zaloguj przez Google</button>
+            <div style="text-align:center; color:#999; font-size:12px; margin:12px 0;" data-i18n="divider_or">— lub —</div>
+            <button id="googleLoginBtn" type="button" style="background:#fff; color:#333; border:1px solid #ccc;" data-i18n="btn_google_login">Zaloguj przez Google</button>
             <div id="authStatus" style="margin-top:10px; font-size:13px;"></div>
         </div>
 
         <div id="authRecovery" style="display:none;">
-            <p style="margin:0 0 10px 0;">Ustaw nowe hasło do konta:</p>
-            <input type="password" id="recoveryPassword" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
-            <button id="recoverySubmitBtn" type="button">Ustaw nowe hasło</button>
+            <p style="margin:0 0 10px 0;" data-i18n="recovery_title">Ustaw nowe hasło do konta:</p>
+            <input type="password" id="recoveryPassword" data-i18n-placeholder="placeholder_new_password" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
+            <button id="recoverySubmitBtn" type="button" data-i18n="btn_set_new_password">Ustaw nowe hasło</button>
             <div id="recoveryStatus" style="margin-top:10px; font-size:13px;"></div>
         </div>
     </div>
 
     <div class="card" id="analyzeCard" style="display:none;">
         <div class="tabs">
-            <button class="tab-btn active" data-mode="url">🔗 Link</button>
-            <button class="tab-btn" data-mode="text">📝 Tekst</button>
-            <button class="tab-btn" data-mode="image">🖼️ Obraz</button>
+            <button class="tab-btn active" data-mode="url">🔗 <span data-i18n="tab_link">Link</span></button>
+            <button class="tab-btn" data-mode="text">📝 <span data-i18n="tab_text">Tekst</span></button>
+            <button class="tab-btn" data-mode="image">🖼️ <span data-i18n="tab_image">Obraz</span></button>
         </div>
 
         <div class="mode-panel active" id="panel-url">
-            <p>Wklej link do analizy:</p>
-            <input type="url" id="urlInput" placeholder="https://...">
+            <p data-i18n="label_paste_link">Wklej link do analizy:</p>
+            <input type="url" id="urlInput" data-i18n-placeholder="placeholder_url" placeholder="https://...">
         </div>
 
         <div class="mode-panel" id="panel-text">
-            <p>Wklej tekst do analizy:</p>
-            <textarea id="textInput" placeholder="Wklej treść, którą chcesz przeanalizować..."></textarea>
+            <p data-i18n="label_paste_text">Wklej tekst do analizy:</p>
+            <textarea id="textInput" data-i18n-placeholder="placeholder_text_content" placeholder="Wklej treść, którą chcesz przeanalizować..."></textarea>
         </div>
 
         <div class="mode-panel" id="panel-image">
-            <p>Wybierz zdjęcie do analizy:</p>
+            <p data-i18n="label_choose_image">Wybierz zdjęcie do analizy:</p>
             <input type="file" id="imageInput" accept="image/*">
             <div id="fileName"></div>
             <img id="imagePreview" alt="podgląd">
         </div>
 
-        <button id="analyzeBtn">Analizuj</button>
+        <button id="analyzeBtn" data-i18n="btn_analyze">Analizuj</button>
         <div id="status" style="margin-top:10px"></div>
     </div>
 
     <div class="card" id="publicScansCard" style="display:none;">
-        <h2>Zobacz, co już wykryliśmy</h2>
-        <input type="search" id="publicScansSearch" placeholder="Szukaj po słowach kluczowych...">
+        <h2 data-i18n="public_scans_heading">Zobacz, co już wykryliśmy</h2>
+        <input type="search" id="publicScansSearch" data-i18n-placeholder="placeholder_search" placeholder="Szukaj po słowach kluczowych...">
         <div id="publicScansList"></div>
     </div>
 
@@ -101,7 +102,31 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script src="i18n.js"></script>
     <script>
+        applyTranslations();
+
+        // Wybór języka jeszcze przed zalogowaniem/rejestracją — działa zawsze,
+        // niezależnie od tego, czy Supabase się wczytał (zmienia tylko localStorage,
+        // do konta trafia dopiero po założeniu go, patrz sekcja 0d i 0f).
+        (function initAuthLanguageSelect() {
+            const select = document.getElementById('authLanguageSelect');
+            SUPPORTED_LANGUAGES.forEach((lang) => {
+                const opt = document.createElement('option');
+                opt.value = lang.code;
+                opt.innerText = lang.name;
+                if (lang.code === getCurrentLanguage()) opt.selected = true;
+                select.appendChild(opt);
+            });
+            select.addEventListener('change', (e) => {
+                setLanguage(e.target.value);
+                // Lista publicznych analiz jest filtrowana po języku — po zmianie
+                // języka trzeba ją odświeżyć, inaczej pokazywałaby wyniki sprzed zmiany.
+                const searchInput = document.getElementById('publicScansSearch');
+                if (sb && searchInput) fetchAndRenderScans(searchInput.value);
+            });
+        })();
+
         // ===== KONFIGURACJA POŁĄCZENIA Z BACKENDEM =====
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
         const SUPABASE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/analyze';
@@ -129,15 +154,15 @@
             if (window.turnstile) window.turnstile.reset();
         }
 
-        // 0. Tłumaczenie typowych błędów Supabase Auth na przyjazny polski komunikat
+        // 0. Tłumaczenie typowych błędów Supabase Auth na przyjazny komunikat w wybranym języku
         function translateAuthError(err) {
             const msg = (err && err.message) || String(err);
-            if (msg.includes('Invalid login credentials')) return 'Nieprawidłowy e-mail lub hasło.';
-            if (msg.includes('User already registered')) return 'To konto już istnieje — zaloguj się zamiast rejestrować.';
-            if (msg.includes('Password should be at least')) return 'Hasło musi mieć co najmniej 6 znaków.';
-            if (msg.includes('Email not confirmed')) return 'Potwierdź adres e-mail — sprawdź skrzynkę i kliknij link, który wysłaliśmy.';
-            if (msg.includes('Unable to validate email')) return 'Nieprawidłowy format adresu e-mail.';
-            if (msg.toLowerCase().includes('captcha')) return 'Potwierdź, że nie jesteś robotem (zaznacz pole powyżej) i spróbuj ponownie.';
+            if (msg.includes('Invalid login credentials')) return t('err_invalid_credentials');
+            if (msg.includes('User already registered')) return t('err_account_exists_login');
+            if (msg.includes('Password should be at least')) return t('err_password_min');
+            if (msg.includes('Email not confirmed')) return t('err_email_not_confirmed');
+            if (msg.includes('Unable to validate email')) return t('err_invalid_email_format');
+            if (msg.toLowerCase().includes('captcha')) return t('err_captcha_generic');
             return msg;
         }
 
@@ -227,11 +252,11 @@
             const loadingEl = document.createElement('p');
             loadingEl.style.textAlign = 'center';
             loadingEl.style.color = 'var(--ink-soft)';
-            loadingEl.innerText = 'Wczytywanie...';
+            loadingEl.innerText = t('loading');
             listEl.appendChild(loadingEl);
 
             const query = sanitizeSearchQuery(rawQuery);
-            let request = sb.from('scans').select('id, input_type, result, created_at');
+            let request = sb.from('scans').select('id, input_type, result, created_at').eq('language', getCurrentLanguage());
             if (query) {
                 request = request.or('result->>source_quote.ilike.%' + query + '%,result->>summary.ilike.%' + query + '%');
             }
@@ -245,7 +270,7 @@
                         console.error(error);
                         const p = document.createElement('p');
                         p.className = 'status-err';
-                        p.innerText = 'Nie udało się wczytać.';
+                        p.innerText = t('public_scans_load_error');
                         listEl.appendChild(p);
                         return;
                     }
@@ -253,7 +278,7 @@
                         const p = document.createElement('p');
                         p.style.textAlign = 'center';
                         p.style.color = 'var(--ink-soft)';
-                        p.innerText = query ? 'Brak wyników dla "' + query + '".' : 'Jeszcze nic tu nie ma — bądź pierwszy!';
+                        p.innerText = query ? t('public_scans_no_results', { query: query }) : t('public_scans_empty');
                         listEl.appendChild(p);
                         return;
                     }
@@ -305,8 +330,8 @@
             document.querySelectorAll('[data-authmode]').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.authmode === mode);
             });
-            document.getElementById('authSubmitBtn').innerText = mode === 'login' ? 'Zaloguj się' : 'Zarejestruj się';
-            document.getElementById('googleLoginBtn').innerText = mode === 'login' ? 'Zaloguj przez Google' : 'Zarejestruj przez Google';
+            document.getElementById('authSubmitBtn').innerText = mode === 'login' ? t('btn_login') : t('btn_signup');
+            document.getElementById('googleLoginBtn').innerText = mode === 'login' ? t('btn_google_login') : t('btn_google_signup');
             document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
             document.getElementById('authStatus').innerText = '';
         }
@@ -320,14 +345,14 @@
             const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
             if (!email || !password) {
-                statusEl.innerHTML = '<span class="status-err">Podaj e-mail i hasło.</span>';
+                statusEl.innerHTML = '<span class="status-err">' + t('err_provide_credentials') + '</span>';
                 return;
             }
             if (!turnstileToken) {
-                statusEl.innerHTML = '<span class="status-err">Zaznacz pole "nie jestem robotem" powyżej.</span>';
+                statusEl.innerHTML = '<span class="status-err">' + t('err_captcha_required') + '</span>';
                 return;
             }
-            statusEl.innerText = 'Chwileczkę...';
+            statusEl.innerText = t('status_please_wait');
             try {
                 if (authFormMode === 'login') {
                     const { error } = await sb.auth.signInWithPassword({
@@ -341,7 +366,11 @@
                         email, password,
                         options: {
                             emailRedirectTo: window.location.origin + window.location.pathname,
-                            captchaToken: turnstileToken
+                            captchaToken: turnstileToken,
+                            // Język wybrany przed rejestracją trafia do metadanych konta —
+                            // przy pierwszym logowaniu (patrz consumeSignupLanguage) nadpisze
+                            // domyślną wartość z bazy, zamiast być przez nią nadpisany.
+                            data: { language: getCurrentLanguage() }
                         }
                     });
                     if (error) throw error;
@@ -350,9 +379,9 @@
                     // przypadku data.user.identities jest puste, więc możemy to rozpoznać
                     // i pokazać właściwy komunikat zamiast mylącego "sprawdź skrzynkę".
                     if (data.user && data.user.identities && data.user.identities.length === 0) {
-                        statusEl.innerHTML = '<span class="status-err">Konto z tym adresem e-mail już istnieje. Spróbuj się zalogować.</span>';
+                        statusEl.innerHTML = '<span class="status-err">' + t('err_account_exists_login') + '</span>';
                     } else {
-                        statusEl.innerHTML = '<span class="status-ok">Sprawdź skrzynkę e-mail i kliknij link potwierdzający, aby dokończyć rejestrację.</span>';
+                        statusEl.innerHTML = '<span class="status-ok">' + t('status_check_email') + '</span>';
                     }
                 }
             } catch (err) {
@@ -368,11 +397,11 @@
             const statusEl = document.getElementById('authStatus');
             const email = document.getElementById('authEmail').value.trim();
             if (!email) {
-                statusEl.innerHTML = '<span class="status-err">Najpierw wpisz swój e-mail powyżej.</span>';
+                statusEl.innerHTML = '<span class="status-err">' + t('err_email_first') + '</span>';
                 return;
             }
             if (!turnstileToken) {
-                statusEl.innerHTML = '<span class="status-err">Zaznacz pole "nie jestem robotem" powyżej.</span>';
+                statusEl.innerHTML = '<span class="status-err">' + t('err_captcha_required') + '</span>';
                 return;
             }
             try {
@@ -381,7 +410,7 @@
                     captchaToken: turnstileToken
                 });
                 if (error) throw error;
-                statusEl.innerHTML = '<span class="status-ok">Wysłaliśmy link do zresetowania hasła na Twój e-mail.</span>';
+                statusEl.innerHTML = '<span class="status-ok">' + t('status_reset_email_sent') + '</span>';
             } catch (err) {
                 statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
             } finally {
@@ -396,6 +425,7 @@
         // już istniejące konto i ją zablokować (patrz sekcja 0j).
         document.getElementById('googleLoginBtn').addEventListener('click', async () => {
             sessionStorage.setItem('pendingGoogleAuthMode', authFormMode);
+            sessionStorage.setItem('pendingGoogleAuthLang', getCurrentLanguage());
             const { error } = await sb.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -415,13 +445,13 @@
             const statusEl = document.getElementById('recoveryStatus');
             const newPassword = document.getElementById('recoveryPassword').value;
             if (!newPassword || newPassword.length < 6) {
-                statusEl.innerHTML = '<span class="status-err">Hasło musi mieć co najmniej 6 znaków.</span>';
+                statusEl.innerHTML = '<span class="status-err">' + t('err_password_min') + '</span>';
                 return;
             }
             try {
                 const { error } = await sb.auth.updateUser({ password: newPassword });
                 if (error) throw error;
-                statusEl.innerHTML = '<span class="status-ok">Hasło ustawione! Możesz teraz korzystać z aplikacji.</span>';
+                statusEl.innerHTML = '<span class="status-ok">' + t('recovery_success') + '</span>';
                 document.getElementById('authRecovery').style.display = 'none';
                 renderAuthUI();
             } catch (err) {
@@ -445,8 +475,28 @@
             await sb.auth.signOut();
             setAuthMode('login');
             document.getElementById('authStatus').innerHTML =
-                '<span class="status-err">Konto z tym adresem Google już istnieje. Zaloguj się zamiast rejestrować.</span>';
+                '<span class="status-err">' + t('err_google_account_exists') + '</span>';
             return true;
+        }
+
+        // Język wybrany PRZED zalogowaniem (na ekranie logowania, lub tuż przed
+        // przekierowaniem do Google) ma pierwszeństwo przy pierwszym logowaniu na
+        // nowo założone konto — inaczej domyślna wartość z bazy by go nadpisała.
+        // Zwraca true, jeśli taki język znaleziono i zastosowano.
+        function consumeSignupLanguage(session) {
+            const metaLang = session.user.user_metadata && session.user.user_metadata.language;
+            if (metaLang && TRANSLATIONS[metaLang]) {
+                setLanguage(metaLang, sb, session.user.id);
+                sb.auth.updateUser({ data: { language: null } });
+                return true;
+            }
+            const pendingLang = sessionStorage.getItem('pendingGoogleAuthLang');
+            sessionStorage.removeItem('pendingGoogleAuthLang');
+            if (pendingLang && TRANSLATIONS[pendingLang]) {
+                setLanguage(pendingLang, sb, session.user.id);
+                return true;
+            }
+            return false;
         }
 
         sb.auth.onAuthStateChange(async (event, session) => {
@@ -457,10 +507,12 @@
             } else {
                 renderAuthUI();
             }
+            if (session && !consumeSignupLanguage(session)) syncLanguageFromProfile(sb, session.user.id);
         });
         sb.auth.getSession().then(({ data: { session } }) => {
             currentSession = session;
             renderAuthUI();
+            if (session) syncLanguageFromProfile(sb, session.user.id);
         });
 
         } // koniec bloku "if (sb)" — od tego miejsca kod działa niezależnie od logowania
@@ -509,7 +561,7 @@
             document.querySelectorAll('.mode-panel').forEach(panel => {
                 panel.classList.toggle('active', panel.id === 'panel-' + mode);
             });
-            const labels = { url: 'Analizuj stronę', text: 'Analizuj tekst', image: 'Analizuj obraz' };
+            const labels = { url: t('analyze_label_url'), text: t('analyze_label_text'), image: t('analyze_label_image') };
             document.getElementById('analyzeBtn').innerText = labels[mode];
             document.getElementById('status').innerText = '';
             document.getElementById('resultCard').style.display = 'none';
@@ -592,15 +644,15 @@
             if (data.error) {
                 card.style.display = 'block';
                 badge.className = 'result-badge badge-yellow';
-                badge.innerText = 'Info';
-                summary.innerText = data.message || 'Coś poszło nie tak. Spróbuj ponownie za chwilę.';
+                badge.innerText = t('badge_info');
+                summary.innerText = data.message || t('result_generic_error');
                 return;
             }
 
             const score = data.result.q_score;
-            let badgeClass = 'badge-red', label = 'Manipulacja: ' + score + '/100';
-            if (score >= 70) { badgeClass = 'badge-green'; label = 'Czysty tekst: ' + score + '/100'; }
-            else if (score >= 40) { badgeClass = 'badge-yellow'; label = 'Częściowo: ' + score + '/100'; }
+            let badgeClass = 'badge-red', label = t('badge_manipulation', { score: score });
+            if (score >= 70) { badgeClass = 'badge-green'; label = t('badge_clean', { score: score }); }
+            else if (score >= 40) { badgeClass = 'badge-yellow'; label = t('badge_partial', { score: score }); }
 
             card.style.display = 'block';
             badge.className = 'result-badge ' + badgeClass;
@@ -625,26 +677,26 @@
             try {
                 if (currentMode === 'url') {
                     const url = document.getElementById('urlInput').value.trim();
-                    if (!url) return alert('Wpisz link!');
+                    if (!url) return alert(t('alert_enter_link'));
                     const hash = await sha256Hex(new TextEncoder().encode(url));
-                    payload = { input_type: 'url', content_hash: hash, source_url: url };
+                    payload = { input_type: 'url', content_hash: hash, source_url: url, language: getCurrentLanguage() };
 
                 } else if (currentMode === 'text') {
                     const text = document.getElementById('textInput').value.trim();
-                    if (!text) return alert('Wklej jakiś tekst!');
+                    if (!text) return alert(t('alert_paste_text'));
                     const hash = await sha256Hex(new TextEncoder().encode(text));
-                    payload = { input_type: 'text', content_hash: hash, char_count: text.length, text_content: text };
+                    payload = { input_type: 'text', content_hash: hash, char_count: text.length, text_content: text, language: getCurrentLanguage() };
 
                 } else if (currentMode === 'image') {
                     const file = document.getElementById('imageInput').files[0];
-                    if (!file) return alert('Wybierz obraz!');
+                    if (!file) return alert(t('alert_choose_image'));
                     const buffer = await file.arrayBuffer();
                     const hash = await sha256Hex(buffer);
-                    payload = { input_type: 'image', content_hash: hash, file_name: file.name, size_kb: Math.round(file.size / 1024) };
+                    payload = { input_type: 'image', content_hash: hash, file_name: file.name, size_kb: Math.round(file.size / 1024), language: getCurrentLanguage() };
                 }
 
                 btn.disabled = true;
-                statusEl.innerText = 'Analizuję...';
+                statusEl.innerText = t('status_analyzing');
                 document.getElementById('resultCard').style.display = 'none';
 
                 // Zalogowany użytkownik: prawdziwy token sesji (serwer sam rozpozna, kim jest).
@@ -667,7 +719,7 @@
                 renderResult(data);
 
             } catch (err) {
-                statusEl.innerHTML = '<span class="status-err">❌ Błąd: ' + err + '</span>';
+                statusEl.innerHTML = '<span class="status-err">' + t('status_err_prefix') + err + '</span>';
             } finally {
                 btn.disabled = false;
             }
