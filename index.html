@@ -48,7 +48,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="analyzeCard" style="display:none;">
         <div class="tabs">
             <button class="tab-btn active" data-mode="url">🔗 Link</button>
             <button class="tab-btn" data-mode="text">📝 Tekst</button>
@@ -148,13 +148,16 @@
             const authCard = document.getElementById('authCard');
             const recovery = document.getElementById('authRecovery');
             const userMenuBtn = document.getElementById('userMenuBtn');
+            const analyzeCard = document.getElementById('analyzeCard');
             if (recovery.style.display === 'block') return; // ekran ustawiania nowego hasła ma pierwszeństwo
             if (currentSession) {
                 authCard.style.display = 'none';
                 userMenuBtn.style.display = 'flex';
+                analyzeCard.style.display = 'block';
             } else {
                 authCard.style.display = 'block';
                 userMenuBtn.style.display = 'none';
+                analyzeCard.style.display = 'none';
             }
         }
 
