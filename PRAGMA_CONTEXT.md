@@ -108,7 +108,12 @@ zanim założysz, że działa.
   przełączania języka. Ładowany na wszystkich trzech stronach HTML.
 - `style.css` — wspólny styl (ciepła, "papierowa" estetyka, czytelna dla
   każdego wieku — świadomie, po kilku iteracjach, odejście od
-  "surowego"/generycznego wyglądu).
+  "surowego"/generycznego wyglądu). Jedna czcionka na całej stronie —
+  'Inter' (sans-serif). Wcześniej nagłówki (`h1`/`h2`) używały ozdobnego
+  szeryfu 'Lora' — usunięte na wyraźną prośbę użytkownika, który go nie
+  lubił; import czcionki Lora usunięty też z linków Google Fonts w
+  `index.html`/`account.html`/`scan.html`, żeby nie ładować niepotrzebnie
+  czcionki, której nic już nie używa.
 - `sw.js` — Service Worker (PWA offline + cache).
 - `manifest.json`, `icon-192.png`, `icon-512.png` — standardowe pliki PWA.
 - `supabase/functions/analyze/index.ts` — jedyny backend: Deno Edge
