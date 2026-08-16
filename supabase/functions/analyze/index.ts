@@ -243,7 +243,9 @@ Deno.serve(async (req: Request) => {
         .eq('id', existing.id)
 
       return new Response(
-        JSON.stringify({ cached: true, cost: 0, result: existing.result }),
+        // "id" pozwala frontendowi otworzyć pełny wynik jako osobną stronę
+        // (scan.html?id=...) zamiast pokazywać go na tej samej stronie.
+        JSON.stringify({ cached: true, cost: 0, id: existing.id, result: existing.result }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -466,7 +468,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ cached: false, cost: finalCost, result }),
+      JSON.stringify({ cached: false, cost: finalCost, id: newScan.id, result }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
