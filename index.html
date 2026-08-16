@@ -48,6 +48,13 @@
         </div>
     </div>
 
+    <div class="card" id="publicScansCard" style="display:none;">
+        <h2>Zobacz, co już wykryliśmy</h2>
+        <p class="tagline" style="text-align:left; margin-bottom:16px;">Prawdziwe analizy zrobione przez innych użytkowników Pragmy.</p>
+        <div id="publicScansList"></div>
+        <p style="text-align:center; font-size:13px; color:var(--ink-soft); margin:16px 0 0 0;">Chcesz sprawdzić własny tekst? <a href="#" id="publicScansSignupLink">Załóż darmowe konto</a>.</p>
+    </div>
+
     <div class="card" id="analyzeCard" style="display:none;">
         <div class="tabs">
             <button class="tab-btn active" data-mode="url">🔗 Link</button>
@@ -137,7 +144,7 @@
 
         if (!sb) {
             document.getElementById('authLoggedOut').innerHTML =
-                '<p style="color:#991b1b; margin:0;">⚠️ Logowanie chwilowo niedostępne (sprawdź połączenie z internetem i odśwież stronę). Możesz nadal skorzystać z jednej bezpłatnej analizy bez konta poniżej.</p>';
+                '<p style="color:#991b1b; margin:0;">⚠️ Logowanie chwilowo niedostępne. Sprawdź połączenie z internetem i odśwież stronę.</p>';
         } else {
         // (Cała logika logowania działa tylko, gdy biblioteka Supabase faktycznie się wczytała.)
 
@@ -149,24 +156,108 @@
             const recovery = document.getElementById('authRecovery');
             const userMenuBtn = document.getElementById('userMenuBtn');
             const analyzeCard = document.getElementById('analyzeCard');
+            const publicScansCard = document.getElementById('publicScansCard');
             if (recovery.style.display === 'block') return; // ekran ustawiania nowego hasła ma pierwszeństwo
             if (currentSession) {
                 authCard.style.display = 'none';
                 userMenuBtn.style.display = 'flex';
                 analyzeCard.style.display = 'block';
+                publicScansCard.style.display = 'none';
             } else {
                 authCard.style.display = 'block';
                 userMenuBtn.style.display = 'none';
                 analyzeCard.style.display = 'none';
+                publicScansCard.style.display = 'block';
+                loadPublicScans();
             }
         }
 
         function showRecoveryForm() {
             document.getElementById('userMenuBtn').style.display = 'none';
+            document.getElementById('publicScansCard').style.display = 'none';
             document.getElementById('authCard').style.display = 'block';
             document.getElementById('authLoggedOut').style.display = 'none';
             document.getElementById('authRecovery').style.display = 'block';
         }
+
+        // 0b-bis. Przeglądarka publicznych analiz (dla niezalogowanych) — czyta bezpośrednio
+        // ze wspólnego cache'u (tabela "scans" ma publiczny odczyt w RLS), zero kosztu API.
+        let publicScansLoaded = false;
+        function loadPublicScans() {
+            if (publicScansLoaded) return;
+            publicScansLoaded = true;
+            const listEl = document.getElementById('publicScansList');
+            listEl.innerHTML = '';
+            const loadingEl = document.createElement('p');
+            loadingEl.style.textAlign = 'center';
+            loadingEl.style.color = 'var(--ink-soft)';
+            loadingEl.innerText = 'Wczytywanie...';
+            listEl.appendChild(loadingEl);
+
+            sb.from('scans')
+                .select('result, created_at')
+                .order('created_at', { ascending: false })
+                .limit(8)
+                .then(({ data, error }) => {
+                    listEl.innerHTML = '';
+                    if (error) {
+                        console.error(error);
+                        const p = document.createElement('p');
+                        p.className = 'status-err';
+                        p.innerText = 'Nie udało się wczytać.';
+                        listEl.appendChild(p);
+                        return;
+                    }
+                    if (!data || data.length === 0) {
+                        const p = document.createElement('p');
+                        p.style.textAlign = 'center';
+                        p.style.color = 'var(--ink-soft)';
+                        p.innerText = 'Jeszcze nic tu nie ma — bądź pierwszy!';
+                        listEl.appendChild(p);
+                        return;
+                    }
+                    // Wszystkie wartości z bazy wstawiamy przez innerText (nie innerHTML),
+                    // żeby treść analizowana przez innych użytkowników nie mogła wstrzyknąć
+                    // kodu HTML na stronie widocznej dla wszystkich odwiedzających.
+                    data.forEach(scan => {
+                        const r = scan.result || {};
+                        const score = r.q_score;
+                        let badgeClass = 'badge-red', label = 'Manipulacja: ' + score + '/100';
+                        if (score >= 70) { badgeClass = 'badge-green'; label = 'Czysty tekst: ' + score + '/100'; }
+                        else if (score >= 40) { badgeClass = 'badge-yellow'; label = 'Częściowo: ' + score + '/100'; }
+
+                        const item = document.createElement('div');
+                        item.className = 'public-scan-item';
+
+                        const badge = document.createElement('span');
+                        badge.className = 'result-badge ' + badgeClass;
+                        badge.innerText = label;
+                        item.appendChild(badge);
+
+                        if (r.source_quote) {
+                            const quote = document.createElement('blockquote');
+                            quote.className = 'result-quote';
+                            quote.innerText = '„' + r.source_quote + '"';
+                            item.appendChild(quote);
+                        }
+
+                        if (r.summary) {
+                            const summary = document.createElement('p');
+                            summary.className = 'result-summary';
+                            summary.innerText = r.summary;
+                            item.appendChild(summary);
+                        }
+
+                        listEl.appendChild(item);
+                    });
+                });
+        }
+
+        document.getElementById('publicScansSignupLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            setAuthMode('signup');
+            document.getElementById('authCard').scrollIntoView({ behavior: 'smooth' });
+        });
 
         // 0c. Przełączanie Zaloguj / Zarejestruj
         let authFormMode = 'login';
