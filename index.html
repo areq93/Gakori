@@ -198,6 +198,17 @@
             });
         }
 
+        // Gdy wracasz na stronę przyciskiem "Wstecz" (np. z widoku pojedynczej
+        // analizy), przeglądarka czasem przywraca starą, "zamrożoną" wersję strony
+        // (tzw. bfcache) zamiast wczytać ją od nowa — lista wtedy bywa pusta, bez
+        // suwaka. Wymuszamy odświeżenie listy zawsze, gdy tak się stanie.
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                publicScansInitialized = false;
+                if (sb) initPublicScans();
+            }
+        });
+
         function inputTypeIcon(inputType) {
             if (inputType === 'url') return '🔗';
             if (inputType === 'image') return '🖼️';
