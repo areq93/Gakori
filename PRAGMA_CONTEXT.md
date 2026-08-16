@@ -135,11 +135,12 @@ zanim założysz, że działa.
     (np. duże portale newsowe typu onet.pl) odrzucają robota Google z
     ogólnym kodem `URL_RETRIEVAL_STATUS_ERROR` — bez podania konkretnego
     powodu. Gdy tak się stanie, backend sam pobiera stronę bezpośrednio
-    (nagłówki jak z przeglądarki), zdejmuje znaczniki HTML "na surowo" i
-    przekazuje to jako zwykły tekst do analizy. To NIE jest inteligentny
-    ekstraktor treści artykułu (może złapać menu/stopkę razem z tekstem) —
-    świadomy kompromis: analiza z odrobiną szumu jest lepsza niż żadna.
-    Jeśli i to się nie uda (np. strona ma prawdziwą ochronę typu
+    (nagłówki jak z przeglądarki), zdejmuje znaczniki HTML "na surowo" —
+    to samo w sobie NIE jest inteligentny ekstraktor treści (może złapać
+    menu/stopkę razem z artykułem) — ale zanim ten surowy tekst trafi do
+    właściwej analizy, przechodzi jeszcze przez `siftFallbackText()`
+    (patrz "Kaskada dwuetapowa" wyżej), które go czyści z szumu. Jeśli i to
+    się nie uda (np. strona ma prawdziwą ochronę typu
     Cloudflare/JS-challenge, nie tylko blokadę po nazwie robota) — dopiero
     wtedy użytkownik widzi błąd `url_fetch_failed`. Prawdziwy powód
     (`retrievalStatus` z Gemini) trafia do pola `details` w odpowiedzi,
@@ -259,6 +260,36 @@ zanim założysz, że działa.
     `translateResult()` jej nie używa). Przy stawce $0,30/milion tokenów
     wejścia to ułamek grosza na analizę — świadomie zaakceptowany koszt w
     zamian za wyraźnie wyższą trafność i różnorodność nazw wzorców.
+  - **Kaskada dwuetapowa (kategoria → szczegół)**: modele językowe mają
+    naturalną skłonność wybierać częściej te modele mentalne, które są
+    "popularniejsze"/lepiej znane (Dowód Społeczny, Efekt Halo...), nawet
+    gdy rzadszy model pasowałby trafniej — to nie błąd naszego kodu, tylko
+    cecha AI. Żeby temu przeciwdziałać, `analyze/index.ts` NIE wysyła już
+    całej biblioteki 100 modeli za jednym razem. Zamiast tego:
+    1. **Etap 1 (tani, "sitowy")** — `pickRelevantCategories()`: krótkie
+       zapytanie z listą tylko 15 NAZW kategorii (bez opisów modeli),
+       pytające zgrubnie "do których kategorii pasuje ta treść?".
+    2. **Etap 2 (właściwy)** — `buildSystemPrompt()` dostaje już tylko
+       przefiltrowaną bibliotekę (`buildMentalModelsLibrary()`) z 1-4
+       wybranych kategorii, nie wszystkich 15.
+    - **Dlaczego to NIE podwaja kosztu** (użytkownik świadomie o to pytał):
+      etap 1 jest tani (tylko nazwy kategorii, nie 100 opisów modeli), a
+      etap 2 jest TAŃSZY niż dawne pojedyncze zapytanie (mniejsza,
+      przefiltrowana biblioteka zamiast wszystkich 100 modeli za każdym
+      razem) — łączny koszt obu zapytań wychodzi z grubsza taki sam jak
+      dawne jedno zapytanie z pełną biblioteką, czasem niższy. Prawdziwym
+      kosztem tej zmiany jest **dodatkowy czas oczekiwania** (jedno
+      zapytanie do Gemini więcej w sekwencji), nie pieniądze.
+    - **Bezpieczny fallback**: jeśli etap 1 zwróci pustą/nieprawidłową
+      listę kategorii (błąd, awaria, coś nieparsowalnego),
+      `buildMentalModelsLibrary()` automatycznie wraca do PEŁNEJ biblioteki
+      wszystkich 15 kategorii — nigdy nie blokuje analizy.
+    - **Ścieżka awaryjnego pobrania strony** (`fetchUrlAsText`, patrz niżej)
+      ma własny, POŁĄCZONY etap 1: `siftFallbackText()` jednym zapytaniem
+      naraz (a) czyści surowy, zaszumiony tekst z menu/stopki/reklam
+      (odwołanie do modelu GIGO w bibliotece) i (b) wskazuje kategorie —
+      połączone w jedno zapytanie celowo, żeby ta ścieżka też miała tylko 2
+      zapytania do Gemini, nie 3.
 - **Lokalizacja komunikatów błędów**: backend zwraca kod błędu (`error`:
   `signup_required`/`insufficient_credits`/`url_fetch_failed`/
   `save_failed`/...) — pole `message` z backendu jest zaszyte na sztywno

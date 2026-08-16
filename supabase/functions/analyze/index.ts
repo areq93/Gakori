@@ -36,42 +36,106 @@ const LANGUAGE_NAMES: Record<string, string> = {
 }
 const DEFAULT_LANGUAGE = 'en'
 
-// Kompaktowa biblioteka 100 modeli mentalnych — wstrzykiwana do promptu jako
-// słownik nazw i wzorców, z którego Gemini wybiera najtrafniejsze określenie
-// dla każdego wykrytego wzorca (zamiast wymyślać ad-hoc nazwy albo trzymać
-// się kilku sztywnych przykładów). Pełna wersja "dla ludzi" (z przykładami)
-// żyje w repo jako MODELE_MENTALNE.md — jeśli zmieniasz jedno, zaktualizuj
-// drugie, żeby się nie rozjechały. Celowo tylko nazwa + jedno zdanie opisu
-// (bez przykładów) — to trzyma koszt tokenów promptu pod kontrolą.
-const MENTAL_MODELS = `
-LOGIKA I MYŚLENIE: Brzytwa Ockhama (najprostsze wyjaśnienie zwykle poprawne); Brzytwa Hanlona (nie przypisuj złej woli temu, co tłumaczy błąd/głupota); Zasady Pierwsze (rozbicie problemu na podstawowe prawdy zamiast analogii); Mapa to nie Terytorium (model rzeczywistości to nie sama rzeczywistość); Krąg Kompetencji (mówienie poza obszarem realnej wiedzy); Inwersja (patrzenie na problem od końca — czego unikać); Prawdopodobieństwo Bayesowskie (aktualizacja oceny w miarę nowych dowodów); Eksperyment Myślowy (testowanie konsekwencji w wyobraźni); Myślenie II Rzędu (pomijanie skutków skutków działania).
-FIZYKA: Entropia (układy dążą do nieładu bez dopływu energii/pracy); Względność (ocena zależy od punktu widzenia obserwatora); Bezwładność (organizacje trwają w obecnym stanie, opór wobec zmiany); Masa Krytyczna (próg wielkości potrzebny, by coś się utrzymało); Prędkość vs Szybkość (tempo działania mylone z tempem w dobrym kierunku); Zasada Dźwigni (mała zmiana w kluczowym miejscu daje wielki efekt); Tarcie (celowe utrudnienia blokujące łatwe działanie, np. rezygnację).
-CHEMIA: Energia Aktywacji (próg wysiłku potrzebny, by zacząć działanie); Katalizator (coś przyspiesza proces, samo się nie zużywając); Półokres Rozpadu (wiedza/trend traci ważność z czasem); Entalpia/Hype (poziom sztucznie napompowanej ekscytacji bez fundamentów).
-BIOLOGIA: Dobór Naturalny (przetrwanie lepiej dopasowanego rozwiązania); Koewolucja (wyścig zbrojeń dwóch stron wzajemnie się napędzających); Homeostaza (nierealistyczna wiara w trwałą równowagę bez zaburzeń); Nisza Ekologiczna (wąska specjalizacja zamiast bycia dla wszystkich); Pasożytnictwo vs Symbioza (jedna strona korzysta kosztem drugiej); Regresja do Średniej (ekstremalny wynik mylony z nową normą); Sygnalizacja (kosztowny, pokazowy sygnał ma udowodnić cechę, niekoniecznie prawdziwą).
-SYSTEMY I INŻYNIERIA: Pętle Sprzężenia (trend napędza sam siebie, dodatnio lub ujemnie); Redundancja (brak zapasu/planu B jako ukryte ryzyko); Wąskie Gardło (jeden słaby element ogranicza całość); Margines Bezpieczeństwa (brak zapasu na błąd lub niespodziankę); Antykruchość (system silniejszy dzięki wstrząsom, nie mimo nich); Modułowość (elementy da się wymieniać niezależnie); Prawo Moore'a (mylne założenie o wiecznym, stałym tempie postępu).
-MATEMATYKA I STATYSTYKA: Rozkład Normalny (nierealistyczne "wszyscy osiągają wynik ekstremalny"); Zasada Pareta 80/20 (mała część przyczyn odpowiada za większość efektów); Procent Składany (efekt kuli śnieżnej, mylony z liniowym wzrostem); Błąd Przeżywalności (wnioskowanie tylko z tych, którzy "przetrwali", pomijając resztę); Istotność Statystyczna (wniosek z próby zbyt małej, by cokolwiek dowodzić); Czarny Łabędź (rzadkie zdarzenie o ogromnym wpływie, ignorowane w prognozach); Zasada Gołębnika (błąd w alokacji, gdy elementów jest więcej niż miejsc).
-EKONOMIA: Koszt Alternatywny (pomija się, co się traci, wybierając opcję); Bodźce (czyj interes naprawdę stoi za rekomendacją); Koszty Utopione (kontynuacja złej decyzji, bo już w nią zainwestowano); Podaż i Popyt (cena wynika z dostępności i chęci zakupu); Przewaga Komparatywna (opłacalność relatywna, nie bezwzględna); Tragedia Wspólnego Pastwiska (indywidualny interes niszczy wspólny zasób); Teoria Gier (wynik zależy od decyzji innych graczy, nie tylko naszej); Efekt Sieciowy (wartość usługi rośnie z liczbą użytkowników); Malejące Przychody (kolejna jednostka wysiłku daje coraz mniej); Asymetria Informacji (jedna strona transakcji wie wyraźnie więcej); Arbitraż (zysk z różnicy cen tego samego dobra na różnych rynkach).
-PSYCHOLOGIA (najczęstsze w manipulacji): Dowód Społeczny (rób jak inni, bo "wszyscy tak robią"); Efekt Potwierdzenia (dobór faktów pasujących do z góry przyjętej tezy); Dysonans Poznawczy (dyskomfort z dwóch sprzecznych przekonań wykorzystywany do nacisku); Efekt Halo (jedna dobra cecha przenoszona na całą ocenę); Heurystyka Dostępności (ocena ryzyka na podstawie tego, co łatwo przypomnieć); Warunkowanie (budowanie automatycznego skojarzenia bodziec-nagroda); Efekt Dunninga-Krugera (pewność siebie odwrotnie proporcjonalna do wiedzy); Awersja do Straty (strach przed stratą silniejszy niż chęć zysku, "nie przegap"); Framing (ta sama treść inaczej oceniana przez sposób podania); Zasada Wzajemności (drobny "prezent" ma wywołać poczucie długu); Fałszywa Pilność (sztuczna presja czasu wymuszająca szybką decyzję); Sztuczny Niedobór ("ostatnie sztuki" mające przyspieszyć zakup); Argument z Autorytetu (racja "bo tak powiedział ekspert/celebryta", bez dowodu); Strach przed Utratą, FOMO (lęk przed pominięciem okazji jako dźwignia nacisku).
-SOCJOLOGIA: Liczba Dunbara (granica liczby realnych relacji społecznych); Mądrość Tłumu (zbiorowa opinia bywa trafniejsza niż jeden ekspert — ale nie zawsze); Dyfuzja Odpowiedzialności (im więcej świadków, tym mniejsza szansa reakcji); Rdzeń-Peryferia (podział na uprzywilejowane centrum i zależne obrzeża); Kapitał Społeczny (wartość płynąca z sieci relacji i zaufania); Zasada Petera (awans aż do poziomu niekompetencji).
-FILOZOFIA I ETYKA: Imperatyw Kategoryczny Kanta (czy zasada byłaby akceptowalna jako powszechne prawo); Utylitaryzm (ocena przez największe dobro dla największej liczby osób); Falsyfikowalność Poppera (teza, której nie da się obalić żadnym dowodem, nie jest naukowa); Relatywizm Kulturowy (norma etyczna zależna od kontekstu kulturowego); Epistemologia (skąd właściwie wiadomo, że to prawda); Stoicyzm (skupienie na tym, na co mamy wpływ); Eudajmonia (trwały sens mylony z chwilową przyjemnością); Primum Non Nocere (zasada "po pierwsze nie szkodzić").
-STRATEGIA: Wojna Asymetryczna (starcie stron o bardzo nierównych zasobach); Pyrrusowe Zwycięstwo (wygrana okupiona kosztem większym niż warta); Walka na Dwa Fronty (rozproszenie sił obniżające szansę powodzenia); Efekt Pewności Wstecznej (twierdzenie "wiedziałem, że tak będzie" po fakcie); Spalona Ziemia (niszczenie wartości, by nie dostała się innym); Blitzkrieg (agresywne, błyskawiczne działanie uprzedzające reakcję odbiorcy).
-LITERATURA I JĘZYK: Błąd Narracji (naciąganie przypadkowych faktów w spójną, wygodną historię); Semantyka/Eufemizm (łagodzące słowo maskujące niewygodną prawdę, np. "optymalizacja" zamiast "zwolnienia"); Ironia Losu (skutek odwrotny do zamierzonego); Podtekst (przekaz sugerowany, nie powiedziany wprost); Archetypy (odwołanie do uniwersalnych wzorców postaci, np. Bohater, Mędrzec).
-INFORMATYKA: GIGO — Garbage In, Garbage Out (jakość wniosku nie może przewyższać jakości danych wejściowych); Abstrakcja (ukrycie niewygodnych szczegółów za prostym opisem); Złożoność (pomijanie realnego kosztu/trudności rozwiązania problemu); Zakleszczenie/Deadlock (strony wzajemnie się blokują, nikt nie ustępuje).
-DESIGN: Forma za Funkcją (efektowna forma bez realnej wartości pod spodem); Złota Proporcja (estetyka podana jako dowód jakości); Afordancja (interfejs/przekaz naprowadzający na jedno działanie bez świadomego wyboru).
-INTERDYSCYPLINARNE: Efekt Lindy'ego (im dłużej coś istnieje, tym dłużej prawdopodobnie przetrwa); Brzytwa Adlera (twierdzenie nie do zweryfikowania eksperymentem nie jest warte sporu); Prawo Parkinsona (praca/koszty rozrastają się, by wypełnić dostępny czas/budżet); Hanlon dla Systemów (błąd systemowy/biurokratyczny mylony ze złą wolą); Heurystyka Uznania (rozpoznawalna marka/nazwisko uznawana za lepszą bez dowodu).
-`.trim()
+// Kompaktowa biblioteka 100 modeli mentalnych, pogrupowana po kategoriach —
+// wstrzykiwana do promptu jako słownik nazw i wzorców, z którego Gemini
+// wybiera najtrafniejsze określenie dla każdego wykrytego wzorca (zamiast
+// wymyślać ad-hoc nazwy albo trzymać się kilku sztywnych przykładów). Pełna
+// wersja "dla ludzi" (z przykładami) żyje w repo jako MODELE_MENTALNE.md —
+// jeśli zmieniasz jedno, zaktualizuj drugie, żeby się nie rozjechały.
+// Celowo tylko nazwa + jedno zdanie opisu (bez przykładów) — to trzyma koszt
+// tokenów promptu pod kontrolą. Podział na kategorie (obiekt, nie jeden
+// płaski string) pozwala wysyłać do właściwej analizy TYLKO kategorie
+// wybrane wcześniej przez tani etap kategoryzacji — patrz
+// pickRelevantCategories() i buildMentalModelsLibrary() niżej.
+const MENTAL_MODELS_BY_CATEGORY: Record<string, string> = {
+  'LOGIKA I MYŚLENIE': 'LOGIKA I MYŚLENIE: Brzytwa Ockhama (najprostsze wyjaśnienie zwykle poprawne); Brzytwa Hanlona (nie przypisuj złej woli temu, co tłumaczy błąd/głupota); Zasady Pierwsze (rozbicie problemu na podstawowe prawdy zamiast analogii); Mapa to nie Terytorium (model rzeczywistości to nie sama rzeczywistość); Krąg Kompetencji (mówienie poza obszarem realnej wiedzy); Inwersja (patrzenie na problem od końca — czego unikać); Prawdopodobieństwo Bayesowskie (aktualizacja oceny w miarę nowych dowodów); Eksperyment Myślowy (testowanie konsekwencji w wyobraźni); Myślenie II Rzędu (pomijanie skutków skutków działania).',
+  FIZYKA: 'FIZYKA: Entropia (układy dążą do nieładu bez dopływu energii/pracy); Względność (ocena zależy od punktu widzenia obserwatora); Bezwładność (organizacje trwają w obecnym stanie, opór wobec zmiany); Masa Krytyczna (próg wielkości potrzebny, by coś się utrzymało); Prędkość vs Szybkość (tempo działania mylone z tempem w dobrym kierunku); Zasada Dźwigni (mała zmiana w kluczowym miejscu daje wielki efekt); Tarcie (celowe utrudnienia blokujące łatwe działanie, np. rezygnację).',
+  CHEMIA: 'CHEMIA: Energia Aktywacji (próg wysiłku potrzebny, by zacząć działanie); Katalizator (coś przyspiesza proces, samo się nie zużywając); Półokres Rozpadu (wiedza/trend traci ważność z czasem); Entalpia/Hype (poziom sztucznie napompowanej ekscytacji bez fundamentów).',
+  BIOLOGIA: 'BIOLOGIA: Dobór Naturalny (przetrwanie lepiej dopasowanego rozwiązania); Koewolucja (wyścig zbrojeń dwóch stron wzajemnie się napędzających); Homeostaza (nierealistyczna wiara w trwałą równowagę bez zaburzeń); Nisza Ekologiczna (wąska specjalizacja zamiast bycia dla wszystkich); Pasożytnictwo vs Symbioza (jedna strona korzysta kosztem drugiej); Regresja do Średniej (ekstremalny wynik mylony z nową normą); Sygnalizacja (kosztowny, pokazowy sygnał ma udowodnić cechę, niekoniecznie prawdziwą).',
+  'SYSTEMY I INŻYNIERIA': 'SYSTEMY I INŻYNIERIA: Pętle Sprzężenia (trend napędza sam siebie, dodatnio lub ujemnie); Redundancja (brak zapasu/planu B jako ukryte ryzyko); Wąskie Gardło (jeden słaby element ogranicza całość); Margines Bezpieczeństwa (brak zapasu na błąd lub niespodziankę); Antykruchość (system silniejszy dzięki wstrząsom, nie mimo nich); Modułowość (elementy da się wymieniać niezależnie); Prawo Moore\'a (mylne założenie o wiecznym, stałym tempie postępu).',
+  'MATEMATYKA I STATYSTYKA': 'MATEMATYKA I STATYSTYKA: Rozkład Normalny (nierealistyczne "wszyscy osiągają wynik ekstremalny"); Zasada Pareta 80/20 (mała część przyczyn odpowiada za większość efektów); Procent Składany (efekt kuli śnieżnej, mylony z liniowym wzrostem); Błąd Przeżywalności (wnioskowanie tylko z tych, którzy "przetrwali", pomijając resztę); Istotność Statystyczna (wniosek z próby zbyt małej, by cokolwiek dowodzić); Czarny Łabędź (rzadkie zdarzenie o ogromnym wpływie, ignorowane w prognozach); Zasada Gołębnika (błąd w alokacji, gdy elementów jest więcej niż miejsc).',
+  EKONOMIA: 'EKONOMIA: Koszt Alternatywny (pomija się, co się traci, wybierając opcję); Bodźce (czyj interes naprawdę stoi za rekomendacją); Koszty Utopione (kontynuacja złej decyzji, bo już w nią zainwestowano); Podaż i Popyt (cena wynika z dostępności i chęci zakupu); Przewaga Komparatywna (opłacalność relatywna, nie bezwzględna); Tragedia Wspólnego Pastwiska (indywidualny interes niszczy wspólny zasób); Teoria Gier (wynik zależy od decyzji innych graczy, nie tylko naszej); Efekt Sieciowy (wartość usługi rośnie z liczbą użytkowników); Malejące Przychody (kolejna jednostka wysiłku daje coraz mniej); Asymetria Informacji (jedna strona transakcji wie wyraźnie więcej); Arbitraż (zysk z różnicy cen tego samego dobra na różnych rynkach).',
+  PSYCHOLOGIA: 'PSYCHOLOGIA (najczęstsze w manipulacji): Dowód Społeczny (rób jak inni, bo "wszyscy tak robią"); Efekt Potwierdzenia (dobór faktów pasujących do z góry przyjętej tezy); Dysonans Poznawczy (dyskomfort z dwóch sprzecznych przekonań wykorzystywany do nacisku); Efekt Halo (jedna dobra cecha przenoszona na całą ocenę); Heurystyka Dostępności (ocena ryzyka na podstawie tego, co łatwo przypomnieć); Warunkowanie (budowanie automatycznego skojarzenia bodziec-nagroda); Efekt Dunninga-Krugera (pewność siebie odwrotnie proporcjonalna do wiedzy); Awersja do Straty (strach przed stratą silniejszy niż chęć zysku, "nie przegap"); Framing (ta sama treść inaczej oceniana przez sposób podania); Zasada Wzajemności (drobny "prezent" ma wywołać poczucie długu); Fałszywa Pilność (sztuczna presja czasu wymuszająca szybką decyzję); Sztuczny Niedobór ("ostatnie sztuki" mające przyspieszyć zakup); Argument z Autorytetu (racja "bo tak powiedział ekspert/celebryta", bez dowodu); Strach przed Utratą, FOMO (lęk przed pominięciem okazji jako dźwignia nacisku).',
+  SOCJOLOGIA: 'SOCJOLOGIA: Liczba Dunbara (granica liczby realnych relacji społecznych); Mądrość Tłumu (zbiorowa opinia bywa trafniejsza niż jeden ekspert — ale nie zawsze); Dyfuzja Odpowiedzialności (im więcej świadków, tym mniejsza szansa reakcji); Rdzeń-Peryferia (podział na uprzywilejowane centrum i zależne obrzeża); Kapitał Społeczny (wartość płynąca z sieci relacji i zaufania); Zasada Petera (awans aż do poziomu niekompetencji).',
+  'FILOZOFIA I ETYKA': 'FILOZOFIA I ETYKA: Imperatyw Kategoryczny Kanta (czy zasada byłaby akceptowalna jako powszechne prawo); Utylitaryzm (ocena przez największe dobro dla największej liczby osób); Falsyfikowalność Poppera (teza, której nie da się obalić żadnym dowodem, nie jest naukowa); Relatywizm Kulturowy (norma etyczna zależna od kontekstu kulturowego); Epistemologia (skąd właściwie wiadomo, że to prawda); Stoicyzm (skupienie na tym, na co mamy wpływ); Eudajmonia (trwały sens mylony z chwilową przyjemnością); Primum Non Nocere (zasada "po pierwsze nie szkodzić").',
+  STRATEGIA: 'STRATEGIA: Wojna Asymetryczna (starcie stron o bardzo nierównych zasobach); Pyrrusowe Zwycięstwo (wygrana okupiona kosztem większym niż warta); Walka na Dwa Fronty (rozproszenie sił obniżające szansę powodzenia); Efekt Pewności Wstecznej (twierdzenie "wiedziałem, że tak będzie" po fakcie); Spalona Ziemia (niszczenie wartości, by nie dostała się innym); Blitzkrieg (agresywne, błyskawiczne działanie uprzedzające reakcję odbiorcy).',
+  'LITERATURA I JĘZYK': 'LITERATURA I JĘZYK: Błąd Narracji (naciąganie przypadkowych faktów w spójną, wygodną historię); Semantyka/Eufemizm (łagodzące słowo maskujące niewygodną prawdę, np. "optymalizacja" zamiast "zwolnienia"); Ironia Losu (skutek odwrotny do zamierzonego); Podtekst (przekaz sugerowany, nie powiedziany wprost); Archetypy (odwołanie do uniwersalnych wzorców postaci, np. Bohater, Mędrzec).',
+  INFORMATYKA: 'INFORMATYKA: GIGO — Garbage In, Garbage Out (jakość wniosku nie może przewyższać jakości danych wejściowych); Abstrakcja (ukrycie niewygodnych szczegółów za prostym opisem); Złożoność (pomijanie realnego kosztu/trudności rozwiązania problemu); Zakleszczenie/Deadlock (strony wzajemnie się blokują, nikt nie ustępuje).',
+  DESIGN: 'DESIGN: Forma za Funkcją (efektowna forma bez realnej wartości pod spodem); Złota Proporcja (estetyka podana jako dowód jakości); Afordancja (interfejs/przekaz naprowadzający na jedno działanie bez świadomego wyboru).',
+  INTERDYSCYPLINARNE: 'INTERDYSCYPLINARNE: Efekt Lindy\'ego (im dłużej coś istnieje, tym dłużej prawdopodobnie przetrwa); Brzytwa Adlera (twierdzenie nie do zweryfikowania eksperymentem nie jest warte sporu); Prawo Parkinsona (praca/koszty rozrastają się, by wypełnić dostępny czas/budżet); Hanlon dla Systemów (błąd systemowy/biurokratyczny mylony ze złą wolą); Heurystyka Uznania (rozpoznawalna marka/nazwisko uznawana za lepszą bez dowodu).',
+}
+const MENTAL_MODEL_CATEGORIES = Object.keys(MENTAL_MODELS_BY_CATEGORY)
+
+// Buduje fragment promptu z biblioteką modeli — TYLKO z wybranych kategorii
+// (patrz pickRelevantCategories()). Pusta/nieprawidłowa lista kategorii to
+// bezpieczny fallback: pełna biblioteka wszystkich 15 kategorii, dokładnie
+// jak przed wprowadzeniem etapu kategoryzacji.
+function buildMentalModelsLibrary(categories: string[]): string {
+  const valid = categories.filter((c) => MENTAL_MODELS_BY_CATEGORY[c])
+  const chosen = valid.length > 0 ? valid : MENTAL_MODEL_CATEGORIES
+  return chosen.map((c) => MENTAL_MODELS_BY_CATEGORY[c]).join('\n')
+}
+
+const CATEGORY_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    categories: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['categories'],
+}
+
+// ETAP 1 (tani, "sitowy") kaskady: zanim zapłacimy za pełną analizę z całą
+// biblioteką 100 modeli, tanim zapytaniem pytamy Gemini, do których z 15
+// KATEGORII prawdopodobnie pasują wzorce w tej treści — bez analizowania
+// szczegółów. Etap 2 (buildSystemPrompt) dostanie już tylko przefiltrowaną,
+// dużo mniejszą bibliotekę z wybranych kategorii, więc łączny koszt obu
+// zapytań wychodzi podobny do dawnego pojedynczego zapytania z całą
+// biblioteką — nie podwaja się. Realną "ceną" tego etapu jest dodatkowy
+// czas oczekiwania na wynik (jedno zapytanie więcej), nie koszt.
+// contentPrompt to fragment identyczny z tym, co pójdzie do etapu 2 (link
+// albo tekst do analizy) — useUrlContext decyduje, czy Gemini ma sam
+// pobrać stronę (tylko dla trybu url, ścieżka główna).
+async function pickRelevantCategories(
+  contentPrompt: string,
+  useUrlContext: boolean,
+  geminiKey: string
+): Promise<string[]> {
+  const prompt = `Poniżej jest treść do wstępnego rozpoznania. Twoje JEDYNE zadanie: zgrubnie wskaż, do których z poniższych kategorii modeli mentalnych najprawdopodobniej będą pasować wzorce widoczne w tej treści (manipulacja, błędy poznawcze, albo trafne, wartościowe rozumowanie) — NIE analizuj jeszcze żadnych szczegółów, nie szukaj cytatów. Wybierz 1-4 najtrafniejsze kategorie z listy (dokładnie w tym brzmieniu):
+${MENTAL_MODEL_CATEGORIES.join(', ')}
+
+${contentPrompt}`
+
+  const requestBody: Record<string, unknown> = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: CATEGORY_RESPONSE_SCHEMA,
+    },
+  }
+  if (useUrlContext) requestBody.tools = [{ urlContext: {} }]
+
+  const data = await callGemini(requestBody, geminiKey)
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text)
+    return Array.isArray(parsed.categories) ? parsed.categories : []
+  } catch {
+    return []
+  }
+}
 
 // Instrukcje dla Gemini są napisane po polsku (to nie ma znaczenia — model
 // rozumie polecenia w dowolnym języku), ale WYNIK ma być w języku wybranym
 // przez użytkownika w ustawieniach aplikacji (parametr "language" z body).
-function buildSystemPrompt(langCode: string): string {
+function buildSystemPrompt(langCode: string, mentalModelsLibrary: string): string {
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   return `Jesteś Pragma — algorytmiczny analityk treści najwyższej jakości. Twoim celem jest, żeby odbiorca poczuł realny wzrost kontroli nad tym, co czyta — precyzyjne, konkretne nazwanie mechanizmu, nie ogólnikowe wrażenie. Nie oceniasz intencji autora, tylko obecność konkretnych wzorców w tekście — zarówno wzorców manipulacji i błędów poznawczych, jak i (rzadziej) trafnych, wartościowych sposobów rozumowania.
 
-BIBLIOTEKA MODELI MENTALNYCH: Masz do dyspozycji poniższą bibliotekę 100 nazwanych modeli mentalnych z wielu dziedzin (logika, fizyka, biologia, ekonomia, psychologia, strategia i inne). Dla KAŻDEGO wykrytego wzorca wybierz z niej najtrafniej pasujący model i użyj jego nazwy (przetłumaczonej na język ${langName}) jako pola "name" — zamiast wymyślać własne, przypadkowe określenie. Jeśli naprawdę żaden model z biblioteki nie pasuje trafnie, możesz nazwać wzorzec inaczej, ale to powinien być rzadki wyjątek, nie reguła. Nie ograniczaj się do kilku najpopularniejszych modeli (jak Dowód Społeczny czy Fałszywa Pilność) — czytaj tekst uważnie i sięgaj też po mniej oczywiste, trafniejsze modele z pełnej biblioteki, gdy lepiej opisują to, co faktycznie dzieje się w tekście.
+BIBLIOTEKA MODELI MENTALNYCH: Masz do dyspozycji poniższą bibliotekę nazwanych modeli mentalnych z wielu dziedzin (wstępnie już zawężoną do kategorii najtrafniejszych dla tej treści). Dla KAŻDEGO wykrytego wzorca wybierz z niej najtrafniej pasujący model i użyj jego nazwy (przetłumaczonej na język ${langName}) jako pola "name" — zamiast wymyślać własne, przypadkowe określenie. Jeśli naprawdę żaden model z biblioteki nie pasuje trafnie, możesz nazwać wzorzec inaczej, ale to powinien być rzadki wyjątek, nie reguła. Nie ograniczaj się do kilku najpopularniejszych modeli (jak Dowód Społeczny czy Fałszywa Pilność) — czytaj tekst uważnie i sięgaj też po mniej oczywiste, trafniejsze modele z biblioteki, gdy lepiej opisują to, co faktycznie dzieje się w tekście.
 
 BIBLIOTEKA:
-${MENTAL_MODELS}
+${mentalModelsLibrary}
 
 JĘZYK: Niezależnie od tego, w jakim języku jest analizowany tekst — pola "name", "explanation" i "summary" MUSZĄ być zawsze napisane WYŁĄCZNIE w języku ${langName}, prostym, codziennym słownictwem zrozumiałym dla każdego. Bez żargonu naukowego, akademickiego — piszesz tak, jakbyś tłumaczył znajomemu przy kawie, nie jak w podręczniku psychologii. Jedynym wyjątkiem jest pole "quote" — to dosłowny cytat, więc zostaje w oryginalnym języku analizowanego tekstu, bez tłumaczenia. Nigdy nie mieszaj języków w jednym polu (poza polem "quote").
 
@@ -194,6 +258,57 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // JavaScript"), nie prawdziwa treść — traktujemy to jak porażkę.
     if (text.length < 200) return null
     return text.slice(0, 20000)
+  } catch {
+    return null
+  }
+}
+
+const FALLBACK_SIFT_SCHEMA = {
+  type: 'object',
+  properties: {
+    clean_text: { type: 'string' },
+    categories: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['clean_text', 'categories'],
+}
+
+// Tanie "sitowe" zapytanie dla ścieżki awaryjnej (fetchUrlAsText): surowy,
+// zdarty z HTML tekst zwykle miesza właściwą treść z menu/stopką/reklamami
+// (patrz model mentalny GIGO w bibliotece) — zanim zapłacimy za pełną
+// analizę, jednym tanim zapytaniem naraz (a) wyciągamy samą treść artykułu
+// i (b) zgrubnie wskazujemy pasujące kategorie modeli mentalnych. Dwa
+// zadania w jednym zapytaniu celowo — żeby ta ścieżka nadal miała tylko 2
+// zapytania do Gemini (sito + właściwa analiza), a nie 3.
+async function siftFallbackText(
+  rawText: string,
+  geminiKey: string
+): Promise<{ cleanText: string; categories: string[] } | null> {
+  const prompt = `Poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Masz dwa zadania:
+1. clean_text: wyciągnij WYŁĄCZNIE właściwą treść artykułu/strony (bez menu, stopki, reklam, list linków) — nie streszczaj, nie skracaj treści, po prostu usuń szum wokół niej.
+2. categories: zgrubnie wskaż 1-4 najtrafniejsze kategorie z listy (dokładnie w tym brzmieniu), do których będą pasować wzorce w tej treści: ${MENTAL_MODEL_CATEGORIES.join(', ')}
+
+SUROWY TEKST:
+${rawText}`
+
+  const data = await callGemini(
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: FALLBACK_SIFT_SCHEMA,
+      },
+    },
+    geminiKey
+  )
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) return null
+  try {
+    const parsed = JSON.parse(text)
+    if (typeof parsed.clean_text !== 'string' || !parsed.clean_text.trim()) return null
+    return {
+      cleanText: parsed.clean_text,
+      categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+    }
   } catch {
     return null
   }
@@ -336,13 +451,23 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!result) {
-      const systemPrompt = buildSystemPrompt(outputLanguage)
       // deno-lint-ignore no-explicit-any
       let geminiData: any = null
 
       if (input_type === 'url') {
-        // Próba 1: wbudowane narzędzie Gemini "URL context" — samo pobiera i
-        // czyta treść strony, nie potrzebujemy własnego scrapera.
+        // ETAP 1 (tani): zanim zapłacimy za pełną analizę, zgrubnie pytamy,
+        // do których kategorii modeli mentalnych prawdopodobnie pasuje ta
+        // strona — patrz pickRelevantCategories(). Etap 2 dostanie już tylko
+        // przefiltrowaną, mniejszą bibliotekę zamiast wszystkich 100 modeli.
+        const categories = await pickRelevantCategories(
+          `Przeanalizuj treść strony pod adresem:\n${source_url}`,
+          true,
+          geminiKey!
+        )
+        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
+
+        // ETAP 2, próba 1: wbudowane narzędzie Gemini "URL context" — samo
+        // pobiera i czyta treść strony, nie potrzebujemy własnego scrapera.
         geminiData = await callGemini(
           {
             contents: [
@@ -366,13 +491,22 @@ Deno.serve(async (req: Request) => {
           // tylko w panelu debugowania ?debug=1, nie dla zwykłego użytkownika).
           const fallbackText = await fetchUrlAsText(source_url)
           if (fallbackText) {
+            // Etap 1 dla tej ścieżki: jedno tanie zapytanie naraz oczyszcza
+            // surowy tekst (menu/stopka wymieszane z artykułem — patrz model
+            // GIGO) i wskazuje pasujące kategorie — patrz siftFallbackText().
+            const sift = await siftFallbackText(fallbackText, geminiKey!)
+            const cleanText = sift?.cleanText || fallbackText
+            const fallbackSystemPrompt = buildSystemPrompt(
+              outputLanguage,
+              buildMentalModelsLibrary(sift?.categories || [])
+            )
             geminiData = await callGemini(
               {
                 contents: [
                   {
                     parts: [
                       {
-                        text: `${systemPrompt}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony, może zawierać fragmenty menu/stopki obok właściwej treści):\n${fallbackText}`,
+                        text: `${fallbackSystemPrompt}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony):\n${cleanText}`,
                       },
                     ],
                   },
@@ -396,6 +530,9 @@ Deno.serve(async (req: Request) => {
           }
         }
       } else {
+        // ETAP 1 (tani) + ETAP 2 — patrz komentarz w gałęzi "url" wyżej.
+        const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!)
+        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
         geminiData = await callGemini(
           {
             contents: [{ parts: [{ text: `${systemPrompt}\n\nTEKST DO ANALIZY:\n${text_content}` }] }],
