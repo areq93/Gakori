@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pragma-v6';
+const CACHE_NAME = 'pragma-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -36,14 +36,16 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-  const isHtmlOrManifest =
+  const needsFreshContent =
     event.request.mode === 'navigate' ||
     url.pathname.endsWith('.html') ||
-    url.pathname.endsWith('manifest.json');
+    url.pathname.endsWith('manifest.json') ||
+    url.pathname.endsWith('.css');
 
-  if (isHtmlOrManifest) {
-    // NETWORK-FIRST: HTML i manifest muszą zawsze być świeże,
-    // inaczej zmiany wgrane na serwer nigdy nie dotrą do telefonu.
+  if (needsFreshContent) {
+    // NETWORK-FIRST: HTML, manifest i style muszą zawsze być świeże, inaczej
+    // zmiany wgrane na serwer nigdy nie dotrą do telefonu (tak jak stary
+    // style.css utknął w cache'u aż do wersji pragma-v7).
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
