@@ -111,12 +111,11 @@ zanim założysz, że działa.
   "surowego"/generycznego wyglądu).
 - `sw.js` — Service Worker (PWA offline + cache).
 - `manifest.json`, `icon-192.png`, `icon-512.png` — standardowe pliki PWA.
-- `supabase/functions/analyze/index.ts` — główny backend: Deno Edge
+- `supabase/functions/analyze/index.ts` — jedyny backend: Deno Edge
   Function wywoływana przez frontend, rozmawia z Gemini API i z bazą.
-- `supabase/functions/translate-scan/index.ts` — druga, mała Edge Function:
-  tanie tłumaczenie GOTOWEGO wyniku na inny język (zamiast pełnej analizy
-  od zera), używana przez przeglądarkę publicznych analiz do dopełniania
-  luk językowych. Zawsze darmowa, bez logowania.
+  (Była też druga funkcja, `translate-scan`, do dotłumaczania listy
+  publicznych analiz przy samym przeglądaniu — świadomie usunięta,
+  patrz niżej "Ponowne użycie przez tłumaczenie".)
 
 ## Zaimplementowane funkcje (stan na dziś)
 
@@ -181,14 +180,18 @@ zanim założysz, że działa.
   obniża wyłącznie nasz koszt operacyjny, nie cenę dla użytkownika.
   Tłumaczymy zawsze z prawdziwego oryginału (`is_translation = false`),
   nigdy z innego tłumaczenia (żeby jakość nie spadała z każdym kolejnym
-  językiem). Przeglądarka publicznych analiz korzysta z osobnej, darmowej
-  funkcji `translate-scan` do leniwego dopełniania listy w językach, w
-  których dana treść nie była jeszcze wprost zgłoszona — tylko przy
-  domyślnym (pustym) przeglądaniu, gdy wyników w danym języku jest mniej
-  niż 6, ograniczone do brakującej liczby wierszy. To celowo leniwe
-  (nie tłumaczymy z góry całej bazy na wszystkie języki) — koszt rośnie
-  tylko tam, gdzie jest faktyczne zapotrzebowanie, i każde tłumaczenie
-  zostaje w cache'u na zawsze (płaci się raz na parę treść+język).
+  językiem). Każde tłumaczenie zostaje w cache'u na zawsze (płaci się raz
+  na parę treść+język).
+  - **WAŻNE — świadomie USUNIĘTE i nie odtwarzać bez wyraźnej prośby**:
+    była też wersja tego mechanizmu wywoływana automatycznie przez samo
+    **przeglądanie** listy publicznych analiz (osobna funkcja
+    `translate-scan`, "dopełniająca" listę w rzadko używanym języku, gdy
+    wyników było mniej niż 6). Usunięta na wyraźne życzenie użytkownika:
+    **dostęp do wyniku w danym języku ma powstawać wyłącznie wtedy, gdy
+    ktoś świadomie kliknie "Analizuj" dla tej treści w tym języku —
+    nigdy jako efekt uboczny samego oglądania strony.** Pusta lista w
+    rzadko używanym języku to poprawny, oczekiwany stan, nie błąd do
+    naprawienia dopełnianiem w tle.
   - **Ekonomia tej funkcji (ważne, żeby nie zawyżać oczekiwań)**: przy
     krótkich treściach (setki znaków) oszczędność kosztu API jest
     kosmetyczna (~10%), bo koszt wyjścia (droższy token) jest podobnej
@@ -232,8 +235,10 @@ zanim założysz, że działa.
   analizę AI; używane, żeby zawsze tłumaczyć z prawdziwego oryginału,
   nigdy z tłumaczenia), `source_url`, `char_count`, `credits_charged`,
   `result` (jsonb — patrz struktura wyniku wyżej), `discovered_by` (uuid,
-  nullable — kto pierwszy wygenerował ten wynik, `null` dla darmowych
-  tłumaczeń z przeglądarki), `view_count`, `created_at`
+  nullable — kto pierwszy wygenerował ten wynik; część starych wierszy ma
+  tu `null` z okresu, gdy istniało jeszcze darmowe dotłumaczanie z samej
+  przeglądarki — ten mechanizm już nie istnieje, patrz "Ponowne użycie
+  przez tłumaczenie" wyżej), `view_count`, `created_at`
   - Ograniczenie unikalności: `UNIQUE (content_hash, language)` —
     **nie** samo `content_hash` (stara reguła `scans_content_hash_key`
     została usunięta i zastąpiona tą złożoną, patrz pułapki niżej).

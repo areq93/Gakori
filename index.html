@@ -140,7 +140,6 @@
         // ===== KONFIGURACJA POŁĄCZENIA Z BACKENDEM =====
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
         const SUPABASE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/analyze';
-        const SUPABASE_TRANSLATE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/translate-scan';
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd'; // Project Settings -> API Keys -> Publishable key
 
         // Logowanie zależy od zewnętrznej biblioteki (CDN) — jeśli się nie wczyta
@@ -294,49 +293,14 @@
 
             let scans = data || [];
 
-            // Lista bywa uboga w nowym/rzadziej używanym języku (mało zgłoszeń
-            // wprost w nim) — dotłumaczamy "w locie" kilka najpopularniejszych
-            // analiz z innych języków, żeby przeglądarka nigdy nie świeciła
-            // pustkami. Tylko dla domyślnego (pustego) przeglądania — wyszukiwanie
-            // zostaje ograniczone do tego, co już istnieje w tym języku, żeby nie
-            // dotłumaczać przy każdym wpisanym słowie kluczowym.
-            if (!query && scans.length < 6) {
-                const known = new Set(scans.map(s => s.content_hash));
-                const { data: candidates } = await sb
-                    .from('scans')
-                    .select('content_hash')
-                    .order('view_count', { ascending: false })
-                    .limit(15);
-                const gapHashes = [];
-                (candidates || []).forEach(c => {
-                    if (!known.has(c.content_hash) && gapHashes.indexOf(c.content_hash) === -1) {
-                        gapHashes.push(c.content_hash);
-                    }
-                });
-                const toFill = gapHashes.slice(0, 6 - scans.length);
-
-                if (toFill.length > 0) {
-                    const filled = await Promise.allSettled(
-                        toFill.map(hash =>
-                            fetch(SUPABASE_TRANSLATE_FUNCTION_URL, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-                                    'apikey': SUPABASE_ANON_KEY
-                                },
-                                body: JSON.stringify({ content_hash: hash, language: currentLang })
-                            }).then(res => res.json())
-                        )
-                    );
-                    filled.forEach(r => {
-                        if (r.status === 'fulfilled' && r.value && r.value.scan) {
-                            scans.push(r.value.scan);
-                        }
-                    });
-                }
-            }
-
+            // Świadomie NIE dopełniamy listy tłumaczeniami z innych języków tu —
+            // samo przeglądanie strony (nawet przez wielu różnych odwiedzających)
+            // nie ma prawa uruchamiać żadnego tłumaczenia w tle. Dostęp do wyniku
+            // w danym języku pojawia się wyłącznie wtedy, gdy ktoś świadomie klika
+            // "Analizuj" dla tej treści w tym języku (patrz analyze/index.ts,
+            // sekcja 5a) — wtedy backend sam decyduje, czy taniej przetłumaczyć
+            // istniejący wynik, czy zrobić pełną analizę. Puste miejsce na liście
+            // w rzadko używanym języku jest tu poprawnym, oczekiwanym stanem.
             if (scans.length === 0) {
                 const p = document.createElement('p');
                 p.style.textAlign = 'center';
