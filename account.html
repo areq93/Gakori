@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pragma_theme') || 'light');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pragma - Twoje konto</title>
@@ -31,7 +32,15 @@
 
             <div style="margin-top:16px;">
                 <label for="languageSelect" style="display:block; font-size:13px; color:var(--ink-soft); margin-bottom:6px;" data-i18n="language_label">Język aplikacji</label>
-                <select id="languageSelect" style="width:100%; padding:11px 12px; border:1.5px solid #cfc0a0; border-radius:4px; font-size:16px; font-family:inherit; color:var(--ink); background:#fffdf7;"></select>
+                <select id="languageSelect" style="width:100%; padding:11px 12px; border:var(--border-w) solid var(--card-border); border-radius:var(--radius-sm); font-size:16px; font-family:inherit; color:var(--ink); background:var(--input-bg);"></select>
+            </div>
+
+            <div style="margin-top:16px;">
+                <label for="themeSelect" style="display:block; font-size:13px; color:var(--ink-soft); margin-bottom:6px;" data-i18n="theme_label">Motyw</label>
+                <select id="themeSelect" style="width:100%; padding:11px 12px; border:var(--border-w) solid var(--card-border); border-radius:var(--radius-sm); font-size:16px; font-family:inherit; color:var(--ink); background:var(--input-bg);">
+                    <option value="light" data-i18n="theme_light">Jasny</option>
+                    <option value="dark" data-i18n="theme_dark">Ciemny</option>
+                </select>
             </div>
 
             <div style="text-align:center; margin-top:14px;">
@@ -104,6 +113,12 @@
                 populateLanguageSelect();
                 document.getElementById('languageSelect').addEventListener('change', (e) => {
                     setLanguage(e.target.value, sb, session.user.id);
+                });
+
+                await syncThemeFromProfile(sb, session.user.id);
+                document.getElementById('themeSelect').value = getCurrentTheme();
+                document.getElementById('themeSelect').addEventListener('change', (e) => {
+                    setTheme(e.target.value, sb, session.user.id);
                 });
                 document.getElementById('accountEmail').innerText = session.user.email;
                 document.getElementById('accountLoading').style.display = 'none';

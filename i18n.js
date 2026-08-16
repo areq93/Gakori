@@ -50,6 +50,7 @@ const TRANSLATIONS = {
         password_changed: "Hasło zmienione.",
         account_load_error: "Nie udało się wczytać danych konta (sprawdź połączenie z internetem i odśwież stronę).",
         language_label: "Język aplikacji",
+        theme_label: "Motyw", theme_light: "Jasny", theme_dark: "Ciemny",
         tab_link: "Link", tab_text: "Tekst", tab_image: "Obraz",
         label_paste_link: "Wklej link do analizy:", placeholder_url: "https://...",
         label_paste_text: "Wklej tekst do analizy:", placeholder_text_content: "Wklej treść, którą chcesz przeanalizować...",
@@ -104,6 +105,7 @@ const TRANSLATIONS = {
         password_changed: "Password changed.",
         account_load_error: "Couldn't load your account (check your connection and reload the page).",
         language_label: "App language",
+        theme_label: "Theme", theme_light: "Light", theme_dark: "Dark",
         tab_link: "Link", tab_text: "Text", tab_image: "Image",
         label_paste_link: "Paste a link to analyze:", placeholder_url: "https://...",
         label_paste_text: "Paste text to analyze:", placeholder_text_content: "Paste the content you want to analyze...",
@@ -158,6 +160,7 @@ const TRANSLATIONS = {
         password_changed: "Contraseña cambiada.",
         account_load_error: "No se pudieron cargar los datos de tu cuenta (revisa tu conexión y recarga la página).",
         language_label: "Idioma de la aplicación",
+        theme_label: "Tema", theme_light: "Claro", theme_dark: "Oscuro",
         tab_link: "Enlace", tab_text: "Texto", tab_image: "Imagen",
         label_paste_link: "Pega un enlace para analizar:", placeholder_url: "https://...",
         label_paste_text: "Pega el texto a analizar:", placeholder_text_content: "Pega el contenido que quieres analizar...",
@@ -212,6 +215,7 @@ const TRANSLATIONS = {
         password_changed: "Passwort geändert.",
         account_load_error: "Kontodaten konnten nicht geladen werden (Verbindung prüfen und Seite neu laden).",
         language_label: "App-Sprache",
+        theme_label: "Thema", theme_light: "Hell", theme_dark: "Dunkel",
         tab_link: "Link", tab_text: "Text", tab_image: "Bild",
         label_paste_link: "Link zur Analyse einfügen:", placeholder_url: "https://...",
         label_paste_text: "Text zur Analyse einfügen:", placeholder_text_content: "Füge den Inhalt ein, den du analysieren möchtest...",
@@ -266,6 +270,7 @@ const TRANSLATIONS = {
         password_changed: "Mot de passe modifié.",
         account_load_error: "Impossible de charger les données du compte (vérifiez votre connexion et rechargez la page).",
         language_label: "Langue de l'application",
+        theme_label: "Thème", theme_light: "Clair", theme_dark: "Sombre",
         tab_link: "Lien", tab_text: "Texte", tab_image: "Image",
         label_paste_link: "Collez un lien à analyser :", placeholder_url: "https://...",
         label_paste_text: "Collez le texte à analyser :", placeholder_text_content: "Collez le contenu que vous souhaitez analyser...",
@@ -320,6 +325,7 @@ const TRANSLATIONS = {
         password_changed: "Пароль изменён.",
         account_load_error: "Не удалось загрузить данные аккаунта (проверьте подключение и обновите страницу).",
         language_label: "Язык приложения",
+        theme_label: "Тема", theme_light: "Светлая", theme_dark: "Тёмная",
         tab_link: "Ссылка", tab_text: "Текст", tab_image: "Изображение",
         label_paste_link: "Вставьте ссылку для анализа:", placeholder_url: "https://...",
         label_paste_text: "Вставьте текст для анализа:", placeholder_text_content: "Вставьте содержимое, которое хотите проанализировать...",
@@ -374,6 +380,7 @@ const TRANSLATIONS = {
         password_changed: "密码已修改。",
         account_load_error: "无法加载账户数据（请检查网络连接并刷新页面）。",
         language_label: "应用语言",
+        theme_label: "主题", theme_light: "浅色", theme_dark: "深色",
         tab_link: "链接", tab_text: "文本", tab_image: "图片",
         label_paste_link: "粘贴要分析的链接：", placeholder_url: "https://...",
         label_paste_text: "粘贴要分析的文本：", placeholder_text_content: "粘贴您想分析的内容…",
@@ -428,6 +435,7 @@ const TRANSLATIONS = {
         password_changed: "パスワードを変更しました。",
         account_load_error: "アカウント情報を読み込めませんでした（接続を確認してページを再読み込みしてください）。",
         language_label: "アプリの言語",
+        theme_label: "テーマ", theme_light: "ライト", theme_dark: "ダーク",
         tab_link: "リンク", tab_text: "テキスト", tab_image: "画像",
         label_paste_link: "分析するリンクを貼り付けてください：", placeholder_url: "https://...",
         label_paste_text: "分析するテキストを貼り付けてください：", placeholder_text_content: "分析したい内容を貼り付けてください…",
@@ -482,6 +490,7 @@ const TRANSLATIONS = {
         password_changed: "पासवर्ड बदल दिया गया।",
         account_load_error: "खाते का डेटा लोड नहीं हो सका (कनेक्शन जांचें और पेज रीलोड करें)।",
         language_label: "ऐप की भाषा",
+        theme_label: "थीम", theme_light: "हल्की", theme_dark: "गहरी",
         tab_link: "लिंक", tab_text: "टेक्स्ट", tab_image: "छवि",
         label_paste_link: "विश्लेषण के लिए लिंक पेस्ट करें:", placeholder_url: "https://...",
         label_paste_text: "विश्लेषण के लिए टेक्स्ट पेस्ट करें:", placeholder_text_content: "वह सामग्री पेस्ट करें जिसका आप विश्लेषण करना चाहते हैं...",
@@ -536,6 +545,7 @@ const TRANSLATIONS = {
         password_changed: "تم تغيير كلمة المرور.",
         account_load_error: "تعذّر تحميل بيانات الحساب (تحقق من الاتصال وأعد تحميل الصفحة).",
         language_label: "لغة التطبيق",
+        theme_label: "المظهر", theme_light: "فاتح", theme_dark: "داكن",
         tab_link: "رابط", tab_text: "نص", tab_image: "صورة",
         label_paste_link: "الصق رابطًا للتحليل:", placeholder_url: "https://...",
         label_paste_text: "الصق نصًا للتحليل:", placeholder_text_content: "الصق المحتوى الذي تريد تحليله...",
@@ -626,6 +636,42 @@ function syncLanguageFromProfile(sb, userId) {
         if (data && data.language && data.language !== getCurrentLanguage()) {
             localStorage.setItem('pragma_lang', data.language);
             applyTranslations();
+        }
+    });
+}
+
+// --- Motyw (jasny/ciemny) — ten sam wzorzec co język wyżej: zapisany
+// lokalnie (działa dla niezalogowanych), a dla zalogowanych też w profilu,
+// żeby ustawienie synchronizowało się między urządzeniami. Motyw jest
+// dodatkowo ustawiany SYNCHRONICZNIE, małym inline-skryptem w <head> każdej
+// strony (przed wczytaniem CSS) — patrz komentarz w style.css przy
+// [data-theme="dark"] — więc te funkcje tylko go PODTRZYMUJĄ/ZMIENIAJĄ po
+// starcie strony, nie odpowiadają za pierwsze ustawienie przy ładowaniu.
+function getCurrentTheme() {
+    return localStorage.getItem('pragma_theme') || 'light';
+}
+
+function applyTheme() {
+    document.documentElement.setAttribute('data-theme', getCurrentTheme());
+}
+
+function setTheme(theme, sb, userId) {
+    if (theme !== 'light' && theme !== 'dark') return;
+    localStorage.setItem('pragma_theme', theme);
+    applyTheme();
+    if (sb && userId) {
+        sb.from('profiles').update({ theme: theme }).eq('id', userId).then(({ error }) => {
+            if (error) console.error('Nie udało się zapisać motywu w profilu (sprawdź reguły RLS dla UPDATE na tabeli profiles):', error);
+        });
+    }
+}
+
+function syncThemeFromProfile(sb, userId) {
+    if (!sb || !userId) return Promise.resolve();
+    return sb.from('profiles').select('theme').eq('id', userId).single().then(({ data }) => {
+        if (data && data.theme && data.theme !== getCurrentTheme()) {
+            localStorage.setItem('pragma_theme', data.theme);
+            applyTheme();
         }
     });
 }
