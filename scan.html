@@ -18,14 +18,14 @@
 <body>
 
     <div class="card" style="max-width:400px; width:100%;">
-        <a href="index.html" class="back-link">← Wróć do Pragmy</a>
+        <a href="index.html" class="back-link" data-i18n="account_back">← Wróć do Pragmy</a>
 
         <div id="scanLoading">
-            <p style="color:var(--ink-soft); margin:0;">Ładowanie...</p>
+            <p style="color:var(--ink-soft); margin:0;" data-i18n="loading">Ładowanie...</p>
         </div>
 
         <div id="scanNotFound" style="display:none;">
-            <p class="status-err">Nie znaleziono takiej analizy.</p>
+            <p class="status-err" data-i18n="scan_not_found">Nie znaleziono takiej analizy.</p>
         </div>
 
         <div id="scanContent" style="display:none;">
@@ -37,7 +37,10 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="i18n.js"></script>
     <script>
+        applyTranslations();
+
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd';
 
@@ -51,7 +54,7 @@
 
         if (!sb) {
             document.getElementById('scanLoading').innerHTML =
-                '<p class="status-err">Nie udało się wczytać analizy (sprawdź połączenie z internetem i odśwież stronę).</p>';
+                '<p class="status-err">' + t('scan_load_error') + '</p>';
         } else {
             const scanId = new URLSearchParams(window.location.search).get('id');
 
@@ -74,9 +77,9 @@
                         }
                         const r = data.result;
                         const score = r.q_score;
-                        let badgeClass = 'badge-red', label = 'Manipulacja: ' + score + '/100';
-                        if (score >= 70) { badgeClass = 'badge-green'; label = 'Czysty tekst: ' + score + '/100'; }
-                        else if (score >= 40) { badgeClass = 'badge-yellow'; label = 'Częściowo: ' + score + '/100'; }
+                        let badgeClass = 'badge-red', label = t('badge_manipulation', { score: score });
+                        if (score >= 70) { badgeClass = 'badge-green'; label = t('badge_clean', { score: score }); }
+                        else if (score >= 40) { badgeClass = 'badge-yellow'; label = t('badge_partial', { score: score }); }
 
                         const icon = data.input_type === 'url' ? '🔗' : data.input_type === 'image' ? '🖼️' : '📝';
                         // Pokazujemy link tylko, gdy to naprawdę http(s) - chroni przed
@@ -85,7 +88,7 @@
                         if (isSafeUrl) {
                             const sourceEl = document.getElementById('scanSource');
                             sourceEl.style.display = 'block';
-                            sourceEl.innerText = icon + ' Źródło: ';
+                            sourceEl.innerText = icon + ' ' + t('scan_source_label');
                             const link = document.createElement('a');
                             link.href = data.source_url;
                             link.target = '_blank';
