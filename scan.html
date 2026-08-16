@@ -29,6 +29,7 @@
         </div>
 
         <div id="scanContent" style="display:none;">
+            <p id="scanSource" style="display:none; margin:0 0 12px 0; font-size:14px;"></p>
             <div id="scanBadge" class="result-badge"></div>
             <blockquote id="scanQuote" class="result-quote"></blockquote>
             <p id="scanSummary" class="result-summary"></p>
@@ -63,7 +64,7 @@
                 showNotFound();
             } else {
                 sb.from('scans')
-                    .select('result')
+                    .select('input_type, source_url, result')
                     .eq('id', scanId)
                     .maybeSingle()
                     .then(({ data, error }) => {
@@ -76,6 +77,22 @@
                         let badgeClass = 'badge-red', label = 'Manipulacja: ' + score + '/100';
                         if (score >= 70) { badgeClass = 'badge-green'; label = 'Czysty tekst: ' + score + '/100'; }
                         else if (score >= 40) { badgeClass = 'badge-yellow'; label = 'Częściowo: ' + score + '/100'; }
+
+                        const icon = data.input_type === 'url' ? '🔗' : data.input_type === 'image' ? '🖼️' : '📝';
+                        // Pokazujemy link tylko, gdy to naprawdę http(s) - chroni przed
+                        // wstrzyknięciem np. "javascript:" jako "źródła" przez złośliwe dane.
+                        const isSafeUrl = data.source_url && /^https?:\/\//i.test(data.source_url);
+                        if (isSafeUrl) {
+                            const sourceEl = document.getElementById('scanSource');
+                            sourceEl.style.display = 'block';
+                            sourceEl.innerText = icon + ' Źródło: ';
+                            const link = document.createElement('a');
+                            link.href = data.source_url;
+                            link.target = '_blank';
+                            link.rel = 'noopener noreferrer nofollow';
+                            link.innerText = data.source_url;
+                            sourceEl.appendChild(link);
+                        }
 
                         const badge = document.getElementById('scanBadge');
                         badge.className = 'result-badge ' + badgeClass;
