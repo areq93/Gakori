@@ -78,6 +78,51 @@ const RESPONSE_SCHEMA = {
   required: ['q_score', 'patterns', 'summary'],
 }
 
+// Tłumaczy GOTOWY wynik analizy na inny język — nie analizuje treści od nowa.
+// Dużo tańsze niż pełna analiza (brak pobierania źródła, brak szukania
+// wzorców) — to fundament "efektu skali": im więcej treści mamy
+// przeanalizowanej w jakimkolwiek języku, tym taniej pokazać ją w kolejnych.
+// "quote" i "q_score" mają zostać dokładnie takie same jak w oryginale.
+async function translateResult(
+  result: Record<string, unknown>,
+  targetLangCode: string,
+  geminiKey: string
+): Promise<Record<string, unknown> | null> {
+  const langName = LANGUAGE_NAMES[targetLangCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
+  const prompt = `Przetłumacz poniższy JSON na język ${langName}. Zasady:
+- Przetłumacz WYŁĄCZNIE pola "name", "explanation" i "summary" — prostym, codziennym językiem, bez żargonu, bez akademickiego stylu.
+- Pole "quote" NIE tłumacz — zostaje dokładnie w oryginalnym brzmieniu, bez żadnych zmian.
+- Pole "q_score" zostaje dokładnie taką samą liczbą jak w oryginale.
+- Zachowaj dokładnie tę samą strukturę JSON i tę samą liczbę elementów w "patterns".
+- Zwróć WYŁĄCZNIE poprawny JSON, bez żadnego dodatkowego tekstu i bez komentarzy.
+
+JSON do przetłumaczenia:
+${JSON.stringify(result)}`
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
+        },
+      }),
+    }
+  )
+  const data = await res.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -186,59 +231,87 @@ Deno.serve(async (req: Request) => {
     // potrzebuje droższego "pełnego" Flash (3.6, $1,50/$7,50 - 5x drożej,
     // zoptymalizowanego pod kodowanie i zadania agentowe).
     const geminiKey = Deno.env.get('GEMINI_API_KEY')
-    const geminiRequestBody: Record<string, unknown> = {
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: RESPONSE_SCHEMA,
-      },
-    }
 
-    const systemPrompt = buildSystemPrompt(outputLanguage)
+    let result: Record<string, unknown> | null = null
+    let usedTranslation = false
 
-    if (input_type === 'url') {
-      // Narzędzie "URL context" — Gemini samo pobiera i czyta treść strony,
-      // nie potrzebujemy własnego scrapera.
-      geminiRequestBody.contents = [
-        { parts: [{ text: `${systemPrompt}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}` }] },
-      ]
-      geminiRequestBody.tools = [{ urlContext: {} }]
-    } else {
-      geminiRequestBody.contents = [
-        { parts: [{ text: `${systemPrompt}\n\nTEKST DO ANALIZY:\n${text_content}` }] },
-      ]
-    }
-
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geminiRequestBody),
-      }
+    // 5a. Zanim zapłacimy za pełną analizę — czy ta sama treść była już
+    // przeanalizowana w INNYM języku? Jeśli tak, dużo taniej jest przetłumaczyć
+    // gotowy wynik niż analizować od zera. Użytkownik płaci tyle samo co
+    // zawsze (patrz sekcja 4 wyżej) — to obniża tylko nasz koszt operacyjny.
+    // Tłumaczymy zawsze z prawdziwego oryginału (is_translation = false),
+    // nigdy z innego tłumaczenia, żeby jakość nie spadała z każdym kolejnym
+    // językiem ("tłumaczenie tłumaczenia").
+    const { data: originalCandidates } = await supabase
+      .from('scans')
+      .select('*')
+      .eq('content_hash', content_hash)
+      .eq('is_translation', false)
+      .limit(5)
+    const original = (originalCandidates || []).find(
+      (row: Record<string, unknown>) => Array.isArray((row.result as { patterns?: unknown })?.patterns)
     )
-    const geminiData = await geminiRes.json()
 
-    if (input_type === 'url') {
-      const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
-      if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
+    if (original) {
+      result = await translateResult(original.result as Record<string, unknown>, outputLanguage, geminiKey!)
+      if (result) usedTranslation = true
+    }
+
+    if (!result) {
+      const geminiRequestBody: Record<string, unknown> = {
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
+        },
+      }
+
+      const systemPrompt = buildSystemPrompt(outputLanguage)
+
+      if (input_type === 'url') {
+        // Narzędzie "URL context" — Gemini samo pobiera i czyta treść strony,
+        // nie potrzebujemy własnego scrapera.
+        geminiRequestBody.contents = [
+          { parts: [{ text: `${systemPrompt}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}` }] },
+        ]
+        geminiRequestBody.tools = [{ urlContext: {} }]
+      } else {
+        geminiRequestBody.contents = [
+          { parts: [{ text: `${systemPrompt}\n\nTEKST DO ANALIZY:\n${text_content}` }] },
+        ]
+      }
+
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiRequestBody),
+        }
+      )
+      const geminiData = await geminiRes.json()
+
+      if (input_type === 'url') {
+        const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
+        if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
+          return new Response(
+            JSON.stringify({
+              error: 'url_fetch_failed',
+              message: 'Nie udało się pobrać treści tej strony — sprawdź, czy link jest poprawny i publicznie dostępny.',
+            }),
+            { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
+      if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
         return new Response(
-          JSON.stringify({
-            error: 'url_fetch_failed',
-            message: 'Nie udało się pobrać treści tej strony — sprawdź, czy link jest poprawny i publicznie dostępny.',
-          }),
-          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'gemini_error', details: geminiData }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-    }
 
-    if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
-      return new Response(
-        JSON.stringify({ error: 'gemini_error', details: geminiData }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
     }
-
-    const result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
 
     // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników)
     const finalCost = user_id ? cost : 0
@@ -248,6 +321,7 @@ Deno.serve(async (req: Request) => {
         content_hash,
         input_type,
         language: outputLanguage,
+        is_translation: usedTranslation,
         source_url: input_type === 'url' ? source_url : null,
         char_count: input_type === 'url' ? 0 : char_count,
         credits_charged: finalCost,
