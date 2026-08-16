@@ -30,6 +30,7 @@
             </div>
             <input type="email" id="authEmail" placeholder="e-mail" autocomplete="email">
             <input type="password" id="authPassword" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
+            <div class="cf-turnstile" data-sitekey="0x4AAAAAAERY10ded3P_8tNf" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin:10px 0;"></div>
             <button id="authSubmitBtn" type="button">Zaloguj się</button>
             <div style="text-align:center; margin-top:8px;">
                 <a href="#" id="forgotPasswordLink" style="font-size:13px; color:#b8502f;">Zapomniałeś hasła?</a>
@@ -93,6 +94,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <script>
         // ===== KONFIGURACJA POŁĄCZENIA Z BACKENDEM =====
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
@@ -110,6 +112,17 @@
         }
         let currentSession = null;
 
+        // Weryfikacja "nie jestem robotem" (Cloudflare Turnstile) — chroni rejestrację,
+        // logowanie i reset hasła przed masowym, automatycznym zakładaniem kont.
+        let turnstileToken = null;
+        window.onTurnstileSuccess = (token) => { turnstileToken = token; };
+        window.onTurnstileError = () => { turnstileToken = null; };
+        window.onTurnstileExpired = () => { turnstileToken = null; };
+        function resetTurnstile() {
+            turnstileToken = null;
+            if (window.turnstile) window.turnstile.reset();
+        }
+
         // 0. Tłumaczenie typowych błędów Supabase Auth na przyjazny polski komunikat
         function translateAuthError(err) {
             const msg = (err && err.message) || String(err);
@@ -118,6 +131,7 @@
             if (msg.includes('Password should be at least')) return 'Hasło musi mieć co najmniej 6 znaków.';
             if (msg.includes('Email not confirmed')) return 'Potwierdź adres e-mail — sprawdź skrzynkę i kliknij link, który wysłaliśmy.';
             if (msg.includes('Unable to validate email')) return 'Nieprawidłowy format adresu e-mail.';
+            if (msg.toLowerCase().includes('captcha')) return 'Potwierdź, że nie jesteś robotem (zaznacz pole powyżej) i spróbuj ponownie.';
             return msg;
         }
 
@@ -176,16 +190,26 @@
                 statusEl.innerHTML = '<span class="status-err">Podaj e-mail i hasło.</span>';
                 return;
             }
+            if (!turnstileToken) {
+                statusEl.innerHTML = '<span class="status-err">Zaznacz pole "nie jestem robotem" powyżej.</span>';
+                return;
+            }
             statusEl.innerText = 'Chwileczkę...';
             try {
                 if (authFormMode === 'login') {
-                    const { error } = await sb.auth.signInWithPassword({ email, password });
+                    const { error } = await sb.auth.signInWithPassword({
+                        email, password,
+                        options: { captchaToken: turnstileToken }
+                    });
                     if (error) throw error;
                     statusEl.innerText = '';
                 } else {
                     const { data, error } = await sb.auth.signUp({
                         email, password,
-                        options: { emailRedirectTo: window.location.origin + window.location.pathname }
+                        options: {
+                            emailRedirectTo: window.location.origin + window.location.pathname,
+                            captchaToken: turnstileToken
+                        }
                     });
                     if (error) throw error;
                     // Supabase celowo nie zwraca błędu dla już istniejącego, potwierdzonego
@@ -200,6 +224,8 @@
                 }
             } catch (err) {
                 statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
+            } finally {
+                resetTurnstile();
             }
         });
 
@@ -212,14 +238,21 @@
                 statusEl.innerHTML = '<span class="status-err">Najpierw wpisz swój e-mail powyżej.</span>';
                 return;
             }
+            if (!turnstileToken) {
+                statusEl.innerHTML = '<span class="status-err">Zaznacz pole "nie jestem robotem" powyżej.</span>';
+                return;
+            }
             try {
                 const { error } = await sb.auth.resetPasswordForEmail(email, {
-                    redirectTo: window.location.origin + window.location.pathname
+                    redirectTo: window.location.origin + window.location.pathname,
+                    captchaToken: turnstileToken
                 });
                 if (error) throw error;
                 statusEl.innerHTML = '<span class="status-ok">Wysłaliśmy link do zresetowania hasła na Twój e-mail.</span>';
             } catch (err) {
                 statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
+            } finally {
+                resetTurnstile();
             }
         });
 
