@@ -29,12 +29,12 @@ body {
     line-height: 1.5;
 }
 h1 {
-    font-family: 'Lora', Georgia, 'Iowan Old Style', serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 2.2rem; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
     text-align: center; margin: 0 0 4px 0;
 }
 h2 {
-    font-family: 'Lora', Georgia, 'Iowan Old Style', serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 1.4rem; font-weight: 700; color: var(--ink); margin: 0 0 16px 0;
 }
 .tagline { margin: 0 0 20px 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.45; text-align: center; }
