@@ -197,6 +197,12 @@
             });
         }
 
+        function inputTypeIcon(inputType) {
+            if (inputType === 'url') return '🔗';
+            if (inputType === 'image') return '🖼️';
+            return '📝';
+        }
+
         // Usuwa znaki mające specjalne znaczenie w składni filtrów PostgREST/ilike,
         // żeby wpisany tekst nie mógł zmienić kształtu zapytania do bazy.
         function sanitizeSearchQuery(str) {
@@ -213,7 +219,7 @@
             listEl.appendChild(loadingEl);
 
             const query = sanitizeSearchQuery(rawQuery);
-            let request = sb.from('scans').select('id, result, created_at');
+            let request = sb.from('scans').select('id, input_type, result, created_at');
             if (query) {
                 request = request.or('result->>source_quote.ilike.%' + query + '%,result->>summary.ilike.%' + query + '%');
             }
@@ -252,6 +258,11 @@
                         const row = document.createElement('a');
                         row.className = 'scan-row';
                         row.href = 'scan.html?id=' + encodeURIComponent(scan.id);
+
+                        const icon = document.createElement('span');
+                        icon.className = 'scan-row-icon';
+                        icon.innerText = inputTypeIcon(scan.input_type);
+                        row.appendChild(icon);
 
                         const badge = document.createElement('span');
                         badge.className = 'result-badge ' + badgeClass;

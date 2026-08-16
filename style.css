@@ -105,6 +105,7 @@ a { color: var(--accent); }
 }
 .scan-row:last-child { border-bottom: none; }
 .scan-row:hover { background: rgba(184, 80, 47, 0.06); }
+.scan-row-icon { flex-shrink: 0; font-size: 15px; }
 .scan-row .result-badge { flex-shrink: 0; margin-bottom: 0; padding: 4px 10px; font-size: 12.5px; }
 .scan-row-snippet { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scan-row-arrow { flex-shrink: 0; color: var(--ink-soft); }
