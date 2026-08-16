@@ -50,9 +50,8 @@
 
     <div class="card" id="publicScansCard" style="display:none;">
         <h2>Zobacz, co już wykryliśmy</h2>
-        <p class="tagline" style="text-align:left; margin-bottom:16px;">Prawdziwe analizy zrobione przez innych użytkowników Pragmy.</p>
+        <input type="search" id="publicScansSearch" placeholder="Szukaj po słowach kluczowych...">
         <div id="publicScansList"></div>
-        <p style="text-align:center; font-size:13px; color:var(--ink-soft); margin:16px 0 0 0;">Chcesz sprawdzić własny tekst? <a href="#" id="publicScansSignupLink">Załóż darmowe konto</a>.</p>
     </div>
 
     <div class="card" id="analyzeCard" style="display:none;">
@@ -168,7 +167,7 @@
                 userMenuBtn.style.display = 'none';
                 analyzeCard.style.display = 'none';
                 publicScansCard.style.display = 'block';
-                loadPublicScans();
+                initPublicScans();
             }
         }
 
@@ -182,10 +181,29 @@
 
         // 0b-bis. Przeglądarka publicznych analiz (dla niezalogowanych) — czyta bezpośrednio
         // ze wspólnego cache'u (tabela "scans" ma publiczny odczyt w RLS), zero kosztu API.
-        let publicScansLoaded = false;
-        function loadPublicScans() {
-            if (publicScansLoaded) return;
-            publicScansLoaded = true;
+        // Pole wyszukiwania filtruje po słowach kluczowych w czasie rzeczywistym (z małym
+        // opóźnieniem, żeby nie odpytywać bazy przy każdym naciśnięciu klawisza).
+        let publicScansInitialized = false;
+        function initPublicScans() {
+            if (publicScansInitialized) return;
+            publicScansInitialized = true;
+            fetchAndRenderScans('');
+
+            let searchDebounce = null;
+            document.getElementById('publicScansSearch').addEventListener('input', (e) => {
+                clearTimeout(searchDebounce);
+                const query = e.target.value;
+                searchDebounce = setTimeout(() => fetchAndRenderScans(query), 300);
+            });
+        }
+
+        // Usuwa znaki mające specjalne znaczenie w składni filtrów PostgREST/ilike,
+        // żeby wpisany tekst nie mógł zmienić kształtu zapytania do bazy.
+        function sanitizeSearchQuery(str) {
+            return str.replace(/[,()."'\\%_]/g, ' ').trim();
+        }
+
+        function fetchAndRenderScans(rawQuery) {
             const listEl = document.getElementById('publicScansList');
             listEl.innerHTML = '';
             const loadingEl = document.createElement('p');
@@ -194,10 +212,15 @@
             loadingEl.innerText = 'Wczytywanie...';
             listEl.appendChild(loadingEl);
 
-            sb.from('scans')
-                .select('id, result, created_at')
+            const query = sanitizeSearchQuery(rawQuery);
+            let request = sb.from('scans').select('id, result, created_at');
+            if (query) {
+                request = request.or('result->>source_quote.ilike.%' + query + '%,result->>summary.ilike.%' + query + '%');
+            }
+
+            request
                 .order('created_at', { ascending: false })
-                .limit(8)
+                .limit(20)
                 .then(({ data, error }) => {
                     listEl.innerHTML = '';
                     if (error) {
@@ -212,7 +235,7 @@
                         const p = document.createElement('p');
                         p.style.textAlign = 'center';
                         p.style.color = 'var(--ink-soft)';
-                        p.innerText = 'Jeszcze nic tu nie ma — bądź pierwszy!';
+                        p.innerText = query ? 'Brak wyników dla "' + query + '".' : 'Jeszcze nic tu nie ma — bądź pierwszy!';
                         listEl.appendChild(p);
                         return;
                     }
@@ -250,12 +273,6 @@
                     });
                 });
         }
-
-        document.getElementById('publicScansSignupLink').addEventListener('click', (e) => {
-            e.preventDefault();
-            setAuthMode('signup');
-            document.getElementById('authCard').scrollIntoView({ behavior: 'smooth' });
-        });
 
         // 0c. Przełączanie Zaloguj / Zarejestruj
         let authFormMode = 'login';
