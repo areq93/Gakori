@@ -323,10 +323,15 @@ Deno.serve(async (req: Request) => {
       if (input_type === 'url') {
         const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
         if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
+          // "details" trafia tylko do panelu debugowania (?debug=1) na froncie —
+          // pozwala zobaczyć PRAWDZIWY powód odmowy Google (np. blokada strony,
+          // strona wymaga zalogowania/paywall, strona nie istnieje) zamiast
+          // zgadywać. Zwykły użytkownik widzi tylko ogólny komunikat "message".
           return new Response(
             JSON.stringify({
               error: 'url_fetch_failed',
               message: 'Nie udało się pobrać treści tej strony — sprawdź, czy link jest poprawny i publicznie dostępny.',
+              details: { retrievalStatus },
             }),
             { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
