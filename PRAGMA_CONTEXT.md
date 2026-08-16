@@ -131,6 +131,19 @@ zanim założysz, że działa.
   API narzędzie **URL Context** (`tools: [{ urlContext: {} }]`) — model
   sam pobiera i czyta stronę, bez własnego scrapera. Obraz: jeszcze nie
   zaimplementowany (`input_type: "image"` zwraca `501 not_implemented`).
+  - **Awaryjne pobranie strony (`fetchUrlAsText()`)**: niektóre strony
+    (np. duże portale newsowe typu onet.pl) odrzucają robota Google z
+    ogólnym kodem `URL_RETRIEVAL_STATUS_ERROR` — bez podania konkretnego
+    powodu. Gdy tak się stanie, backend sam pobiera stronę bezpośrednio
+    (nagłówki jak z przeglądarki), zdejmuje znaczniki HTML "na surowo" i
+    przekazuje to jako zwykły tekst do analizy. To NIE jest inteligentny
+    ekstraktor treści artykułu (może złapać menu/stopkę razem z tekstem) —
+    świadomy kompromis: analiza z odrobiną szumu jest lepsza niż żadna.
+    Jeśli i to się nie uda (np. strona ma prawdziwą ochronę typu
+    Cloudflare/JS-challenge, nie tylko blokadę po nazwie robota) — dopiero
+    wtedy użytkownik widzi błąd `url_fetch_failed`. Prawdziwy powód
+    (`retrievalStatus` z Gemini) trafia do pola `details` w odpowiedzi,
+    widocznego tylko w panelu debugowania frontendu (`?debug=1`).
 - **Wiele wzorców manipulacji na analizę**: `result.patterns` to lista
   `{name, quote, explanation}`, nie pojedynczy wynik. Stare, już
   zcache'owane analizy mają starą strukturę (`source_quote`) — frontend
