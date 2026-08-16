@@ -29,10 +29,13 @@
         </div>
 
         <div id="scanContent" style="display:none;">
-            <p id="scanSource" style="display:none; margin:0 0 12px 0; font-size:14px;"></p>
+            <p id="scanSource" class="scan-source-box" style="display:none;"></p>
             <div id="scanBadge" class="result-badge"></div>
             <div id="scanPatterns"></div>
-            <p id="scanSummary" class="result-summary"></p>
+            <div class="summary-block">
+                <p class="summary-label" data-i18n="summary_label">Podsumowanie</p>
+                <p id="scanSummary" class="result-summary"></p>
+            </div>
         </div>
     </div>
 
@@ -107,14 +110,27 @@
                         const patternsEl = document.getElementById('scanPatterns');
                         if (Array.isArray(r.patterns)) {
                             r.patterns.forEach(p => {
+                                // Starsze, już zcache'owane analizy sprzed tej zmiany nie mają
+                                // pattern_type/tip — domyślnie traktujemy je jako "manipulation"
+                                // (tak było jedyne dostępne znaczenie przed wprowadzeniem drugiego typu).
+                                const isReasoning = p.pattern_type === 'reasoning';
                                 const item = document.createElement('div');
-                                item.className = 'pattern-item';
+                                item.className = 'pattern-item ' + (isReasoning ? 'pattern-reasoning' : 'pattern-manipulation');
+
+                                const header = document.createElement('div');
+                                header.className = 'pattern-header';
+                                const tag = document.createElement('span');
+                                tag.className = 'pattern-tag';
+                                tag.innerText = t(isReasoning ? 'pattern_tag_reasoning' : 'pattern_tag_manipulation');
+                                header.appendChild(tag);
                                 if (p.name) {
-                                    const name = document.createElement('div');
+                                    const name = document.createElement('span');
                                     name.className = 'pattern-name';
                                     name.innerText = p.name;
-                                    item.appendChild(name);
+                                    header.appendChild(name);
                                 }
+                                item.appendChild(header);
+
                                 const quote = document.createElement('blockquote');
                                 quote.className = 'result-quote';
                                 quote.innerText = '„' + p.quote + '"';
@@ -124,6 +140,18 @@
                                     explanation.className = 'pattern-explanation';
                                     explanation.innerText = p.explanation;
                                     item.appendChild(explanation);
+                                }
+                                if (p.tip) {
+                                    const tip = document.createElement('div');
+                                    tip.className = 'pattern-tip';
+                                    const tipLabel = document.createElement('span');
+                                    tipLabel.className = 'pattern-tip-label';
+                                    tipLabel.innerText = t('tip_label');
+                                    tip.appendChild(tipLabel);
+                                    const tipText = document.createElement('span');
+                                    tipText.innerText = p.tip;
+                                    tip.appendChild(tipText);
+                                    item.appendChild(tip);
                                 }
                                 patternsEl.appendChild(item);
                             });

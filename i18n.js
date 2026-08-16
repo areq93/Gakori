@@ -69,6 +69,7 @@ const TRANSLATIONS = {
         public_scans_empty: "Jeszcze nic tu nie ma — bądź pierwszy!",
         public_scans_no_results: "Brak wyników dla \"{query}\".", public_scans_load_error: "Nie udało się wczytać.",
         scan_not_found: "Nie znaleziono takiej analizy.", scan_source_label: "Źródło: ",
+        tip_label: "Co teraz zrobić:", pattern_tag_manipulation: "WZORZEC", pattern_tag_reasoning: "OBSERWACJA", summary_label: "Podsumowanie",
         scan_load_error: "Nie udało się wczytać analizy (sprawdź połączenie z internetem i odśwież stronę).",
     },
     en: {
@@ -119,6 +120,7 @@ const TRANSLATIONS = {
         public_scans_empty: "Nothing here yet — be the first!",
         public_scans_no_results: "No results for \"{query}\".", public_scans_load_error: "Couldn't load.",
         scan_not_found: "This analysis could not be found.", scan_source_label: "Source: ",
+        tip_label: "What to do now:", pattern_tag_manipulation: "PATTERN", pattern_tag_reasoning: "OBSERVATION", summary_label: "Summary",
         scan_load_error: "Couldn't load the analysis (check your connection and reload the page).",
     },
     es: {
@@ -169,6 +171,7 @@ const TRANSLATIONS = {
         public_scans_empty: "Todavía no hay nada aquí — ¡sé el primero!",
         public_scans_no_results: "Sin resultados para \"{query}\".", public_scans_load_error: "No se pudo cargar.",
         scan_not_found: "No se encontró este análisis.", scan_source_label: "Fuente: ",
+        tip_label: "Qué hacer ahora:", pattern_tag_manipulation: "PATRÓN", pattern_tag_reasoning: "OBSERVACIÓN", summary_label: "Resumen",
         scan_load_error: "No se pudo cargar el análisis (revisa tu conexión y recarga la página).",
     },
     de: {
@@ -219,6 +222,7 @@ const TRANSLATIONS = {
         public_scans_empty: "Hier ist noch nichts — sei der Erste!",
         public_scans_no_results: "Keine Ergebnisse für \"{query}\".", public_scans_load_error: "Laden fehlgeschlagen.",
         scan_not_found: "Diese Analyse wurde nicht gefunden.", scan_source_label: "Quelle: ",
+        tip_label: "Was jetzt tun:", pattern_tag_manipulation: "MUSTER", pattern_tag_reasoning: "BEOBACHTUNG", summary_label: "Zusammenfassung",
         scan_load_error: "Analyse konnte nicht geladen werden (Verbindung prüfen und Seite neu laden).",
     },
     fr: {
@@ -269,6 +273,7 @@ const TRANSLATIONS = {
         public_scans_empty: "Rien ici pour l'instant — soyez le premier !",
         public_scans_no_results: "Aucun résultat pour \"{query}\".", public_scans_load_error: "Échec du chargement.",
         scan_not_found: "Cette analyse est introuvable.", scan_source_label: "Source : ",
+        tip_label: "Que faire maintenant :", pattern_tag_manipulation: "SCHÉMA", pattern_tag_reasoning: "OBSERVATION", summary_label: "Résumé",
         scan_load_error: "Impossible de charger l'analyse (vérifiez votre connexion et rechargez la page).",
     },
     ru: {
@@ -319,6 +324,7 @@ const TRANSLATIONS = {
         public_scans_empty: "Здесь пока пусто — станьте первым!",
         public_scans_no_results: "Нет результатов по запросу \"{query}\".", public_scans_load_error: "Не удалось загрузить.",
         scan_not_found: "Такой анализ не найден.", scan_source_label: "Источник: ",
+        tip_label: "Что делать сейчас:", pattern_tag_manipulation: "ПРИЁМ", pattern_tag_reasoning: "НАБЛЮДЕНИЕ", summary_label: "Итог",
         scan_load_error: "Не удалось загрузить анализ (проверьте подключение и обновите страницу).",
     },
     zh: {
@@ -369,6 +375,7 @@ const TRANSLATIONS = {
         public_scans_empty: "这里还没有内容——成为第一个吧！",
         public_scans_no_results: "没有找到与“{query}”相关的结果。", public_scans_load_error: "加载失败。",
         scan_not_found: "未找到该分析。", scan_source_label: "来源：",
+        tip_label: "现在该怎么做：", pattern_tag_manipulation: "手法", pattern_tag_reasoning: "观察", summary_label: "总结",
         scan_load_error: "无法加载分析结果（请检查网络连接并刷新页面）。",
     },
     ja: {
@@ -419,6 +426,7 @@ const TRANSLATIONS = {
         public_scans_empty: "まだ何もありません — あなたが最初になりましょう！",
         public_scans_no_results: "「{query}」に一致する結果はありません。", public_scans_load_error: "読み込みに失敗しました。",
         scan_not_found: "この分析結果は見つかりませんでした。", scan_source_label: "出典：",
+        tip_label: "今できること：", pattern_tag_manipulation: "パターン", pattern_tag_reasoning: "気づき", summary_label: "まとめ",
         scan_load_error: "分析結果を読み込めませんでした（接続を確認してページを再読み込みしてください）。",
     },
     hi: {
@@ -469,6 +477,7 @@ const TRANSLATIONS = {
         public_scans_empty: "यहां अभी तक कुछ नहीं है — पहले बनें!",
         public_scans_no_results: "\"{query}\" के लिए कोई परिणाम नहीं।", public_scans_load_error: "लोड नहीं हो सका।",
         scan_not_found: "यह विश्लेषण नहीं मिला।", scan_source_label: "स्रोत: ",
+        tip_label: "अभी क्या करें:", pattern_tag_manipulation: "पैटर्न", pattern_tag_reasoning: "अवलोकन", summary_label: "सारांश",
         scan_load_error: "विश्लेषण लोड नहीं हो सका (कनेक्शन जांचें और पेज रीलोड करें)।",
     },
     ar: {
@@ -519,6 +528,7 @@ const TRANSLATIONS = {
         public_scans_empty: "لا يوجد شيء هنا بعد — كن الأول!",
         public_scans_no_results: "لا توجد نتائج لـ \"{query}\".", public_scans_load_error: "تعذّر التحميل.",
         scan_not_found: "لم يتم العثور على هذا التحليل.", scan_source_label: "المصدر: ",
+        tip_label: "ماذا تفعل الآن:", pattern_tag_manipulation: "نمط", pattern_tag_reasoning: "ملاحظة", summary_label: "الملخص",
         scan_load_error: "تعذّر تحميل التحليل (تحقق من الاتصال وأعد تحميل الصفحة).",
     },
 };

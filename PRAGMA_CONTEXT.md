@@ -145,10 +145,39 @@ zanim założysz, że działa.
     wtedy użytkownik widzi błąd `url_fetch_failed`. Prawdziwy powód
     (`retrievalStatus` z Gemini) trafia do pola `details` w odpowiedzi,
     widocznego tylko w panelu debugowania frontendu (`?debug=1`).
-- **Wiele wzorców manipulacji na analizę**: `result.patterns` to lista
-  `{name, quote, explanation}`, nie pojedynczy wynik. Stare, już
-  zcache'owane analizy mają starą strukturę (`source_quote`) — frontend
-  obsługuje oba warianty (nigdy nie zostaną przeliczone).
+- **Wiele wzorców na analizę + typ + praktyczna podpowiedź**: `result.patterns`
+  to lista `{pattern_type, name, quote, explanation, tip}`, nie pojedynczy
+  wynik. Stare, już zcache'owane analizy mają starszą strukturę (część ma
+  `source_quote` zamiast `patterns`, część ma `patterns` bez `pattern_type`/
+  `tip`) — frontend (`scan.html`) obsługuje wszystkie warianty (nigdy nie
+  zostaną przeliczone, brak `pattern_type` traktowany jako `manipulation`,
+  brak `tip` po prostu nie pokazuje tej sekcji).
+  - `pattern_type`: `"manipulation"` (wzorzec manipulacji/błąd poznawczy) albo
+    `"reasoning"` (trafny, wartościowy sposób rozumowania — Pragma ma
+    aktywnie szukać OBU typów, nie tylko manipulacji, patrz sekcja o 100
+    modelach mentalnych wyżej). Wartość NIE jest tłumaczona (zawsze
+    angielskie słowo), frontend mapuje ją na etykietę przez i18n
+    (`pattern_tag_manipulation`/`pattern_tag_reasoning`) i inny kolor
+    obramowania (czerwony/pomarańczowy vs niebieski).
+  - `tip`: krótka, PRAKTYCZNA podpowiedź "co teraz zrobić" (sprawdź,
+    poszukaj, odczekaj) — **świadomie NIGDY oceniająca** ("ufaj"/"nie
+    ufaj"/"dobre"/"złe"/"wiarygodne"). To ważna, przemyślana granica: gdyby
+    Pragma zaczęła wydawać takie werdykty (nawet przy `pattern_type:
+    "reasoning"`), sama stałaby się tym, przed czym ostrzega (Argument z
+    Autorytetu — "wierz, bo brzmi rzetelnie"). Zasada ustalona z
+    użytkownikiem wprost: **nie zaspokajamy ludzkiej potrzeby "łatwego
+    wyroku" wyrokiem, tylko konkretną czynnością do wykonania** — to buduje
+    nawyk samodzielnego myślenia, nie zastępuje go.
+  - **Wygląd wyniku na `scan.html`**: każdy wzorzec to osobna, wyraźnie
+    odgraniczona ramka (`pattern-item`) z kolorowym paskiem po lewej
+    (czerwony/pomarańczowy dla `manipulation`, niebieski dla `reasoning`),
+    małą etykietą typu, nazwą, cytatem, wyjaśnieniem i (jeśli jest) ramką
+    z podpowiedzią "Co teraz zrobić". Źródło (link) ma własne, odznaczone
+    tłem pole (`scan-source-box`). Podsumowanie jest oddzielone linią i
+    małym nagłówkiem "Podsumowanie" (`summary-block`) na dole. Style w
+    `style.css` — jeśli dodajesz nowe pole do wyniku, trzymaj się tego
+    samego wzorca (osobna, podpisana sekcja, nie gołe zdanie wtopione w
+    resztę tekstu).
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
