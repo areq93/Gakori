@@ -106,6 +106,11 @@
     <script>
         applyTranslations();
 
+        // Zadeklarowane tu (zamiast jako "function" wewnątrz bloku "else" niżej),
+        // żeby był dostępny również stąd, z selektora języka na ekranie logowania,
+        // który działa niezależnie od tego, czy Supabase się wczytał.
+        let fetchAndRenderScans;
+
         // Wybór języka jeszcze przed zalogowaniem/rejestracją — działa zawsze,
         // niezależnie od tego, czy Supabase się wczytał (zmienia tylko localStorage,
         // do konta trafia dopiero po założeniu go, patrz sekcja 0d i 0f).
@@ -130,6 +135,7 @@
         // ===== KONFIGURACJA POŁĄCZENIA Z BACKENDEM =====
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
         const SUPABASE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/analyze';
+        const SUPABASE_TRANSLATE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/translate-scan';
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd'; // Project Settings -> API Keys -> Publishable key
 
         // Logowanie zależy od zewnętrznej biblioteki (CDN) — jeśli się nie wczyta
@@ -246,7 +252,7 @@
             return str.replace(/[,()."'\\%_]/g, ' ').trim();
         }
 
-        function fetchAndRenderScans(rawQuery) {
+        fetchAndRenderScans = async function (rawQuery) {
             const listEl = document.getElementById('publicScansList');
             listEl.innerHTML = '';
             const loadingEl = document.createElement('p');
@@ -256,72 +262,117 @@
             listEl.appendChild(loadingEl);
 
             const query = sanitizeSearchQuery(rawQuery);
-            let request = sb.from('scans').select('id, input_type, result, created_at').eq('language', getCurrentLanguage());
+            const currentLang = getCurrentLanguage();
+            let request = sb.from('scans').select('id, content_hash, input_type, result, created_at').eq('language', currentLang);
             if (query) {
                 request = request.or('result->>source_quote.ilike.%' + query + '%,result->>summary.ilike.%' + query + '%');
             }
 
-            request
-                .order('created_at', { ascending: false })
-                .limit(20)
-                .then(({ data, error }) => {
-                    listEl.innerHTML = '';
-                    if (error) {
-                        console.error(error);
-                        const p = document.createElement('p');
-                        p.className = 'status-err';
-                        p.innerText = t('public_scans_load_error');
-                        listEl.appendChild(p);
-                        return;
+            const { data, error } = await request.order('created_at', { ascending: false }).limit(20);
+
+            listEl.innerHTML = '';
+            if (error) {
+                console.error(error);
+                const p = document.createElement('p');
+                p.className = 'status-err';
+                p.innerText = t('public_scans_load_error');
+                listEl.appendChild(p);
+                return;
+            }
+
+            let scans = data || [];
+
+            // Lista bywa uboga w nowym/rzadziej używanym języku (mało zgłoszeń
+            // wprost w nim) — dotłumaczamy "w locie" kilka najpopularniejszych
+            // analiz z innych języków, żeby przeglądarka nigdy nie świeciła
+            // pustkami. Tylko dla domyślnego (pustego) przeglądania — wyszukiwanie
+            // zostaje ograniczone do tego, co już istnieje w tym języku, żeby nie
+            // dotłumaczać przy każdym wpisanym słowie kluczowym.
+            if (!query && scans.length < 6) {
+                const known = new Set(scans.map(s => s.content_hash));
+                const { data: candidates } = await sb
+                    .from('scans')
+                    .select('content_hash')
+                    .order('view_count', { ascending: false })
+                    .limit(15);
+                const gapHashes = [];
+                (candidates || []).forEach(c => {
+                    if (!known.has(c.content_hash) && gapHashes.indexOf(c.content_hash) === -1) {
+                        gapHashes.push(c.content_hash);
                     }
-                    if (!data || data.length === 0) {
-                        const p = document.createElement('p');
-                        p.style.textAlign = 'center';
-                        p.style.color = 'var(--ink-soft)';
-                        p.innerText = query ? t('public_scans_no_results', { query: query }) : t('public_scans_empty');
-                        listEl.appendChild(p);
-                        return;
-                    }
-                    // Wszystkie wartości z bazy wstawiamy przez innerText (nie innerHTML),
-                    // żeby treść analizowana przez innych użytkowników nie mogła wstrzyknąć
-                    // kodu HTML na stronie widocznej dla wszystkich odwiedzających.
-                    data.forEach(scan => {
-                        const r = scan.result || {};
-                        const score = r.q_score;
-                        let badgeClass = 'badge-red', label = score + '/100';
-                        if (score >= 70) badgeClass = 'badge-green';
-                        else if (score >= 40) badgeClass = 'badge-yellow';
-
-                        const row = document.createElement('a');
-                        row.className = 'scan-row';
-                        row.href = 'scan.html?id=' + encodeURIComponent(scan.id);
-
-                        const icon = document.createElement('span');
-                        icon.className = 'scan-row-icon';
-                        icon.innerText = inputTypeIcon(scan.input_type);
-                        row.appendChild(icon);
-
-                        const badge = document.createElement('span');
-                        badge.className = 'result-badge ' + badgeClass;
-                        badge.innerText = label;
-                        row.appendChild(badge);
-
-                        const snippet = document.createElement('span');
-                        snippet.className = 'scan-row-snippet';
-                        const firstPatternQuote = Array.isArray(r.patterns) && r.patterns[0] ? r.patterns[0].quote : null;
-                        const rawSnippet = firstPatternQuote || r.source_quote || r.summary || '';
-                        snippet.innerText = rawSnippet.length > 60 ? rawSnippet.slice(0, 60) + '…' : rawSnippet;
-                        row.appendChild(snippet);
-
-                        const arrow = document.createElement('span');
-                        arrow.className = 'scan-row-arrow';
-                        arrow.innerText = '→';
-                        row.appendChild(arrow);
-
-                        listEl.appendChild(row);
-                    });
                 });
-        }
+                const toFill = gapHashes.slice(0, 6 - scans.length);
+
+                if (toFill.length > 0) {
+                    const filled = await Promise.allSettled(
+                        toFill.map(hash =>
+                            fetch(SUPABASE_TRANSLATE_FUNCTION_URL, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                                    'apikey': SUPABASE_ANON_KEY
+                                },
+                                body: JSON.stringify({ content_hash: hash, language: currentLang })
+                            }).then(res => res.json())
+                        )
+                    );
+                    filled.forEach(r => {
+                        if (r.status === 'fulfilled' && r.value && r.value.scan) {
+                            scans.push(r.value.scan);
+                        }
+                    });
+                }
+            }
+
+            if (scans.length === 0) {
+                const p = document.createElement('p');
+                p.style.textAlign = 'center';
+                p.style.color = 'var(--ink-soft)';
+                p.innerText = query ? t('public_scans_no_results', { query: query }) : t('public_scans_empty');
+                listEl.appendChild(p);
+                return;
+            }
+
+            // Wszystkie wartości z bazy wstawiamy przez innerText (nie innerHTML),
+            // żeby treść analizowana przez innych użytkowników nie mogła wstrzyknąć
+            // kodu HTML na stronie widocznej dla wszystkich odwiedzających.
+            scans.forEach(scan => {
+                const r = scan.result || {};
+                const score = r.q_score;
+                let badgeClass = 'badge-red', label = score + '/100';
+                if (score >= 70) badgeClass = 'badge-green';
+                else if (score >= 40) badgeClass = 'badge-yellow';
+
+                const row = document.createElement('a');
+                row.className = 'scan-row';
+                row.href = 'scan.html?id=' + encodeURIComponent(scan.id);
+
+                const icon = document.createElement('span');
+                icon.className = 'scan-row-icon';
+                icon.innerText = inputTypeIcon(scan.input_type);
+                row.appendChild(icon);
+
+                const badge = document.createElement('span');
+                badge.className = 'result-badge ' + badgeClass;
+                badge.innerText = label;
+                row.appendChild(badge);
+
+                const snippet = document.createElement('span');
+                snippet.className = 'scan-row-snippet';
+                const firstPatternQuote = Array.isArray(r.patterns) && r.patterns[0] ? r.patterns[0].quote : null;
+                const rawSnippet = firstPatternQuote || r.source_quote || r.summary || '';
+                snippet.innerText = rawSnippet.length > 60 ? rawSnippet.slice(0, 60) + '…' : rawSnippet;
+                row.appendChild(snippet);
+
+                const arrow = document.createElement('span');
+                arrow.className = 'scan-row-arrow';
+                arrow.innerText = '→';
+                row.appendChild(arrow);
+
+                listEl.appendChild(row);
+            });
+        };
 
         // 0c. Przełączanie Zaloguj / Zarejestruj
         let authFormMode = 'login';

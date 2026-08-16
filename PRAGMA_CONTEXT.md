@@ -111,8 +111,12 @@ zanim założysz, że działa.
   "surowego"/generycznego wyglądu).
 - `sw.js` — Service Worker (PWA offline + cache).
 - `manifest.json`, `icon-192.png`, `icon-512.png` — standardowe pliki PWA.
-- `supabase/functions/analyze/index.ts` — jedyny backend: Deno Edge
+- `supabase/functions/analyze/index.ts` — główny backend: Deno Edge
   Function wywoływana przez frontend, rozmawia z Gemini API i z bazą.
+- `supabase/functions/translate-scan/index.ts` — druga, mała Edge Function:
+  tanie tłumaczenie GOTOWEGO wyniku na inny język (zamiast pełnej analizy
+  od zera), używana przez przeglądarkę publicznych analiz do dopełniania
+  luk językowych. Zawsze darmowa, bez logowania.
 
 ## Zaimplementowane funkcje (stan na dziś)
 
@@ -160,6 +164,23 @@ zanim założysz, że działa.
 - **Model AI**: `gemini-3.5-flash-lite` (świadomy wybór — prosta
   klasyfikacja tekstu nie potrzebuje droższego "pełnego" Flash
   zoptymalizowanego pod kodowanie/zadania agentowe).
+- **Ponowne użycie przez tłumaczenie (efekt skali między językami)**: gdy
+  ktoś prosi o analizę treści, która **już istnieje w innym języku**,
+  backend (`analyze`) zamiast płacić za pełną analizę AI od zera, tanio
+  **tłumaczy gotowy wynik** (`translateResult()` — tylko `name`/
+  `explanation`/`summary`, `quote` i `q_score` zostają bez zmian).
+  Użytkownik płaci **dokładnie tyle samo**, co za zwykłą analizę — to
+  obniża wyłącznie nasz koszt operacyjny, nie cenę dla użytkownika.
+  Tłumaczymy zawsze z prawdziwego oryginału (`is_translation = false`),
+  nigdy z innego tłumaczenia (żeby jakość nie spadała z każdym kolejnym
+  językiem). Przeglądarka publicznych analiz korzysta z osobnej, darmowej
+  funkcji `translate-scan` do leniwego dopełniania listy w językach, w
+  których dana treść nie była jeszcze wprost zgłoszona — tylko przy
+  domyślnym (pustym) przeglądaniu, gdy wyników w danym języku jest mniej
+  niż 6, ograniczone do brakującej liczby wierszy. To celowo leniwe
+  (nie tłumaczymy z góry całej bazy na wszystkie języki) — koszt rośnie
+  tylko tam, gdzie jest faktyczne zapotrzebowanie, i każde tłumaczenie
+  zostaje w cache'u na zawsze (płaci się raz na parę treść+język).
 
 ## Baza danych — znane tabele (zrekonstruowane z kodu, nie z osobnego
 ## pliku schematu w repo — jeśli coś tu nie zgadza się z rzeczywistością
@@ -173,10 +194,14 @@ zanim założysz, że działa.
 **`scans`** (współdzielony cache analiz, publiczny odczyt w RLS):
 - `id`, `content_hash` (klucz cache'u treści), `input_type` (`text`/`url`/
   `image`), `language` (text, `NOT NULL DEFAULT 'en'` — **razem z
-  `content_hash` tworzy właściwy klucz cache'u**), `source_url`,
-  `char_count`, `credits_charged`, `result` (jsonb — patrz struktura
-  wyniku wyżej), `discovered_by` (uuid, nullable — kto pierwszy
-  wygenerował ten wynik), `view_count`, `created_at`
+  `content_hash` tworzy właściwy klucz cache'u**), `is_translation`
+  (boolean, `NOT NULL DEFAULT false` — `true`, gdy wynik powstał przez
+  przetłumaczenie istniejącej analizy z innego języka, a nie przez pełną
+  analizę AI; używane, żeby zawsze tłumaczyć z prawdziwego oryginału,
+  nigdy z tłumaczenia), `source_url`, `char_count`, `credits_charged`,
+  `result` (jsonb — patrz struktura wyniku wyżej), `discovered_by` (uuid,
+  nullable — kto pierwszy wygenerował ten wynik, `null` dla darmowych
+  tłumaczeń z przeglądarki), `view_count`, `created_at`
 
 **`wallet_transactions`**:
 - `user_id`, `amount`, `type` (np. `spend`), `related_scan_id`
@@ -235,6 +260,25 @@ Function (backend), nie bezpośrednio z przeglądarki.
 - **"Wdrożone" ≠ "scalone do main" ≠ "backend wdrożony w Supabase"** — to
   trzy osobne, ręczne kroki. Nieporozumienie co do tego było źródłem co
   najmniej dwóch sesji dezorientacji ("zrobiłem, a nic się nie zmieniło").
+- **`ALTER TABLE ... ADD COLUMN ... DEFAULT X`** nadaje tę wartość domyślną
+  RÓWNIEŻ istniejącym, starym wierszom — nawet jeśli w rzeczywistości mają
+  inną wartość (np. `scans.language DEFAULT 'en'` oznaczyło stare, w
+  rzeczywistości polskie analizy jako angielskie). Po każdej takiej
+  migracji sprawdź, czy trzeba dodatkowo ręcznie poprawić (backfill) stare
+  wiersze `UPDATE`-em, zanim nowa kolumna zacznie być używana w logice
+  aplikacji.
+- **Deklaracje `function nazwa() {}` wewnątrz bloku `if`/`else`** nie są w
+  praktyce (w Chrome) niezawodnie widoczne z kodu leżącego PRZED/POZA tym
+  blokiem w tym samym pliku, mimo teoretycznego hoistingu (Annex B) —
+  wywołanie takiej funkcji z zewnątrz rzuca `ReferenceError`. W
+  `index.html` `fetchAndRenderScans` jest zdefiniowana wewnątrz `else {}`
+  (blok "tylko gdy Supabase się wczytał"), a wywoływana też z zewnątrz
+  (selektor języka na ekranie logowania) — naprawione przez jawną
+  deklarację `let fetchAndRenderScans;` na zewnątrz i przypisanie
+  `fetchAndRenderScans = async function (...) {...};` w środku, zamiast
+  `function fetchAndRenderScans(...) {...}`. Jeśli kolejna funkcja
+  zdefiniowana wewnątrz `else {}` będzie potrzebna spoza tego bloku —
+  zastosuj ten sam wzorzec, nie zakładaj, że hoisting to załatwi.
 
 ## Świadomie odłożone na później (nie budować bez wyraźnej prośby)
 
