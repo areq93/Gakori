@@ -108,6 +108,23 @@ const RESPONSE_SCHEMA = {
   required: ['q_score', 'patterns', 'summary'],
 }
 
+// Wspólny punkt wywołania Gemini — używany zarówno przez tłumaczenie gotowego
+// wyniku, jak i pełną analizę (URL, tekst i awaryjne ponowienie po nieudanym
+// pobraniu linku). Trzymanie tego w jednym miejscu gwarantuje, że wszystkie
+// wywołania biją w ten sam model i ten sam adres.
+// deno-lint-ignore no-explicit-any
+async function callGemini(requestBody: Record<string, unknown>, geminiKey: string): Promise<any> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    }
+  )
+  return await res.json()
+}
+
 // Tłumaczy GOTOWY wynik analizy na inny język — nie analizuje treści od nowa.
 // Dużo tańsze niż pełna analiza (brak pobierania źródła, brak szukania
 // wzorców) — to fundament "efektu skali": im więcej treści mamy
@@ -129,25 +146,54 @@ async function translateResult(
 JSON do przetłumaczenia:
 ${JSON.stringify(result)}`
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
+  const data = await callGemini(
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }),
-    }
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: RESPONSE_SCHEMA,
+      },
+    },
+    geminiKey
   )
-  const data = await res.json()
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) return null
   try {
     return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+// Awaryjne pobranie strony, gdy wbudowany pobieracz Gemini (URL Context)
+// dostanie odmowę. Czasem blokowany jest tylko konkretnie robot Google, a
+// zwykłe żądanie (z nagłówkami jak z przeglądarki) i tak przejdzie. To NIE
+// jest prawdziwy, inteligentny ekstraktor treści artykułu — zdejmujemy
+// wszystkie znaczniki HTML jak leci, więc w tekście może zostać menu, stopka
+// itp. razem z właściwą treścią. Świadomy kompromis: analiza z odrobiną
+// szumu jest lepsza niż brak analizy w ogóle.
+async function fetchUrlAsText(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept-Language': 'pl,en;q=0.8',
+      },
+    })
+    if (!res.ok) return null
+    const html = await res.text()
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    // Zbyt krótki wynik to zwykle strona-zaślepka (np. "włącz obsługę
+    // JavaScript"), nie prawdziwa treść — traktujemy to jak porażkę.
+    if (text.length < 200) return null
+    return text.slice(0, 20000)
   } catch {
     return null
   }
@@ -288,57 +334,79 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!result) {
-      const geminiRequestBody: Record<string, unknown> = {
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }
-
       const systemPrompt = buildSystemPrompt(outputLanguage)
+      // deno-lint-ignore no-explicit-any
+      let geminiData: any = null
 
       if (input_type === 'url') {
-        // Narzędzie "URL context" — Gemini samo pobiera i czyta treść strony,
-        // nie potrzebujemy własnego scrapera.
-        geminiRequestBody.contents = [
-          { parts: [{ text: `${systemPrompt}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}` }] },
-        ]
-        geminiRequestBody.tools = [{ urlContext: {} }]
-      } else {
-        geminiRequestBody.contents = [
-          { parts: [{ text: `${systemPrompt}\n\nTEKST DO ANALIZY:\n${text_content}` }] },
-        ]
-      }
+        // Próba 1: wbudowane narzędzie Gemini "URL context" — samo pobiera i
+        // czyta treść strony, nie potrzebujemy własnego scrapera.
+        geminiData = await callGemini(
+          {
+            contents: [
+              { parts: [{ text: `${systemPrompt}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}` }] },
+            ],
+            tools: [{ urlContext: {} }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: RESPONSE_SCHEMA,
+            },
+          },
+          geminiKey!
+        )
 
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(geminiRequestBody),
-        }
-      )
-      const geminiData = await geminiRes.json()
-
-      if (input_type === 'url') {
         const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
         if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
-          // "details" trafia tylko do panelu debugowania (?debug=1) na froncie —
-          // pozwala zobaczyć PRAWDZIWY powód odmowy Google (np. blokada strony,
-          // strona wymaga zalogowania/paywall, strona nie istnieje) zamiast
-          // zgadywać. Zwykły użytkownik widzi tylko ogólny komunikat "message".
-          return new Response(
-            JSON.stringify({
-              error: 'url_fetch_failed',
-              message: 'Nie udało się pobrać treści tej strony — sprawdź, czy link jest poprawny i publicznie dostępny.',
-              details: { retrievalStatus },
-            }),
-            { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+          // Próba 2 (awaryjna): czasem blokowany jest tylko robot Google, a
+          // zwykłe pobranie strony (jak przez przeglądarkę) się uda — patrz
+          // fetchUrlAsText(). Jeśli to też zawiedzie, dopiero wtedy poddajemy
+          // się i zwracamy błąd (z prawdziwym powodem w "details" — widocznym
+          // tylko w panelu debugowania ?debug=1, nie dla zwykłego użytkownika).
+          const fallbackText = await fetchUrlAsText(source_url)
+          if (fallbackText) {
+            geminiData = await callGemini(
+              {
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `${systemPrompt}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony, może zawierać fragmenty menu/stopki obok właściwej treści):\n${fallbackText}`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  responseMimeType: 'application/json',
+                  responseSchema: RESPONSE_SCHEMA,
+                },
+              },
+              geminiKey!
+            )
+          } else {
+            return new Response(
+              JSON.stringify({
+                error: 'url_fetch_failed',
+                message: 'Nie udało się pobrać treści tej strony — sprawdź, czy link jest poprawny i publicznie dostępny.',
+                details: { retrievalStatus, fallback: 'failed' },
+              }),
+              { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
         }
+      } else {
+        geminiData = await callGemini(
+          {
+            contents: [{ parts: [{ text: `${systemPrompt}\n\nTEKST DO ANALIZY:\n${text_content}` }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: RESPONSE_SCHEMA,
+            },
+          },
+          geminiKey!
+        )
       }
 
-      if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
+      if (!geminiData?.candidates?.[0]?.content?.parts?.[0]?.text) {
         return new Response(
           JSON.stringify({ error: 'gemini_error', details: geminiData }),
           { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
