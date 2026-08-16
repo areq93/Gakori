@@ -206,6 +206,27 @@ zanim założysz, że działa.
     funkcji to nie wzrost marży % na transakcję (nie ma tu gdzie rosnąć),
     tylko **obniżenie zsumowanego kosztu operacyjnego w miarę wzrostu
     skali i liczby obsługiwanych języków**.
+- **Biblioteka 100 modeli mentalnych (jakość analiz)**: `analyze/index.ts`
+  ma wbudowaną skróconą (nazwa + jedno zdanie opisu, bez przykładów)
+  bibliotekę 100 nazwanych modeli mentalnych z wielu dziedzin (logika,
+  fizyka, biologia, ekonomia, psychologia, socjologia, filozofia,
+  strategia, język, informatyka, design i inne) — stała `MENTAL_MODELS` w
+  kodzie. Prompt instruuje Gemini, żeby dla każdego wykrytego wzorca
+  wybierał nazwę z tej biblioteki (przetłumaczoną na język wyniku) zamiast
+  wymyślać własne, przypadkowe określenia albo trzymać się tylko kilku
+  najbardziej oczywistych (Dowód Społeczny, Fałszywa Pilność...). Celowo
+  **cała biblioteka 100 modeli**, nie tylko podzbiór "manipulacyjny" —
+  świadoma decyzja użytkownika: Pragma ma nazywać też trafne, wartościowe
+  wzorce rozumowania w tekście, nie tylko manipulacje.
+  - Pełna wersja "dla ludzi" (z przykładami, pogrupowana w 15 kategorii)
+    żyje w `MODELE_MENTALNE.md` w katalogu głównym repo. **Te dwa miejsca
+    muszą być trzymane w zgodzie** — jeśli dodajesz/zmieniasz model w
+    jednym, zaktualizuj też drugie.
+  - Wpływ na koszt: biblioteka dokłada do promptu ~2-2,5 tys. tokenów
+    wejścia przy KAŻDEJ pełnej analizie (nie przy tłumaczeniu wyniku —
+    `translateResult()` jej nie używa). Przy stawce $0,30/milion tokenów
+    wejścia to ułamek grosza na analizę — świadomie zaakceptowany koszt w
+    zamian za wyraźnie wyższą trafność i różnorodność nazw wzorców.
 - **Lokalizacja komunikatów błędów**: backend zwraca kod błędu (`error`:
   `signup_required`/`insufficient_credits`/`url_fetch_failed`/
   `save_failed`/...) — pole `message` z backendu jest zaszyte na sztywno
