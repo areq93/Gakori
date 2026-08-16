@@ -260,7 +260,12 @@
         });
 
         // 0f. Logowanie przez Google
+        // Google (w przeciwieństwie do e-maila) nie rozróżnia "zaloguj" od "zarejestruj" —
+        // to zawsze ta sama czynność. Zapamiętujemy, którą zakładkę wybrał użytkownik przed
+        // przekierowaniem do Google, żeby po powrocie móc rozpoznać próbę "rejestracji" na
+        // już istniejące konto i ją zablokować (patrz sekcja 0j).
         document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+            sessionStorage.setItem('pendingGoogleAuthMode', authFormMode);
             const { error } = await sb.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -295,7 +300,27 @@
         });
 
         // 0j. Śledzenie stanu sesji Supabase Auth (login/logout/odzyskiwanie hasła)
-        sb.auth.onAuthStateChange((event, session) => {
+        // Blokada "rejestracji przez Google" na już istniejące konto: rozpoznajemy to po
+        // tym, że konto zostało utworzone dawno temu, a nie w tej właśnie chwili.
+        async function handleGoogleSignupOnExistingAccount(session) {
+            const pendingMode = sessionStorage.getItem('pendingGoogleAuthMode');
+            sessionStorage.removeItem('pendingGoogleAuthMode');
+            if (pendingMode !== 'signup' || !session) return false;
+
+            const createdAt = new Date(session.user.created_at).getTime();
+            const lastSignInAt = new Date(session.user.last_sign_in_at).getTime();
+            const isFreshAccount = Math.abs(lastSignInAt - createdAt) < 5000;
+            if (isFreshAccount) return false;
+
+            await sb.auth.signOut();
+            setAuthMode('login');
+            document.getElementById('authStatus').innerHTML =
+                '<span class="status-err">Konto z tym adresem Google już istnieje. Zaloguj się zamiast rejestrować.</span>';
+            return true;
+        }
+
+        sb.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && await handleGoogleSignupOnExistingAccount(session)) return;
             currentSession = session;
             if (event === 'PASSWORD_RECOVERY') {
                 showRecoveryForm();
