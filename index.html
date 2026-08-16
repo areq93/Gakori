@@ -702,7 +702,17 @@
                 card.style.display = 'block';
                 badge.className = 'result-badge badge-yellow';
                 badge.innerText = t('badge_info');
-                summary.innerText = data.message || t('result_generic_error');
+                // Komunikat błędu tłumaczymy PO KODZIE błędu (ten sam system co
+                // reszta interfejsu) — nie ufamy data.message, bo backend zwraca
+                // go na sztywno po polsku, niezależnie od wybranego języka.
+                const errorMessageKeys = {
+                    signup_required: 'err_signup_required',
+                    insufficient_credits: 'err_insufficient_credits',
+                    url_fetch_failed: 'err_url_fetch_failed',
+                    save_failed: 'err_save_failed',
+                };
+                const key = errorMessageKeys[data.error];
+                summary.innerText = key ? t(key) : t('result_generic_error');
                 return;
             }
 
