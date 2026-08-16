@@ -728,6 +728,7 @@
             }
 
             let payload = null;
+            let statusInterval = null;
 
             try {
                 if (currentMode === 'url') {
@@ -751,8 +752,22 @@
                 }
 
                 btn.disabled = true;
-                statusEl.innerText = t('status_analyzing');
                 document.getElementById('resultCard').style.display = 'none';
+
+                // Prawdziwa analiza to teraz kilka kolejnych zapytań do AI
+                // (kategoryzacja, właściwa analiza, czasem jeszcze awaryjne
+                // pobranie strony) — trwa dłużej niż dawne pojedyncze
+                // zapytanie. Zamiast martwego "Analizuję...", pokazujemy
+                // zmieniające się komunikaty, żeby czekanie nie wydawało się
+                // zawieszeniem strony (ten sam trik, którego używają czaty
+                // AI pokazując "co właśnie robię").
+                const statusSteps = ['status_step_1', 'status_step_2', 'status_step_3', 'status_step_4', 'status_step_5', 'status_step_6'];
+                let stepIndex = 0;
+                statusEl.innerText = t(statusSteps[0]);
+                statusInterval = setInterval(() => {
+                    stepIndex = (stepIndex + 1) % statusSteps.length;
+                    statusEl.innerText = t(statusSteps[stepIndex]);
+                }, 2200);
 
                 // Zalogowany użytkownik: prawdziwy token sesji (serwer sam rozpozna, kim jest).
                 // Niezalogowany: publiczny klucz projektu — serwer potraktuje to jak anonima.
@@ -769,6 +784,7 @@
                 });
                 const data = await res.json();
 
+                clearInterval(statusInterval);
                 statusEl.innerText = '';
                 payloadEl.innerText = JSON.stringify(data, null, 2);
 
@@ -782,8 +798,10 @@
                 }
 
             } catch (err) {
+                clearInterval(statusInterval);
                 statusEl.innerHTML = '<span class="status-err">' + t('status_err_prefix') + err + '</span>';
             } finally {
+                clearInterval(statusInterval);
                 btn.disabled = false;
             }
         });

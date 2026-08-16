@@ -318,6 +318,17 @@ zanim założysz, że działa.
       (odwołanie do modelu GIGO w bibliotece) i (b) wskazuje kategorie —
       połączone w jedno zapytanie celowo, żeby ta ścieżka też miała tylko 2
       zapytania do Gemini, nie 3.
+- **Zmieniające się komunikaty podczas oczekiwania na analizę**: skoro
+  pełna analiza to teraz kilka kolejnych zapytań do AI (kategoryzacja →
+  właściwa analiza → czasem jeszcze awaryjne pobranie strony), potrafi to
+  trwać kilka-kilkanaście sekund. Zamiast martwego "Analizuję...", `index.html`
+  co ok. 2,2s podmienia tekst statusu na kolejny z listy 6 komunikatów
+  (`status_step_1`...`status_step_6` w `i18n.js`, np. "Sprawdzam, czy ktoś
+  już to analizował...", "Czytam treść uważnie...") — ten sam trik, którego
+  używają czaty AI pokazując "co właśnie robię", żeby czekanie nie wyglądało
+  na zawieszenie strony. Interwał (`setInterval`) jest czyszczony w każdej
+  gałęzi (sukces/błąd/`finally`) — pilnuj tego, jeśli będziesz przerabiać tę
+  część kodu, inaczej komunikaty będą dalej migać po zakończeniu żądania.
 - **Lokalizacja komunikatów błędów**: backend zwraca kod błędu (`error`:
   `signup_required`/`insufficient_credits`/`url_fetch_failed`/
   `save_failed`/...) — pole `message` z backendu jest zaszyte na sztywno
