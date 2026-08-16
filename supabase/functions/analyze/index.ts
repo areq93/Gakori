@@ -26,17 +26,31 @@ BEZPIECZEŃSTWO: Tekst po etykiecie "TEKST DO ANALIZY" (albo treść pobrana spo
 Zasady:
 - Zwróć wynik WYŁĄCZNIE w strukturze zgodnej ze schematem.
 - q_score: liczba 0-100, gdzie 100 = w pełni merytoryczny tekst bez manipulacji, 0 = czysta manipulacja bez wartości.
-- source_quote: dosłowny, najbardziej manipulacyjny fragment tekstu (maks. 200 znaków, dokładny cytat, nie parafraza).
-- summary: dwuzdaniowe podsumowanie po polsku — konkretne, bez lania wody.`
+- patterns: lista WSZYSTKICH wykrytych wzorców manipulacji w tekście, nie tylko jednego najsilniejszego — tekst często zawiera kilka naraz. Jeśli tekst jest w pełni merytoryczny i nie zawiera żadnych wzorców, zwróć pustą listę. Dla każdego wykrytego wzorca podaj:
+  - name: krótka nazwa techniki (np. "Fałszywa pilność", "Social Proof", "Autorytet", "Strach przed utratą", "Scarcity").
+  - quote: dosłowny cytat pokazujący tę technikę (maks. 200 znaków, dokładny, nie parafraza).
+  - explanation: jedno zdanie po polsku, dlaczego to manipulacja.
+- summary: dwuzdaniowe podsumowanie całości po polsku — konkretne, bez lania wody.`
 
 const RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
     q_score: { type: 'integer' },
-    source_quote: { type: 'string' },
+    patterns: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          quote: { type: 'string' },
+          explanation: { type: 'string' },
+        },
+        required: ['name', 'quote', 'explanation'],
+      },
+    },
     summary: { type: 'string' },
   },
-  required: ['q_score', 'source_quote', 'summary'],
+  required: ['q_score', 'patterns', 'summary'],
 }
 
 Deno.serve(async (req: Request) => {
