@@ -91,14 +91,52 @@ a { color: var(--accent); }
 .badge-yellow { background: #fef9c3; color: #854d0e; }
 .badge-red { background: #fee2e2; color: #991b1b; }
 .result-quote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: #55503f; line-height: 1.5; }
-.result-summary { margin: 0; line-height: 1.6; }
 
-/* Poszczególne wykryte wzorce manipulacji (może być kilka w jednej analizie) */
-.pattern-item { margin-bottom: 16px; }
-.pattern-item:last-child { margin-bottom: 14px; }
-.pattern-name { font-weight: 700; font-size: 12.5px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
-.pattern-item .result-quote { margin-bottom: 6px; }
-.pattern-explanation { font-size: 13.5px; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+/* Ramka wokół informacji o źródle (link analizowanej strony) na scan.html */
+.scan-source-box {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: rgba(36, 31, 24, 0.05); border: 1px solid var(--card-border); border-radius: 6px;
+    padding: 10px 12px; margin: 0 0 18px 0; font-size: 13px; line-height: 1.4; word-break: break-all;
+}
+.scan-source-box a { font-weight: 600; }
+
+/* Poszczególne wykryte wzorce (manipulacja albo trafny sposób rozumowania) —
+   każdy w osobnej, wyraźnie odgraniczonej ramce, żeby łatwo było je przewijać
+   wzrokiem jako osobne "karty" wewnątrz wyniku. */
+.pattern-item {
+    background: rgba(36, 31, 24, 0.035); border: 1px solid var(--card-border); border-radius: 7px;
+    padding: 14px 16px; margin-bottom: 14px; border-left-width: 4px; border-left-style: solid;
+}
+.pattern-item:last-child { margin-bottom: 0; }
+.pattern-item.pattern-manipulation { border-left-color: var(--accent); }
+.pattern-item.pattern-reasoning { border-left-color: #3b6ea5; }
+
+.pattern-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.pattern-tag {
+    font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 2px 8px; border-radius: 3px; white-space: nowrap;
+}
+.pattern-manipulation .pattern-tag { background: #fee2e2; color: #991b1b; }
+.pattern-reasoning .pattern-tag { background: #dbe7f5; color: #2c5480; }
+.pattern-name { font-weight: 700; font-size: 13.5px; color: var(--ink); }
+
+.pattern-item .result-quote { margin: 0 0 8px 0; }
+.pattern-explanation { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 10px 0; line-height: 1.5; }
+.pattern-item .pattern-explanation:last-child { margin-bottom: 0; }
+
+.pattern-tip {
+    display: flex; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--ink);
+    background: #fdf6ea; border: 1px dashed var(--card-border); border-radius: 5px; padding: 8px 10px;
+}
+.pattern-tip-label { font-weight: 700; color: var(--accent-dark); flex-shrink: 0; }
+
+/* Podsumowanie całości — osobny blok pod listą wzorców */
+.summary-block { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--card-border); }
+.summary-label {
+    font-weight: 700; font-size: 12.5px; color: var(--ink-soft); text-transform: uppercase;
+    letter-spacing: 0.04em; margin: 0 0 6px 0;
+}
+.result-summary { margin: 0; line-height: 1.6; }
 
 /* Przeglądarka publicznych analiz (dla niezalogowanych) — lista klikalnych wierszy */
 #publicScansSearch { margin-top: 0; }
