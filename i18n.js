@@ -524,15 +524,25 @@ function setLanguage(lang, sb, userId) {
     localStorage.setItem('pragma_lang', lang);
     applyTranslations();
     if (sb && userId) {
-        sb.from('profiles').update({ language: lang }).eq('id', userId).then(() => {});
+        // Jeśli ten zapis się nie uda (np. brak reguły RLS pozwalającej na
+        // edycję własnego profilu), NIE chcemy tego ukrywać po cichu jak
+        // dotąd — inaczej lokalny wybór językowy zostanie po chwili
+        // nadpisany starą wartością z bazy przy najbliższej synchronizacji
+        // (patrz syncLanguageFromProfile).
+        sb.from('profiles').update({ language: lang }).eq('id', userId).then(({ error }) => {
+            if (error) console.error('Nie udało się zapisać języka w profilu (sprawdź reguły RLS dla UPDATE na tabeli profiles):', error);
+        });
     }
 }
 
 // Wczytuje zapisany w profilu język (dla zalogowanych) i stosuje go, jeśli
 // różni się od tego zapisanego lokalnie (np. zmieniono na innym urządzeniu).
+// Zwraca Promise — jeśli wywołujący kod chce poczekać, aż lokalny stan
+// będzie na pewno zsynchronizowany z profilem, zanim np. wypełni jakiś
+// selektor wartością, powinien to zrobić przez await.
 function syncLanguageFromProfile(sb, userId) {
-    if (!sb || !userId) return;
-    sb.from('profiles').select('language').eq('id', userId).single().then(({ data }) => {
+    if (!sb || !userId) return Promise.resolve();
+    return sb.from('profiles').select('language').eq('id', userId).single().then(({ data }) => {
         if (data && data.language && data.language !== getCurrentLanguage()) {
             localStorage.setItem('pragma_lang', data.language);
             applyTranslations();

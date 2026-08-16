@@ -315,7 +315,7 @@ Deno.serve(async (req: Request) => {
 
     // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników)
     const finalCost = user_id ? cost : 0
-    const { data: newScan } = await supabase
+    const { data: newScan, error: insertError } = await supabase
       .from('scans')
       .insert({
         content_hash,
@@ -331,6 +331,21 @@ Deno.serve(async (req: Request) => {
       })
       .select()
       .single()
+
+    // Jeśli zapis się nie uda, NIE kontynuujemy w ciemno (poprzednio kod
+    // próbował dalej użyć newScan.id, co przy null-u wywalało się
+    // niezrozumiałym błędem "Cannot read properties of null") — zwracamy
+    // czytelny błąd z prawdziwym powodem z bazy.
+    if (insertError || !newScan) {
+      return new Response(
+        JSON.stringify({
+          error: 'save_failed',
+          message: 'Nie udało się zapisać wyniku analizy w bazie.',
+          details: insertError,
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // 7. ODJĘCIE KREDYTÓW (tylko dla zalogowanych)
     if (user_id && profile) {

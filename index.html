@@ -553,17 +553,23 @@
         sb.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && await handleGoogleSignupOnExistingAccount(session)) return;
             currentSession = session;
+            // Czekamy na dociągnięcie właściwego języka z profilu PRZED
+            // wyrenderowaniem — inaczej lista publicznych analiz (którą
+            // renderAuthUI od razu odpala) startowałaby ze starą wartością
+            // języka, a statyczne napisy zaktualizowałyby się dopiero
+            // chwilę później, osobno — dokładnie ten rozjazd, który już raz
+            // zgłosił użytkownik (część interfejsu w innym języku niż lista).
+            if (session && !consumeSignupLanguage(session)) await syncLanguageFromProfile(sb, session.user.id);
             if (event === 'PASSWORD_RECOVERY') {
                 showRecoveryForm();
             } else {
                 renderAuthUI();
             }
-            if (session && !consumeSignupLanguage(session)) syncLanguageFromProfile(sb, session.user.id);
         });
-        sb.auth.getSession().then(({ data: { session } }) => {
+        sb.auth.getSession().then(async ({ data: { session } }) => {
             currentSession = session;
+            if (session) await syncLanguageFromProfile(sb, session.user.id);
             renderAuthUI();
-            if (session) syncLanguageFromProfile(sb, session.user.id);
         });
 
         } // koniec bloku "if (sb)" — od tego miejsca kod działa niezależnie od logowania

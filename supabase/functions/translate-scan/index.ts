@@ -163,7 +163,7 @@ Deno.serve(async (req: Request) => {
 
     // 3. Zapisz przetłumaczony wynik jako nowy, darmowy wpis w cache'u — kolejne
     // osoby przeglądające w tym samym języku dostaną go od razu, bez czekania.
-    const { data: newScan } = await supabase
+    const { data: newScan, error: insertError } = await supabase
       .from('scans')
       .insert({
         content_hash,
@@ -179,6 +179,13 @@ Deno.serve(async (req: Request) => {
       })
       .select('id, input_type, source_url, result, created_at')
       .single()
+
+    if (insertError || !newScan) {
+      return new Response(
+        JSON.stringify({ error: 'save_failed', details: insertError }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     return new Response(
       JSON.stringify({ cached: false, cost: 0, scan: newScan }),
