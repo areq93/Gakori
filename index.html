@@ -48,12 +48,6 @@
         </div>
     </div>
 
-    <div class="card" id="publicScansCard" style="display:none;">
-        <h2>Zobacz, co już wykryliśmy</h2>
-        <input type="search" id="publicScansSearch" placeholder="Szukaj po słowach kluczowych...">
-        <div id="publicScansList"></div>
-    </div>
-
     <div class="card" id="analyzeCard" style="display:none;">
         <div class="tabs">
             <button class="tab-btn active" data-mode="url">🔗 Link</button>
@@ -80,6 +74,12 @@
 
         <button id="analyzeBtn">Analizuj</button>
         <div id="status" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card" id="publicScansCard" style="display:none;">
+        <h2>Zobacz, co już wykryliśmy</h2>
+        <input type="search" id="publicScansSearch" placeholder="Szukaj po słowach kluczowych...">
+        <div id="publicScansList"></div>
     </div>
 
     <div id="resultCard" class="result-card">
@@ -161,14 +161,15 @@
                 authCard.style.display = 'none';
                 userMenuBtn.style.display = 'flex';
                 analyzeCard.style.display = 'block';
-                publicScansCard.style.display = 'none';
             } else {
                 authCard.style.display = 'block';
                 userMenuBtn.style.display = 'none';
                 analyzeCard.style.display = 'none';
-                publicScansCard.style.display = 'block';
-                initPublicScans();
             }
+            // Przeglądarka publicznych analiz jest widoczna zawsze — zalogowani
+            // i niezalogowani mogą jej równie naturalnie używać.
+            publicScansCard.style.display = 'block';
+            initPublicScans();
         }
 
         function showRecoveryForm() {
