@@ -152,10 +152,29 @@ zanim założysz, że działa.
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
   wstawieniem do filtra PostgREST), okno ograniczone do ~6 wierszy z
-  suwakiem, klik prowadzi do `scan.html?id=...`. Widoczna zawsze (i dla
-  zalogowanych, i dla niezalogowanych) — celowa decyzja: to mechanizm
-  wzrostu/odkrywalności o zerowym koszcie krańcowym (czyta się z już
-  policzonego, współdzielonego cache'u, bez wywoływania Gemini).
+  suwakiem, klik prowadzi do `scan.html?id=...` **w nowej karcie**
+  (`target="_blank"`) — celowo, żeby klik w wynik nie gubił przewijanej
+  listy pod spodem. Widoczna zawsze (i dla zalogowanych, i dla
+  niezalogowanych) — celowa decyzja: to mechanizm wzrostu/odkrywalności o
+  zerowym koszcie krańcowym (czyta się z już policzonego, współdzielonego
+  cache'u, bez wywoływania Gemini).
+- **Własna, świeża analiza też otwiera się w nowej karcie**: kliknięcie
+  "Analizuj" na `index.html` otwiera wynik jako `scan.html?id=...` w nowej
+  karcie (zamiast pokazywać go w `resultCard` pod listą publicznych
+  analiz na tej samej stronie — to była pierwsza wersja, zmieniona na
+  wyraźną prośbę użytkownika). Backend (`analyze/index.ts`) zwraca teraz
+  `id` zeskanowanego wyniku w odpowiedzi (dla trafienia z cache'u —
+  `existing.id`, dla świeżej analizy — `newScan.id`), żeby frontend miał
+  co wstawić do adresu. Techniczny szczegół, ważny przy kolejnych
+  zmianach: pustą kartę (`window.open('', '_blank')`) trzeba otworzyć
+  **od razu po kliknięciu**, zanim zacznie się jakiekolwiek `await`
+  (nawet liczenie hasha) — przeglądarki blokują otwieranie nowej karty,
+  jeśli zrobi się to dopiero po odpowiedzi serwera, bo "uprawnienie" z
+  kliknięcia użytkownika już wygasło. Dopiero gdy wynik jest znany, kartę
+  się przekierowuje (sukces) albo zamyka (błąd — błędy nadal pokazują się
+  na tej samej stronie, nie ma sensu otwierać pustej karty na komunikat
+  błędu). Jeśli przeglądarka i tak zablokuje wyskakującą kartę,
+  `resultCard` na tej samej stronie działa jako zapasowe rozwiązanie.
 - **Wielojęzyczność (10 języków)**: PL, EN, ES, DE, FR, RU, ZH, JA, HI, AR.
   Domyślny język: **angielski**. Obejmuje cały interfejs ORAZ wynik
   analizy AI (`name`/`explanation`/`summary` w wybranym języku; pole
