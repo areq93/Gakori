@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pragma_theme') || 'light');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pragma - Analiza</title>
@@ -38,7 +39,7 @@
             <div class="cf-turnstile" data-sitekey="0x4AAAAAAERY10ded3P_8tNf" data-size="flexible" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin:10px 0;"></div>
             <button id="authSubmitBtn" type="button" data-i18n="btn_login">Zaloguj się</button>
             <div style="text-align:center; margin-top:8px;">
-                <a href="#" id="forgotPasswordLink" style="font-size:13px; color:#b8502f;" data-i18n="link_forgot_password">Zapomniałeś hasła?</a>
+                <a href="#" id="forgotPasswordLink" style="font-size:13px; color:var(--accent);" data-i18n="link_forgot_password">Zapomniałeś hasła?</a>
             </div>
             <div style="text-align:center; color:#999; font-size:12px; margin:12px 0;" data-i18n="divider_or">— lub —</div>
             <button id="googleLoginBtn" type="button" style="background:#fff; color:#333; border:1px solid #ccc;" data-i18n="btn_google_login">Zaloguj przez Google</button>
@@ -540,6 +541,7 @@
             // chwilę później, osobno — dokładnie ten rozjazd, który już raz
             // zgłosił użytkownik (część interfejsu w innym języku niż lista).
             if (session && !consumeSignupLanguage(session)) await syncLanguageFromProfile(sb, session.user.id);
+            if (session) await syncThemeFromProfile(sb, session.user.id);
             if (event === 'PASSWORD_RECOVERY') {
                 showRecoveryForm();
             } else {
@@ -549,6 +551,7 @@
         sb.auth.getSession().then(async ({ data: { session } }) => {
             currentSession = session;
             if (session) await syncLanguageFromProfile(sb, session.user.id);
+            if (session) await syncThemeFromProfile(sb, session.user.id);
             renderAuthUI();
         });
 

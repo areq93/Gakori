@@ -183,6 +183,36 @@ zanim założysz, że działa.
     `style.css` — jeśli dodajesz nowe pole do wyniku, trzymaj się tego
     samego wzorca (osobna, podpisana sekcja, nie gołe zdanie wtopione w
     resztę tekstu).
+- **Styl wizualny "Retro plakat"**: grube (2px), zawsze ciemne/jasne w
+  zależności od motywu obramowania kart i przycisków, płaskie przesunięte
+  cienie "jak u naklejki" (`--sticker-shadow`, `--sticker-shadow-sm`),
+  zaokrąglone rogi (`--radius`, `--radius-sm`). Wybrany przez użytkownika
+  spośród 3 zaproponowanych wariantów retro (pokazanych jako zrzuty ekranu
+  do porównania — dobra metoda przy tego typu decyzjach: łatwiej wskazać
+  wariant niż opisać słowami). Jedna czcionka na całej stronie — 'Inter'
+  (wcześniej nagłówki miały ozdobny szeryf 'Lora', usunięty na wcześniejszą
+  prośbę użytkownika). Wszystkie kolory/rozmiary jako zmienne CSS w
+  `:root` na górze `style.css` — zmieniaj tam, nie w poszczególnych regułach.
+- **Motyw jasny/ciemny**: przełącznik w ustawieniach konta
+  (`account.html`, selektor obok języka), ten sam wzorzec zapisu co język —
+  `localStorage` (`pragma_theme`, działa też dla niezalogowanych) + kolumna
+  `profiles.theme` dla zalogowanych (synchronizacja między urządzeniami).
+  Funkcje w `i18n.js`: `getCurrentTheme()`, `applyTheme()`, `setTheme()`,
+  `syncThemeFromProfile()` — analogiczne do `getCurrentLanguage()` itd.
+  Motyw przełącza się atrybutem `data-theme="dark"` na `<html>`, a
+  `style.css` ma pod `:root[data-theme="dark"]` nadpisane te same zmienne
+  CSS, których używa reszta pliku (więc każda reguła korzystająca ze
+  zmiennych automatycznie działa w obu motywach — nowe style pisz ZAWSZE
+  przez zmienne, nigdy na sztywno wpisanym kolorem, inaczej zepsujesz
+  dark mode).
+  - **Ważne — zapobieganie "błyskowi" złego motywu**: w `<head>` każdej z
+    3 stron HTML jest mały, samodzielny inline `<script>` (przed linkiem do
+    `style.css`), który synchronicznie odczytuje `localStorage` i ustawia
+    `data-theme` na `<html>` ZANIM przeglądarka narysuje stronę. Bez tego
+    strona zawsze najpierw mignęłaby jasnym motywem, nawet dla kogoś z
+    ustawionym ciemnym. Funkcje w `i18n.js` (`applyTheme()` itd.) tylko
+    PODTRZYMUJĄ/ZMIENIAJĄ motyw po starcie strony — nie odpowiadają za to
+    pierwsze, natychmiastowe ustawienie.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
@@ -353,6 +383,8 @@ zanim założysz, że działa.
 - `id` (uuid)
 - `wallet_balance` (numeric) — saldo kredytów
 - `language` (text, `NOT NULL DEFAULT 'en'`) — ustawienie języka konta
+- `theme` (text, `NOT NULL DEFAULT 'light'`) — ustawienie motywu (`light`/
+  `dark`), ten sam wzorzec co `language` (patrz niżej "Motyw jasny/ciemny")
 
 **`scans`** (współdzielony cache analiz, publiczny odczyt w RLS):
 - `id`, `content_hash` (klucz cache'u treści), `input_type` (`text`/`url`/

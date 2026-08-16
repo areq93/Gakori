@@ -1,13 +1,57 @@
+/* Styl "Retro plakat" — grube czarne obramowania, mocny kontrast, płaskie
+   przesunięte cienie jak u naklejki/plakatu. Wybrany przez użytkownika
+   spośród 3 wariantów retro, żeby zastąpić poprzedni, bardziej stonowany
+   wygląd. Jeśli zmieniasz paletę — zmień tylko zmienne tutaj, reszta pliku
+   się do nich odwołuje. */
 :root {
     --ink: #241f18;
-    --ink-soft: #6b6152;
-    --paper: #ece3d1;
-    --card: #f8f2e4;
-    --card-border: #d6c9ab;
-    --accent: #b8502f;
-    --accent-dark: #96401f;
-    --primary: #241f18;
-    --primary-dark: #100d09;
+    --ink-soft: #5c5344;
+    --paper: #ede1c8;
+    --card: #fff8ec;
+    --card-border: #241f18;
+    --accent: #d1495b;
+    --accent-dark: #a83347;
+    --accent-soft: #f6c9cf;
+    --primary: #1f6f6b;
+    --primary-dark: #15514d;
+    --primary-soft: #d3e6e4;
+    --input-bg: #fffdf7;
+    --debug-bg: #ded2b4;
+    --debug-border: #c3b48c;
+    --shadow-color: var(--card-border);
+    --radius: 14px;
+    --radius-sm: 9px;
+    --border-w: 2px;
+    --sticker-shadow: 4px 4px 0 var(--shadow-color);
+    --sticker-shadow-sm: 3px 3px 0 var(--shadow-color);
+    --paper-dot-color: 60,45,20;
+}
+
+/* Tryb ciemny — ta sama "retro plakat" estetyka (grube obramowania, płaskie
+   przesunięte cienie), tylko z odwróconą jasnością. Obramowania stają się
+   jasne (żeby było je widać na ciemnym tle), a cień zostaje osobno ciemny
+   (--shadow-color), żeby nadal wyglądał jak cień, nie poświata. Przełączane
+   atrybutem data-theme na <html> — patrz applyTheme() w i18n.js. Ustawiany
+   SYNCHRONICZNIE małym inline-skryptem w <head> każdej strony (przed
+   wczytaniem tego pliku CSS), żeby uniknąć "błysku" złego motywu przy
+   ładowaniu strony. */
+:root[data-theme="dark"] {
+    --ink: #f3ead9;
+    --ink-soft: #cbbfa4;
+    --paper: #211d17;
+    --card: #2c261d;
+    --card-border: #f3ead9;
+    --accent: #e97b8b;
+    --accent-dark: #f6c9cf;
+    --accent-soft: #4a2a30;
+    --primary: #4fb3ad;
+    --primary-dark: #a8ddd9;
+    --primary-soft: #1f3d3b;
+    --input-bg: #1c1812;
+    --debug-bg: #3a3327;
+    --debug-border: #55492f;
+    --shadow-color: #0d0b08;
+    --paper-dot-color: 255,240,214;
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -16,14 +60,14 @@ body {
     display: flex; flex-direction: column; align-items: center; padding: 20px;
     background-color: var(--paper);
     background-image:
-        radial-gradient(circle at 12% 18%, rgba(60,45,20,0.13) 0px, rgba(60,45,20,0.13) 1px, transparent 1.6px),
-        radial-gradient(circle at 78% 8%, rgba(60,45,20,0.10) 0px, rgba(60,45,20,0.10) 1px, transparent 1.4px),
-        radial-gradient(circle at 34% 62%, rgba(60,45,20,0.12) 0px, rgba(60,45,20,0.12) 1.2px, transparent 1.8px),
-        radial-gradient(circle at 90% 55%, rgba(60,45,20,0.09) 0px, rgba(60,45,20,0.09) 1px, transparent 1.4px),
-        radial-gradient(circle at 55% 85%, rgba(60,45,20,0.10) 0px, rgba(60,45,20,0.10) 1.1px, transparent 1.6px),
-        radial-gradient(circle at 20% 92%, rgba(60,45,20,0.08) 0px, rgba(60,45,20,0.08) 1px, transparent 1.4px),
-        radial-gradient(circle at 65% 32%, rgba(60,45,20,0.08) 0px, rgba(60,45,20,0.08) 1px, transparent 1.4px),
-        radial-gradient(circle at 8% 70%, rgba(60,45,20,0.09) 0px, rgba(60,45,20,0.09) 1px, transparent 1.4px),
+        radial-gradient(circle at 12% 18%, rgba(var(--paper-dot-color),0.13) 0px, rgba(var(--paper-dot-color),0.13) 1px, transparent 1.6px),
+        radial-gradient(circle at 78% 8%, rgba(var(--paper-dot-color),0.10) 0px, rgba(var(--paper-dot-color),0.10) 1px, transparent 1.4px),
+        radial-gradient(circle at 34% 62%, rgba(var(--paper-dot-color),0.12) 0px, rgba(var(--paper-dot-color),0.12) 1.2px, transparent 1.8px),
+        radial-gradient(circle at 90% 55%, rgba(var(--paper-dot-color),0.09) 0px, rgba(var(--paper-dot-color),0.09) 1px, transparent 1.4px),
+        radial-gradient(circle at 55% 85%, rgba(var(--paper-dot-color),0.10) 0px, rgba(var(--paper-dot-color),0.10) 1.1px, transparent 1.6px),
+        radial-gradient(circle at 20% 92%, rgba(var(--paper-dot-color),0.08) 0px, rgba(var(--paper-dot-color),0.08) 1px, transparent 1.4px),
+        radial-gradient(circle at 65% 32%, rgba(var(--paper-dot-color),0.08) 0px, rgba(var(--paper-dot-color),0.08) 1px, transparent 1.4px),
+        radial-gradient(circle at 8% 70%, rgba(var(--paper-dot-color),0.09) 0px, rgba(var(--paper-dot-color),0.09) 1px, transparent 1.4px),
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
     color: var(--ink);
     line-height: 1.5;
@@ -39,37 +83,37 @@ h2 {
 }
 .tagline { margin: 0 0 20px 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.45; text-align: center; }
 .card {
-    background: var(--card); padding: 22px; border-radius: 8px;
-    border: 1px solid var(--card-border);
-    box-shadow: 0 8px 22px rgba(36, 31, 24, 0.10), 0 1px 3px rgba(36, 31, 24, 0.08);
+    background: var(--card); padding: 22px; border-radius: var(--radius);
+    border: var(--border-w) solid var(--card-border);
+    box-shadow: var(--sticker-shadow);
     width: 100%; max-width: 400px; box-sizing: border-box;
 }
 input, textarea {
     width: 100%; padding: 13px 14px; margin: 10px 0;
-    border: 1.5px solid #cfc0a0; border-radius: 4px; box-sizing: border-box;
-    font-size: 16px; font-family: inherit; color: var(--ink); background: #fffdf7;
+    border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm); box-sizing: border-box;
+    font-size: 16px; font-family: inherit; color: var(--ink); background: var(--input-bg);
     transition: border-color .15s ease;
 }
-input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+input:focus, textarea:focus { outline: none; border-color: var(--primary); }
 textarea { resize: vertical; min-height: 100px; }
 button {
-    width: 100%; padding: 13px; background: var(--primary); color: #f7f1e4; border: none;
-    border-radius: 4px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer; font-size: 16px;
+    width: 100%; padding: 13px; background: var(--primary); color: #fdf6ee; border: var(--border-w) solid var(--card-border);
+    border-radius: var(--radius-sm); font-weight: 700; letter-spacing: 0.01em; cursor: pointer; font-size: 16px;
     font-family: 'Inter', inherit;
-    box-shadow: 3px 3px 0 rgba(36,31,24,0.2);
+    box-shadow: var(--sticker-shadow-sm);
     transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
 }
 button:hover { background: var(--primary-dark); }
-button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(36,31,24,0.2); }
-button:disabled { background: #a89e88; box-shadow: none; cursor: default; transform: none; }
+button:active { transform: translate(3px, 3px); box-shadow: none; }
+button:disabled { background: #a89e88; border-color: #a89e88; box-shadow: none; cursor: default; transform: none; }
 
 .tabs { display: flex; gap: 6px; margin: 10px 0; }
 .tab-btn {
     flex: 1; padding: 11px 4px; font-size: 13.5px; font-weight: 700;
-    background: #ece3ce; color: #6b6152; border: 1.5px solid #d6c9ab; border-radius: 4px;
+    background: var(--card); color: var(--ink-soft); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
     cursor: pointer; width: auto; margin: 0; box-shadow: none;
 }
-.tab-btn.active { background: var(--accent); color: #fdf6ee; border-color: var(--accent); box-shadow: 3px 3px 0 rgba(184,80,47,0.25); }
+.tab-btn.active { background: var(--accent); color: #fff8ec; border-color: var(--card-border); box-shadow: var(--sticker-shadow-sm); }
 
 .mode-panel { display: none; }
 .mode-panel.active { display: block; }
@@ -81,21 +125,21 @@ a { color: var(--accent); }
 
 /* Karta wyniku */
 .result-card {
-    background: var(--card); padding: 22px; border-radius: 8px;
-    border: 1px solid var(--card-border);
-    box-shadow: 0 8px 22px rgba(36, 31, 24, 0.10), 0 1px 3px rgba(36, 31, 24, 0.08);
+    background: var(--card); padding: 22px; border-radius: var(--radius);
+    border: var(--border-w) solid var(--card-border);
+    box-shadow: var(--sticker-shadow);
     width: 100%; max-width: 400px; margin-top: 16px; box-sizing: border-box; display: none;
 }
-.result-badge { display: inline-block; padding: 6px 14px; border-radius: 4px; font-weight: bold; font-size: 14px; margin-bottom: 14px; }
-.badge-green { background: #dcfce7; color: #166534; }
-.badge-yellow { background: #fef9c3; color: #854d0e; }
-.badge-red { background: #fee2e2; color: #991b1b; }
-.result-quote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: #55503f; line-height: 1.5; }
+.result-badge { display: inline-block; padding: 6px 14px; border-radius: var(--radius-sm); font-weight: bold; font-size: 14px; margin-bottom: 14px; border: 1.5px solid; }
+.badge-green { background: #dcfce7; color: #166534; border-color: #166534; }
+.badge-yellow { background: #fef9c3; color: #854d0e; border-color: #854d0e; }
+.badge-red { background: #fee2e2; color: #991b1b; border-color: #991b1b; }
+.result-quote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: var(--ink-soft); line-height: 1.5; }
 
 /* Ramka wokół informacji o źródle (link analizowanej strony) na scan.html */
 .scan-source-box {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    background: rgba(36, 31, 24, 0.05); border: 1px solid var(--card-border); border-radius: 6px;
+    background: var(--card); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
     padding: 10px 12px; margin: 0 0 18px 0; font-size: 13px; line-height: 1.4; word-break: break-all;
 }
 .scan-source-box a { font-weight: 600; }
@@ -104,20 +148,20 @@ a { color: var(--accent); }
    każdy w osobnej, wyraźnie odgraniczonej ramce, żeby łatwo było je przewijać
    wzrokiem jako osobne "karty" wewnątrz wyniku. */
 .pattern-item {
-    background: rgba(36, 31, 24, 0.035); border: 1px solid var(--card-border); border-radius: 7px;
-    padding: 14px 16px; margin-bottom: 14px; border-left-width: 4px; border-left-style: solid;
+    background: var(--card); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 14px; border-left-width: 5px; border-left-style: solid;
 }
 .pattern-item:last-child { margin-bottom: 0; }
 .pattern-item.pattern-manipulation { border-left-color: var(--accent); }
-.pattern-item.pattern-reasoning { border-left-color: #3b6ea5; }
+.pattern-item.pattern-reasoning { border-left-color: var(--primary); }
 
 .pattern-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .pattern-tag {
     font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
     padding: 2px 8px; border-radius: 3px; white-space: nowrap;
 }
-.pattern-manipulation .pattern-tag { background: #fee2e2; color: #991b1b; }
-.pattern-reasoning .pattern-tag { background: #dbe7f5; color: #2c5480; }
+.pattern-manipulation .pattern-tag { background: var(--accent-soft); color: var(--accent-dark); }
+.pattern-reasoning .pattern-tag { background: var(--primary-soft); color: var(--primary-dark); }
 .pattern-name { font-weight: 700; font-size: 13.5px; color: var(--ink); }
 
 .pattern-item .result-quote { margin: 0 0 8px 0; }
@@ -126,12 +170,12 @@ a { color: var(--accent); }
 
 .pattern-tip {
     display: flex; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--ink);
-    background: #fdf6ea; border: 1px dashed var(--card-border); border-radius: 5px; padding: 8px 10px;
+    background: var(--paper); border: 1.5px dashed var(--card-border); border-radius: var(--radius-sm); padding: 8px 10px;
 }
 .pattern-tip-label { font-weight: 700; color: var(--accent-dark); flex-shrink: 0; }
 
 /* Podsumowanie całości — osobny blok pod listą wzorców */
-.summary-block { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--card-border); }
+.summary-block { margin-top: 18px; padding-top: 16px; border-top: var(--border-w) solid var(--card-border); }
 .summary-label {
     font-weight: 700; font-size: 12.5px; color: var(--ink-soft); text-transform: uppercase;
     letter-spacing: 0.04em; margin: 0 0 6px 0;
@@ -145,11 +189,11 @@ a { color: var(--accent); }
 }
 .scan-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 12px 4px; border-bottom: 1px solid var(--card-border);
+    padding: 12px 4px; border-bottom: 1.5px solid var(--card-border);
     text-decoration: none; color: var(--ink);
 }
 .scan-row:last-child { border-bottom: none; }
-.scan-row:hover { background: rgba(184, 80, 47, 0.06); }
+.scan-row:hover { background: var(--accent-soft); }
 .scan-row-icon { flex-shrink: 0; font-size: 15px; }
 .scan-row .result-badge { flex-shrink: 0; margin-bottom: 0; padding: 4px 10px; font-size: 12.5px; }
 .scan-row-snippet { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -157,7 +201,7 @@ a { color: var(--accent); }
 #publicScansList p.status-err, #publicScansList p.status-ok { text-align: center; }
 
 /* Panel debugowania — tylko dla developera, patrz sekcja 1 w skrypcie (?debug=1) */
-#debug { display: none; margin-top: 20px; padding: 10px; background: #ded2b4; border-radius: 4px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed #c3b48c; box-sizing: border-box; color: var(--ink-soft); }
+#debug { display: none; margin-top: 20px; padding: 10px; background: var(--debug-bg); border-radius: 4px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed var(--debug-border); box-sizing: border-box; color: var(--ink-soft); }
 .status-ok { color: #166534; font-weight: bold; }
 .status-err { color: #991b1b; font-weight: bold; }
 
@@ -165,9 +209,9 @@ a { color: var(--accent); }
 #userMenuBtn {
     display: none; position: fixed; top: 16px; right: 16px; z-index: 50;
     width: 44px; height: 44px; padding: 0; border-radius: 50%;
-    background: var(--primary); color: #f7f1e4; font-size: 20px;
+    background: var(--primary); color: #fdf6ee; font-size: 20px; border: var(--border-w) solid var(--card-border);
     align-items: center; justify-content: center; text-decoration: none;
-    box-shadow: 3px 3px 0 rgba(36,31,24,0.2);
+    box-shadow: var(--sticker-shadow-sm);
 }
 
 /* Link powrotny na dedykowanych podstronach (np. account.html) */
