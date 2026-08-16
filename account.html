@@ -91,12 +91,16 @@
                 }
             });
 
-            sb.auth.getSession().then(({ data: { session } }) => {
+            sb.auth.getSession().then(async ({ data: { session } }) => {
                 if (!session) {
                     window.location.href = 'index.html';
                     return;
                 }
-                syncLanguageFromProfile(sb, session.user.id);
+                // Czekamy na zakończenie synchronizacji z profilem, zanim
+                // wypełnimy selektor — inaczej mógłby na chwilę (albo na
+                // stałe, jeśli coś przerwie stronę) pokazać nieaktualną
+                // wartość sprzed synchronizacji.
+                await syncLanguageFromProfile(sb, session.user.id);
                 populateLanguageSelect();
                 document.getElementById('languageSelect').addEventListener('change', (e) => {
                     setLanguage(e.target.value, sb, session.user.id);
