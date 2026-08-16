@@ -19,7 +19,11 @@
 
     <a id="userMenuBtn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto">👤</a>
 
-    <div class="card" id="authCard">
+    <div id="appLoading" style="text-align:center; padding:60px 0; color:var(--ink-soft);">
+        <p data-i18n="loading">Ładowanie...</p>
+    </div>
+
+    <div class="card" id="authCard" style="display:none;">
         <h1 style="margin-top:0">Pragma</h1>
         <p class="tagline" data-i18n="tagline">Wklej tekst, a my pokażemy Ci, czy ktoś próbuje Tobą manipulować.</p>
 
@@ -176,6 +180,8 @@
         if (!sb) {
             document.getElementById('authLoggedOut').innerHTML =
                 '<p style="color:#991b1b; margin:0;">⚠️ Logowanie chwilowo niedostępne. Sprawdź połączenie z internetem i odśwież stronę.</p>';
+            document.getElementById('appLoading').style.display = 'none';
+            document.getElementById('authCard').style.display = 'block';
         } else {
         // (Cała logika logowania działa tylko, gdy biblioteka Supabase faktycznie się wczytała.)
 
@@ -183,6 +189,10 @@
         // Po zalogowaniu cała karta logowania znika — zostaje tylko ikona profilu w rogu,
         // która prowadzi do osobnej podstrony z zarządzaniem kontem (account.html).
         function renderAuthUI() {
+            // Dopiero teraz wiadomo na pewno, czy użytkownik jest zalogowany —
+            // do tego momentu pokazuje się neutralny stan ładowania zamiast
+            // krótkiego "błysku" ekranu logowania, który zaraz i tak zniknie.
+            document.getElementById('appLoading').style.display = 'none';
             const authCard = document.getElementById('authCard');
             const recovery = document.getElementById('authRecovery');
             const userMenuBtn = document.getElementById('userMenuBtn');
@@ -205,6 +215,7 @@
         }
 
         function showRecoveryForm() {
+            document.getElementById('appLoading').style.display = 'none';
             document.getElementById('userMenuBtn').style.display = 'none';
             document.getElementById('publicScansCard').style.display = 'none';
             document.getElementById('authCard').style.display = 'block';
