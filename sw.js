@@ -1,8 +1,9 @@
-const CACHE_NAME = 'pragma-v5';
+const CACHE_NAME = 'pragma-v6';
 const ASSETS = [
   './',
   './index.html',
   './account.html',
+  './scan.html',
   './style.css',
   './manifest.json',
   './icon-192.png',

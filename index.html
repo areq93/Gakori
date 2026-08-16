@@ -195,7 +195,7 @@
             listEl.appendChild(loadingEl);
 
             sb.from('scans')
-                .select('result, created_at')
+                .select('id, result, created_at')
                 .order('created_at', { ascending: false })
                 .limit(8)
                 .then(({ data, error }) => {
@@ -222,33 +222,31 @@
                     data.forEach(scan => {
                         const r = scan.result || {};
                         const score = r.q_score;
-                        let badgeClass = 'badge-red', label = 'Manipulacja: ' + score + '/100';
-                        if (score >= 70) { badgeClass = 'badge-green'; label = 'Czysty tekst: ' + score + '/100'; }
-                        else if (score >= 40) { badgeClass = 'badge-yellow'; label = 'Częściowo: ' + score + '/100'; }
+                        let badgeClass = 'badge-red', label = score + '/100';
+                        if (score >= 70) badgeClass = 'badge-green';
+                        else if (score >= 40) badgeClass = 'badge-yellow';
 
-                        const item = document.createElement('div');
-                        item.className = 'public-scan-item';
+                        const row = document.createElement('a');
+                        row.className = 'scan-row';
+                        row.href = 'scan.html?id=' + encodeURIComponent(scan.id);
 
                         const badge = document.createElement('span');
                         badge.className = 'result-badge ' + badgeClass;
                         badge.innerText = label;
-                        item.appendChild(badge);
+                        row.appendChild(badge);
 
-                        if (r.source_quote) {
-                            const quote = document.createElement('blockquote');
-                            quote.className = 'result-quote';
-                            quote.innerText = '„' + r.source_quote + '"';
-                            item.appendChild(quote);
-                        }
+                        const snippet = document.createElement('span');
+                        snippet.className = 'scan-row-snippet';
+                        const rawSnippet = r.source_quote || r.summary || '';
+                        snippet.innerText = rawSnippet.length > 60 ? rawSnippet.slice(0, 60) + '…' : rawSnippet;
+                        row.appendChild(snippet);
 
-                        if (r.summary) {
-                            const summary = document.createElement('p');
-                            summary.className = 'result-summary';
-                            summary.innerText = r.summary;
-                            item.appendChild(summary);
-                        }
+                        const arrow = document.createElement('span');
+                        arrow.className = 'scan-row-arrow';
+                        arrow.innerText = '→';
+                        row.appendChild(arrow);
 
-                        listEl.appendChild(item);
+                        listEl.appendChild(row);
                     });
                 });
         }
