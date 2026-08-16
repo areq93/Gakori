@@ -68,7 +68,8 @@
 
         <div class="mode-panel" id="panel-image">
             <p data-i18n="label_choose_image">Wybierz zdjęcie do analizy:</p>
-            <input type="file" id="imageInput" accept="image/*">
+            <input type="file" id="imageInput" accept="image/*" style="display:none;">
+            <button type="button" id="imageInputTrigger" data-i18n="btn_choose_image" style="background:#fff; color:#333; border:1px solid #ccc;">Wybierz zdjęcie</button>
             <div id="fileName"></div>
             <img id="imagePreview" alt="podgląd">
         </div>
@@ -628,6 +629,14 @@
         });
 
         // 4. Podgląd wybranego obrazu
+        // Prawdziwe pole <input type="file"> jest ukryte — przeglądarka i tak
+        // pokazuje jego przycisk/placeholder ("Wybierz plik") we WŁASNYM języku
+        // systemu, ignorując język ustawiony w naszej aplikacji. Zamiast tego
+        // pokazujemy własny, w pełni przetłumaczony przycisk, który tylko
+        // otwiera ten sam, ukryty selektor plików.
+        document.getElementById('imageInputTrigger').addEventListener('click', () => {
+            document.getElementById('imageInput').click();
+        });
         document.getElementById('imageInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             const preview = document.getElementById('imagePreview');
