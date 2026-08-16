@@ -93,12 +93,17 @@ a { color: var(--accent); }
 .result-quote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: #55503f; line-height: 1.5; }
 .result-summary { margin: 0; line-height: 1.6; }
 
-/* Przeglądarka publicznych analiz (dla niezalogowanych) */
-.public-scan-item { padding: 12px 0; border-bottom: 1px solid var(--card-border); }
-.public-scan-item:last-child { border-bottom: none; padding-bottom: 0; }
-.public-scan-item .result-badge { margin-bottom: 8px; }
-.public-scan-item .result-quote { font-size: 14px; margin-bottom: 6px; }
-.public-scan-item .result-summary { font-size: 13.5px; color: var(--ink-soft); }
+/* Przeglądarka publicznych analiz (dla niezalogowanych) — lista klikalnych wierszy */
+.scan-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 4px; border-bottom: 1px solid var(--card-border);
+    text-decoration: none; color: var(--ink);
+}
+.scan-row:last-child { border-bottom: none; }
+.scan-row:hover { background: rgba(184, 80, 47, 0.06); }
+.scan-row .result-badge { flex-shrink: 0; margin-bottom: 0; padding: 4px 10px; font-size: 12.5px; }
+.scan-row-snippet { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan-row-arrow { flex-shrink: 0; color: var(--ink-soft); }
 #publicScansList p.status-err, #publicScansList p.status-ok { text-align: center; }
 
 /* Panel debugowania — tylko dla developera, patrz sekcja 1 w skrypcie (?debug=1) */
