@@ -93,6 +93,13 @@ a { color: var(--accent); }
 .result-quote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: #55503f; line-height: 1.5; }
 .result-summary { margin: 0; line-height: 1.6; }
 
+/* Poszczególne wykryte wzorce manipulacji (może być kilka w jednej analizie) */
+.pattern-item { margin-bottom: 16px; }
+.pattern-item:last-child { margin-bottom: 14px; }
+.pattern-name { font-weight: 700; font-size: 12.5px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.pattern-item .result-quote { margin-bottom: 6px; }
+.pattern-explanation { font-size: 13.5px; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+
 /* Przeglądarka publicznych analiz (dla niezalogowanych) — lista klikalnych wierszy */
 #publicScansSearch { margin-top: 0; }
 #publicScansList {

@@ -84,7 +84,7 @@
 
     <div id="resultCard" class="result-card">
         <div id="resultBadge" class="result-badge"></div>
-        <blockquote id="resultQuote" class="result-quote"></blockquote>
+        <div id="resultPatterns"></div>
         <p id="resultSummary" class="result-summary"></p>
     </div>
 
@@ -283,7 +283,8 @@
 
                         const snippet = document.createElement('span');
                         snippet.className = 'scan-row-snippet';
-                        const rawSnippet = r.source_quote || r.summary || '';
+                        const firstPatternQuote = Array.isArray(r.patterns) && r.patterns[0] ? r.patterns[0].quote : null;
+                        const rawSnippet = firstPatternQuote || r.source_quote || r.summary || '';
                         snippet.innerText = rawSnippet.length > 60 ? rawSnippet.slice(0, 60) + '…' : rawSnippet;
                         row.appendChild(snippet);
 
@@ -545,17 +546,53 @@
         }
 
         // 6. Wyświetlenie wyniku (albo przyjaznego komunikatu, jeśli backend odmówił)
+        // Renderuje listę wykrytych wzorców manipulacji. Obsługuje nową strukturę
+        // wyniku (result.patterns — lista {name, quote, explanation}) oraz starą,
+        // sprzed wprowadzenia wielu wzorców (pojedyncze result.source_quote) —
+        // stare, już zcache'owane analizy nigdy nie zostaną przeliczone.
+        function renderPatterns(container, result) {
+            container.innerHTML = '';
+            if (Array.isArray(result.patterns)) {
+                result.patterns.forEach(p => {
+                    const item = document.createElement('div');
+                    item.className = 'pattern-item';
+                    if (p.name) {
+                        const name = document.createElement('div');
+                        name.className = 'pattern-name';
+                        name.innerText = p.name;
+                        item.appendChild(name);
+                    }
+                    const quote = document.createElement('blockquote');
+                    quote.className = 'result-quote';
+                    quote.innerText = '„' + p.quote + '"';
+                    item.appendChild(quote);
+                    if (p.explanation) {
+                        const explanation = document.createElement('p');
+                        explanation.className = 'pattern-explanation';
+                        explanation.innerText = p.explanation;
+                        item.appendChild(explanation);
+                    }
+                    container.appendChild(item);
+                });
+            } else if (result.source_quote) {
+                const quote = document.createElement('blockquote');
+                quote.className = 'result-quote';
+                quote.innerText = '„' + result.source_quote + '"';
+                container.appendChild(quote);
+            }
+        }
+
         function renderResult(data) {
             const card = document.getElementById('resultCard');
             const badge = document.getElementById('resultBadge');
-            const quote = document.getElementById('resultQuote');
+            const patternsEl = document.getElementById('resultPatterns');
             const summary = document.getElementById('resultSummary');
+            patternsEl.innerHTML = '';
 
             if (data.error) {
                 card.style.display = 'block';
                 badge.className = 'result-badge badge-yellow';
                 badge.innerText = 'Info';
-                quote.style.display = 'none';
                 summary.innerText = data.message || 'Coś poszło nie tak. Spróbuj ponownie za chwilę.';
                 return;
             }
@@ -568,8 +605,7 @@
             card.style.display = 'block';
             badge.className = 'result-badge ' + badgeClass;
             badge.innerText = label;
-            quote.style.display = 'block';
-            quote.innerText = '„' + data.result.source_quote + '"';
+            renderPatterns(patternsEl, data.result);
             summary.innerText = data.result.summary;
         }
 

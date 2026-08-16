@@ -31,7 +31,7 @@
         <div id="scanContent" style="display:none;">
             <p id="scanSource" style="display:none; margin:0 0 12px 0; font-size:14px;"></p>
             <div id="scanBadge" class="result-badge"></div>
-            <blockquote id="scanQuote" class="result-quote"></blockquote>
+            <div id="scanPatterns"></div>
             <p id="scanSummary" class="result-summary"></p>
         </div>
     </div>
@@ -98,11 +98,37 @@
                         badge.className = 'result-badge ' + badgeClass;
                         badge.innerText = label;
 
-                        const quote = document.getElementById('scanQuote');
-                        if (r.source_quote) {
+                        // Nowa struktura wyniku ma r.patterns (lista wielu wzorców), stara
+                        // (już zcache'owane analizy sprzed tej zmiany) ma pojedynczy
+                        // r.source_quote — obsługujemy oba warianty.
+                        const patternsEl = document.getElementById('scanPatterns');
+                        if (Array.isArray(r.patterns)) {
+                            r.patterns.forEach(p => {
+                                const item = document.createElement('div');
+                                item.className = 'pattern-item';
+                                if (p.name) {
+                                    const name = document.createElement('div');
+                                    name.className = 'pattern-name';
+                                    name.innerText = p.name;
+                                    item.appendChild(name);
+                                }
+                                const quote = document.createElement('blockquote');
+                                quote.className = 'result-quote';
+                                quote.innerText = '„' + p.quote + '"';
+                                item.appendChild(quote);
+                                if (p.explanation) {
+                                    const explanation = document.createElement('p');
+                                    explanation.className = 'pattern-explanation';
+                                    explanation.innerText = p.explanation;
+                                    item.appendChild(explanation);
+                                }
+                                patternsEl.appendChild(item);
+                            });
+                        } else if (r.source_quote) {
+                            const quote = document.createElement('blockquote');
+                            quote.className = 'result-quote';
                             quote.innerText = '„' + r.source_quote + '"';
-                        } else {
-                            quote.style.display = 'none';
+                            patternsEl.appendChild(quote);
                         }
 
                         document.getElementById('scanSummary').innerText = r.summary || '';
