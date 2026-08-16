@@ -164,6 +164,14 @@ zanim założysz, że działa.
 - **Model AI**: `gemini-3.5-flash-lite` (świadomy wybór — prosta
   klasyfikacja tekstu nie potrzebuje droższego "pełnego" Flash
   zoptymalizowanego pod kodowanie/zadania agentowe).
+- **Brak "błysku" złego stanu przy ładowaniu strony**: `index.html` nie
+  pokazuje domyślnie karty logowania (`authCard` ma `display:none` w
+  samym HTML) — zamiast tego widać neutralny stan `#appLoading`
+  ("Ładowanie..."), dopóki `renderAuthUI()`/`showRecoveryForm()` (albo
+  ścieżka błędu przy niewczytanym Supabase) świadomie nie zdecydują,
+  który widok pokazać. Ten sam wzorzec już wcześniej istniał na
+  `account.html` (`#accountLoading`) — jeśli powstanie kolejna strona z
+  asynchronicznym sprawdzaniem stanu logowania, stosuj go od razu.
 - **Ponowne użycie przez tłumaczenie (efekt skali między językami)**: gdy
   ktoś prosi o analizę treści, która **już istnieje w innym języku**,
   backend (`analyze`) zamiast płacić za pełną analizę AI od zera, tanio
@@ -181,6 +189,30 @@ zanim założysz, że działa.
   (nie tłumaczymy z góry całej bazy na wszystkie języki) — koszt rośnie
   tylko tam, gdzie jest faktyczne zapotrzebowanie, i każde tłumaczenie
   zostaje w cache'u na zawsze (płaci się raz na parę treść+język).
+  - **Ekonomia tej funkcji (ważne, żeby nie zawyżać oczekiwań)**: przy
+    krótkich treściach (setki znaków) oszczędność kosztu API jest
+    kosmetyczna (~10%), bo koszt wyjścia (droższy token) jest podobnej
+    wielkości w obu ścieżkach — realna różnica rośnie z długością
+    źródła (przy długim artykule/linku spadek kosztu sięga ~80%+, bo
+    tłumaczenie nie zależy wcale od długości oryginału, tylko pełna
+    analiza). Marża procentowa na pojedynczej transakcji i tak zawsze
+    wychodzi blisko 100%, bo koszt API (`gemini-3.5-flash-lite`: $0,30 /
+    $2,50 za milion tokenów wejścia/wyjścia, zweryfikowane na żywo
+    16.08.2026 — patrz sekcja "Cennik" niżej) jest ułamkiem grosza
+    względem jakiejkolwiek sensownej ceny za kredyt. Realna wartość tej
+    funkcji to nie wzrost marży % na transakcję (nie ma tu gdzie rosnąć),
+    tylko **obniżenie zsumowanego kosztu operacyjnego w miarę wzrostu
+    skali i liczby obsługiwanych języków**.
+- **Lokalizacja komunikatów błędów**: backend zwraca kod błędu (`error`:
+  `signup_required`/`insufficient_credits`/`url_fetch_failed`/
+  `save_failed`/...) — pole `message` z backendu jest zaszyte na sztywno
+  po polsku i NIE powinno być pokazywane wprost użytkownikowi. Frontend
+  (`renderResult()` w `index.html`) mapuje kod błędu na klucz i18n
+  (`err_*`) i tłumaczy przez ten sam mechanizm co resztę interfejsu. Przy
+  dodawaniu nowego typu błędu w backendzie — dodaj też odpowiadający klucz
+  `err_*` we wszystkich 10 językach w `i18n.js` i dopisz go do mapy
+  `errorMessageKeys` w `index.html`, inaczej użytkownik zobaczy albo
+  polski tekst, albo ogólny fallback.
 
 ## Baza danych — znane tabele (zrekonstruowane z kodu, nie z osobnego
 ## pliku schematu w repo — jeśli coś tu nie zgadza się z rzeczywistością
@@ -202,6 +234,9 @@ zanim założysz, że działa.
   `result` (jsonb — patrz struktura wyniku wyżej), `discovered_by` (uuid,
   nullable — kto pierwszy wygenerował ten wynik, `null` dla darmowych
   tłumaczeń z przeglądarki), `view_count`, `created_at`
+  - Ograniczenie unikalności: `UNIQUE (content_hash, language)` —
+    **nie** samo `content_hash` (stara reguła `scans_content_hash_key`
+    została usunięta i zastąpiona tą złożoną, patrz pułapki niżej).
 
 **`wallet_transactions`**:
 - `user_id`, `amount`, `type` (np. `spend`), `related_scan_id`
@@ -209,7 +244,12 @@ zanim założysz, że działa.
 RLS: `scans` ma publiczny odczyt (używane przez niezalogowanych w
 przeglądarce publicznych analiz i na `scan.html`). Zapis do `scans`/
 `profiles`/`wallet_transactions` idzie przez `service_role` w Edge
-Function (backend), nie bezpośrednio z przeglądarki.
+Function (backend), nie bezpośrednio z przeglądarki — **z jednym
+wyjątkiem**: `profiles.language` jest aktualizowane bezpośrednio z
+przeglądarki (`setLanguage()` w `i18n.js`, wywoływane z sesją
+zalogowanego użytkownika), więc `profiles` ma regułę RLS pozwalającą
+zalogowanemu użytkownikowi na `UPDATE` własnego wiersza (`auth.uid() =
+id`), obok istniejącej reguły `SELECT`.
 
 ## Cennik (do skalibrowania na realnych danych — na razie przybliżenia)
 
@@ -221,6 +261,20 @@ Function (backend), nie bezpośrednio z przeglądarki.
   ogromnej strony).
 - Pierwszy skan anonimowy (tylko tryb tekstowy): darmowy do
   `ANONYMOUS_MAX_CHARS = 3000` znaków.
+- **Wciąż nieustalone**: ile 1 kredyt ma być wart w złotówkach/dolarach.
+  Bez tego nie da się policzyć realnej marży w walucie, tylko w
+  procentach. Jak wypadnie ta rozmowa — dopisz tu ustaloną wartość.
+- **Koszt API jest ułamkiem grosza względem jakiejkolwiek sensownej ceny
+  za kredyt** — dla `gemini-3.5-flash-lite` ($0,30 / $2,50 za milion
+  tokenów wejścia/wyjścia, zweryfikowane na żywo 16.08.2026, zgodne z
+  ceną już wcześniej zapisaną w kodzie) pojedyncza analiza kosztuje
+  rzędu $0,0007-0,0035 zależnie od długości treści. Oznacza to, że marża
+  na pojedynczej transakcji jest z natury tego biznesu blisko 100%
+  niezależnie od tego, czy to pełna analiza, czy tanie tłumaczenie z
+  cache'u — różnica między nimi liczy się dopiero w **zsumowanym**
+  koszcie operacyjnym przy dużej skali i długich treściach, nie w
+  procencie marży na jednej analizie (patrz też sekcja "Ponowne użycie
+  przez tłumaczenie" wyżej).
 
 ## Ważne wzorce bezpieczeństwa (nie usuwać/omijać przy zmianach)
 
@@ -279,6 +333,45 @@ Function (backend), nie bezpośrednio z przeglądarki.
   `function fetchAndRenderScans(...) {...}`. Jeśli kolejna funkcja
   zdefiniowana wewnątrz `else {}` będzie potrzebna spoza tego bloku —
   zastosuj ten sam wzorzec, nie zakładaj, że hoisting to załatwi.
+- **RLS domyślnie daje tylko to, na co jest jawna reguła** — tabela
+  `profiles` miała regułę tylko na `SELECT`, żadnej na `UPDATE`. Zapis
+  języka do profilu (`setLanguage()`) więc zawsze cicho się nie udawał
+  (żaden błąd nie był widoczny, bo kod nie sprawdzał `error` ze
+  Supabase), a przy kolejnej synchronizacji stara wartość z bazy
+  nadpisywała lokalny wybór użytkownika — wyglądało to jak "język sam się
+  resetuje". Ogólna zasada: przy każdej nowej tabeli/kolumnie
+  aktualizowanej bezpośrednio z przeglądarki, sprawdź w Supabase
+  (Database → Policies), czy reguła RLS na dany typ operacji
+  (`SELECT`/`INSERT`/`UPDATE`/`DELETE`) w ogóle istnieje — sama tabela
+  "działająca" do odczytu nie gwarantuje, że zapis też zadziała.
+- **Nigdy nie ignoruj `error` ze Supabase (`.then(() => {})` albo
+  `const { data } = await ...` bez `error`)** — to dokładnie ten sam
+  mechanizm co powyżej: cichy błąd wygląda jak "nic się nie stało", a
+  naprawia się go dopiero wtedy, gdy ktoś przypadkiem doda logowanie i
+  zobaczy prawdziwy powód. Dotyczy to też backendu — `insert(...).select()`
+  bez sprawdzenia `error`/`!data` prowadziło do `Cannot read properties
+  of null (reading 'id')` zamiast czytelnego komunikatu, gdy zapis do
+  `scans` się nie udawał (patrz niżej: stary klucz unikalności).
+- **Stary klucz unikalności `scans_content_hash_key`** (samo
+  `content_hash`, sprzed wprowadzenia wielojęzyczności) blokował drugi
+  wiersz dla tej samej treści w innym języku — insert w `analyze` i
+  `translate-scan` wywalał się z `duplicate key value violates unique
+  constraint`. Naprawione zmianą na złożony klucz `UNIQUE (content_hash,
+  language)` (`DROP CONSTRAINT scans_content_hash_key` +
+  `ADD CONSTRAINT ... UNIQUE (content_hash, language)`). Ogólna lekcja:
+  gdy zmienia się "co jest unikalne" w danych (tu: z "treść" na "treść +
+  język"), sprawdź, czy ograniczenia na poziomie bazy (constraints, nie
+  tylko logika w kodzie) zostały zaktualizowane tak samo — sama zmiana
+  zapytań `.eq()` w kodzie nie wystarczy, jeśli baza ma z tyłu starszą,
+  węższą regułę.
+- **Natywny `<input type="file">`** pokazuje swój przycisk/placeholder
+  ("Wybierz plik" / "Nie wybrano pliku") w języku przeglądarki/systemu
+  użytkownika — atrybut `lang` na stronie na to nie wpływa, więc zwykły
+  mechanizm i18n go nie obejmuje. Naprawione przez ukrycie natywnego pola
+  (`display:none`) i zastąpienie go własnym, w pełni tłumaczonym
+  przyciskiem, który tylko programowo klika ukryty input
+  (`imageInputTrigger` w `index.html`). Jeśli w przyszłości dojdzie kolejne
+  pole plikowe — zastosuj ten sam wzorzec od razu, nie po zgłoszeniu.
 
 ## Świadomie odłożone na później (nie budować bez wyraźnej prośby)
 
@@ -290,6 +383,31 @@ Function (backend), nie bezpośrednio z przeglądarki.
 - Obniżanie darmowego bonusu powitalnego / limity rejestracji po IP w
   Supabase — świadomie odłożone (zasada Lean Startup: nie buduj obrony
   przed zagrożeniem, które się jeszcze nie zmaterializowało).
+
+## Dokumenty z pomysłami biznesowymi (traktuj krytycznie)
+
+Użytkownik czasem wkleja obszerne pliki PDF z burzy mózgów wygenerowanej w
+osobnej rozmowie z AI (np. `PRagma.pdf` — dziesiątki stron o teorii gier,
+memetyce, ESS, modelach Mungera, mechanizmach reputacji itd.). Takie pliki:
+- Same jawnie ostrzegają, że są wewnętrznie niespójne (treść bliżej końca
+  pliku ma pierwszeństwo nad treścią bliżej początku dla tego samego
+  tematu).
+- Zawierają konkretne liczby (np. ceny API, wzory kosztowe), które bywają
+  nieaktualne, dotyczą innych/starszych modeli albo są tylko ilustracyjnym
+  szacunkiem, nie zweryfikowanym faktem.
+- Mają dużo spekulatywnej, filozoficznej otoczki (teoria ewolucji,
+  Dawkins, Munger) obudowującej całkiem konkretne, techniczne pomysły
+  (np. system reputacji, mechanizm "pierwszeństwa odkrycia", prywatne vs
+  publiczne skany) — warto oddzielić jedno od drugiego.
+
+Zasada: każdą konkretną, weryfikowalną liczbę lub fakt z takiego pliku
+(zwłaszcza ceny/koszty) sprawdź w prawdziwym, aktualnym źródle (np.
+`WebSearch`) przed użyciem jej w kodzie czy w rozmowie — nie kopiuj
+wprost. Przykład z tej sesji: plik podawał cenę Gemini "0,07 PLN / 0,28
+PLN za milion tokenów" dla starego modelu — sprawdzenie na żywo pokazało,
+że aktualna, prawidłowa cena dla modelu faktycznie używanego w kodzie
+(`gemini-3.5-flash-lite`) to $0,30 / $2,50 za milion tokenów, czyli
+zupełnie inna liczba, i to ta druga jest poprawna.
 
 ## Zasady współpracy w tym projekcie
 
