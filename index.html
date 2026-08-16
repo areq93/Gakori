@@ -728,34 +728,23 @@
             }
 
             let payload = null;
-            // Wynik ma się otworzyć w nowej karcie (scan.html), nie pod listą
-            // publicznych analiz na tej samej stronie. Pustą kartę trzeba
-            // otworzyć TERAZ, w tej samej chwili co klik — przeglądarki
-            // blokują otwieranie nowej karty, jeśli zrobimy to dopiero po
-            // odpowiedzi serwera (za późno, "klik" już się "przedawnił").
-            // Dopiero gdy znamy wynik, przekierowujemy tę pustą kartę na
-            // właściwy adres (albo zamykamy ją, jeśli coś poszło nie tak).
-            let resultWindow = null;
 
             try {
                 if (currentMode === 'url') {
                     const url = document.getElementById('urlInput').value.trim();
                     if (!url) return alert(t('alert_enter_link'));
-                    resultWindow = window.open('', '_blank');
                     const hash = await sha256Hex(new TextEncoder().encode(url));
                     payload = { input_type: 'url', content_hash: hash, source_url: url, language: getCurrentLanguage() };
 
                 } else if (currentMode === 'text') {
                     const text = document.getElementById('textInput').value.trim();
                     if (!text) return alert(t('alert_paste_text'));
-                    resultWindow = window.open('', '_blank');
                     const hash = await sha256Hex(new TextEncoder().encode(text));
                     payload = { input_type: 'text', content_hash: hash, char_count: text.length, text_content: text, language: getCurrentLanguage() };
 
                 } else if (currentMode === 'image') {
                     const file = document.getElementById('imageInput').files[0];
                     if (!file) return alert(t('alert_choose_image'));
-                    resultWindow = window.open('', '_blank');
                     const buffer = await file.arrayBuffer();
                     const hash = await sha256Hex(buffer);
                     payload = { input_type: 'image', content_hash: hash, file_name: file.name, size_kb: Math.round(file.size / 1024), language: getCurrentLanguage() };
@@ -784,20 +773,15 @@
                 payloadEl.innerText = JSON.stringify(data, null, 2);
 
                 if (data.error) {
-                    // Błąd pokazujemy na tej samej stronie (nie ma sensu otwierać
-                    // pustej karty na komunikat błędu) — zamykamy pustą kartę.
-                    if (resultWindow) resultWindow.close();
+                    // Błąd pokazujemy na tej samej stronie.
                     renderResult(data);
-                } else if (resultWindow) {
-                    resultWindow.location = 'scan.html?id=' + encodeURIComponent(data.id);
                 } else {
-                    // Przeglądarka zablokowała otwarcie nowej karty (blokada
-                    // wyskakujących okienek) — pokazujemy wynik zapasowo tu.
-                    renderResult(data);
+                    // Przechodzimy w TEJ SAMEJ karcie na stronę z wynikiem
+                    // (nie otwieramy nowej karty przeglądarki).
+                    window.location.href = 'scan.html?id=' + encodeURIComponent(data.id);
                 }
 
             } catch (err) {
-                if (resultWindow) resultWindow.close();
                 statusEl.innerHTML = '<span class="status-err">' + t('status_err_prefix') + err + '</span>';
             } finally {
                 btn.disabled = false;
