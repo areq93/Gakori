@@ -224,6 +224,46 @@ const RESPONSE_SCHEMA = {
   required: ['q_score', 'patterns', 'summary'],
 }
 
+// Kategorie niedozwolonej treści na obrazie — patrz moderacja niżej
+// (Deno.serve, gałąź "image"). Trzymane jako lista stałych wartości (nie
+// dowolny tekst), żeby wynik był przewidywalny i łatwy do dalszego użycia
+// (np. w przyszłych statystykach), a nie za każdym razem inaczej sformułowany
+// przez model.
+const UNSAFE_CONTENT_CATEGORIES = [
+  'nudity_or_sexual_content',
+  'graphic_violence_or_gore',
+  'animal_or_human_abuse',
+  'disaster_with_graphic_injuries',
+]
+
+// Schemat tylko dla obrazów — rozszerzony o pola moderacji treści. Trzymany
+// osobno od RESPONSE_SCHEMA (tekst/link), żeby nie ruszać sprawdzonego,
+// stabilnego kształtu wyniku dla tamtych trybów.
+const IMAGE_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    unsafe_content: { type: 'boolean' },
+    unsafe_content_category: { type: 'string' },
+    q_score: { type: 'integer' },
+    patterns: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          pattern_type: { type: 'string', enum: ['manipulation', 'reasoning'] },
+          name: { type: 'string' },
+          quote: { type: 'string' },
+          explanation: { type: 'string' },
+          tip: { type: 'string' },
+        },
+        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip'],
+      },
+    },
+    summary: { type: 'string' },
+  },
+  required: ['unsafe_content', 'unsafe_content_category', 'q_score', 'patterns', 'summary'],
+}
+
 // Wspólny punkt wywołania Gemini — używany zarówno przez tłumaczenie gotowego
 // wyniku, jak i pełną analizę (URL, tekst i awaryjne ponowienie po nieudanym
 // pobraniu linku). Trzymanie tego w jednym miejscu gwarantuje, że wszystkie
@@ -429,7 +469,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    let profile = null
+    let profile: { wallet_balance: number } | null = null
     if (user_id) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user_id).single()
       profile = data
@@ -512,6 +552,33 @@ Deno.serve(async (req: Request) => {
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+    }
+
+    // Moderacja treści na obrazie: jeśli Gemini (własny klasyfikator w
+    // schemacie ALBO wbudowany mechanizm bezpieczeństwa dostawcy) wykryje
+    // niedozwoloną treść, obciążamy konto pełną stawką jako karę za samą
+    // PRÓBĘ (świadomy odstraszacz, nie pomyłka — użytkownik poprosił o to
+    // wprost), ale NIC nie trafia do współdzielonego cache'u/przeglądarki
+    // publicznych analiz. `cost`/`user_id`/`profile` są już ustalone w tym
+    // miejscu (sekcja 4 wyżej), więc funkcja może z nich bezpiecznie
+    // skorzystać przez domknięcie (closure).
+    async function respondUnsafeContent(category: string): Promise<Response> {
+      if (user_id && profile) {
+        await supabase
+          .from('profiles')
+          .update({ wallet_balance: profile.wallet_balance - cost })
+          .eq('id', user_id)
+        await supabase.from('wallet_transactions').insert({
+          user_id,
+          amount: -cost,
+          type: 'unsafe_content_penalty',
+          related_scan_id: null,
+        })
+      }
+      return new Response(
+        JSON.stringify({ error: 'unsafe_content', category, charged: user_id ? cost : 0 }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // 5. WYWOŁANIE GEMINI (wymuszony JSON wg schematu)
@@ -632,13 +699,21 @@ Deno.serve(async (req: Request) => {
         // tekstu, po którym dałoby się zgrubnie wybrać kategorie, a płaska
         // stawka i tak ma duży margines na dodatkowe tokeny pełnej biblioteki).
         const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+        // Moderacja treści — pierwsza rzecz, o którą pytamy Gemini, zanim
+        // pójdzie dalej do właściwej analizy. To DODATKOWA warstwa do
+        // wbudowanego mechanizmu bezpieczeństwa dostawcy (sprawdzanego niżej
+        // przez promptFeedback.blockReason/finishReason) — łapie też
+        // przypadki z listy użytkownika (katastrofy, zranienia, znęcanie
+        // się), które niekoniecznie trafiają w kategorie blokowane
+        // automatycznie przez samego dostawcę.
+        const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy obraz przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "q_score", "patterns" i "summary" zostaw odpowiednio: 0, pusta lista, pusty tekst. NIE opisuj ani nie analizuj dalej takiej treści. Jeśli obraz NIE przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.`
         geminiData = await callGemini(
           {
             contents: [
               {
                 parts: [
                   {
-                    text: `${systemPrompt}\n\nPrzeanalizuj treść widoczną na przesłanym obrazie (to może być zrzut ekranu, zdjęcie tekstu, wykres, post z mediów społecznościowych itp.) — potraktuj ją dokładnie tak samo jak tekst do analizy.`,
+                    text: `${systemPrompt}\n\n${moderationInstruction}\n\nPrzeanalizuj treść widoczną na przesłanym obrazie (to może być zrzut ekranu, zdjęcie tekstu, wykres, post z mediów społecznościowych itp.) — potraktuj ją dokładnie tak samo jak tekst do analizy.`,
                   },
                   { inlineData: { mimeType: imageMimeType, data: image_base64 } },
                 ],
@@ -646,11 +721,21 @@ Deno.serve(async (req: Request) => {
             ],
             generationConfig: {
               responseMimeType: 'application/json',
-              responseSchema: RESPONSE_SCHEMA,
+              responseSchema: IMAGE_RESPONSE_SCHEMA,
             },
           },
           geminiKey!
         )
+
+        // Gemini może sam zablokować odpowiedź na poziomie WŁASNYCH filtrów
+        // bezpieczeństwa (najbardziej drastyczne przypadki) — wtedy nie ma
+        // żadnego tekstu do sparsowania niżej. Traktujemy to identycznie jak
+        // nasz klasyfikator: karzemy za próbę, nic nie zapisujemy publicznie.
+        const blockReason = geminiData?.promptFeedback?.blockReason
+        const imageFinishReason = geminiData?.candidates?.[0]?.finishReason
+        if (blockReason || imageFinishReason === 'SAFETY') {
+          return await respondUnsafeContent('blocked_by_provider')
+        }
       } else {
         // ETAP 1 (tani) + ETAP 2 — patrz komentarz w gałęzi "url" wyżej.
         const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!)
@@ -675,6 +760,16 @@ Deno.serve(async (req: Request) => {
       }
 
       result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
+
+      // Nasz własny klasyfikator (patrz moderationInstruction w gałęzi
+      // "image" wyżej) — druga warstwa moderacji, obok wbudowanego
+      // mechanizmu bezpieczeństwa dostawcy sprawdzonego przed parsowaniem.
+      if (input_type === 'image') {
+        const imgResult = result as { unsafe_content?: boolean; unsafe_content_category?: string }
+        if (imgResult.unsafe_content) {
+          return await respondUnsafeContent(imgResult.unsafe_content_category || 'unspecified')
+        }
+      }
     }
 
     // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników)

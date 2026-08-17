@@ -139,9 +139,50 @@ zanim założysz, że działa.
   rozmiar jak w pierwszej, tymczasowej wersji interfejsu), backend sam
   rozpoznaje prawdziwy typ pliku po zawartości i woła Gemini
   multimodalnie (`inlineData` z base64 + wykrytym `mimeType`), patrz
-  sekcja "Cennik" wyżej. PDF: jeszcze nie zaimplementowany (`input_type:
-  "pdf"` zwróciłby `501 not_implemented`, gdyby frontend w ogóle wysyłał
-  taki typ — na razie nie ma dla PDF żadnego pola w interfejsie).
+  sekcja "Cennik" wyżej.
+  - **Moderacja treści na obrazach** (użytkownik poprosił wprost, żeby
+    zablokować próby wrzucania niedozwolonej treści): DWIE niezależne
+    warstwy sprawdzania w tym samym, jedynym wywołaniu Gemini (bez
+    dodatkowego kosztu):
+    1. Wbudowany mechanizm bezpieczeństwa samego dostawcy —
+       `geminiData.promptFeedback.blockReason` albo
+       `candidates[0].finishReason === 'SAFETY'` łapie najbardziej
+       drastyczne przypadki, zanim w ogóle jest jakikolwiek tekst do
+       sparsowania.
+    2. Własny klasyfikator wstrzyknięty na początek promptu
+       (`moderationInstruction` w kodzie) — każe Gemini NAJPIERW ocenić,
+       czy obraz przedstawia nagość/treści seksualne, drastyczną przemoc/
+       krew/wnętrzności/zwłoki, znęcanie się nad ludźmi lub zwierzętami,
+       albo drastyczne skutki katastrof — i ustawić `unsafe_content`
+       (bool) + `unsafe_content_category` (jedna z ustalonej listy
+       `UNSAFE_CONTENT_CATEGORIES`) w schemacie odpowiedzi
+       (`IMAGE_RESPONSE_SCHEMA`, osobny od `RESPONSE_SCHEMA` używanego
+       przez tekst/link — nie miesza się z ich sprawdzonym kształtem).
+       To łapie kategorie z listy użytkownika, które niekoniecznie
+       trafiają w domyślne kategorie blokowane automatycznie przez
+       samego dostawcę (np. "katastrofy", "zranienia").
+    - **Kara za samą próbę**: w OBU przypadkach wykrycia konto zostaje
+      obciążone **pełną stawką `IMAGE_SCAN_COST`, tak jak za normalną,
+      udaną analizę** (funkcja `respondUnsafeContent()`) — świadomy
+      odstraszacz na wyraźną prośbę użytkownika, nie pomyłka. Transakcja
+      w `wallet_transactions` ma `type: 'unsafe_content_penalty'`
+      (odróżnialna od zwykłego `'spend'` w razie potrzeby analizy
+      później) i `related_scan_id: null`.
+    - **NIC nie trafia do współdzielonego cache'u `scans`** przy
+      wykryciu — żaden wiersz się nie zapisuje, więc treść nigdy nie
+      pojawia się w publicznej przeglądarce analiz ani pod żadnym `id`.
+      Ponowna próba z tym samym plikiem zawsze przechodzi przez pełne
+      (płatne) sprawdzenie od nowa — nie ma tu żadnego "darmowego"
+      powtórzenia, bo nie ma czego cache'ować.
+    - Frontend pokazuje użytkownikowi czytelny komunikat (`err_unsafe_content`
+      w `i18n.js`, wszystkie 10 języków) i od razu odświeża widoczny stan
+      kredytów (patrz "Stan kredytów" wyżej), żeby liczba na ekranie
+      zgadzała się z tym, co faktycznie pobrano.
+  - PDF: jeszcze nie zaimplementowany (`input_type: "pdf"` zwróciłby
+    `501 not_implemented`, gdyby frontend w ogóle wysyłał taki typ — na
+    razie nie ma dla PDF żadnego pola w interfejsie). Moderacja opisana
+    wyżej ma docelowo obejmować też obrazy WEWNĄTRZ analizowanych PDF-ów
+    (pominięte, nie analizowane) — patrz "Świadomie odłożone na później".
   - **Awaryjne pobranie strony (`fetchUrlAsText()`)**: niektóre strony
     (np. duże portale newsowe typu onet.pl) odrzucają robota Google z
     ogólnym kodem `URL_RETRIEVAL_STATUS_ERROR` — bez podania konkretnego
@@ -483,6 +524,14 @@ zanim założysz, że działa.
   niezalogowanych) — celowa decyzja: to mechanizm wzrostu/odkrywalności o
   zerowym koszcie krańcowym (czyta się z już policzonego, współdzielonego
   cache'u, bez wywoływania Gemini).
+  - **Obrazy (i docelowo PDF) świadomie WYŁĄCZONE z tej listy** (filtr
+    `.neq('input_type', 'image')` w zapytaniu) — bez podglądu samego
+    pliku sama tekstowa analiza obrazu nie daje przeglądającym żadnego
+    kontekstu, co właściwie było analizowane, więc nie ma sensu ich
+    "odkrywać" tak jak tekst/link. Bezpośredni link `scan.html?id=...`
+    do takiej analizy nadal działa dla osoby, która go ma (RLS na
+    `scans` pozwala na publiczny odczyt) — po prostu nie jest
+    "wyszukiwalny"/nie pojawia się w przeglądaniu.
 - **Własna, świeża analiza przenosi na stronę wyniku w TEJ SAMEJ karcie**:
   kliknięcie "Analizuj" na `index.html` po otrzymaniu wyniku przekierowuje
   (`window.location.href = 'scan.html?id=...'`) — bez otwierania nowej
@@ -875,7 +924,13 @@ id`), obok istniejącej reguły `SELECT`.
   `supabase/functions/analyze/index.ts` — PDF to jedyna część tego punktu
   wciąż odłożona na później, zaplanowana jako osobny, dwuetapowy flow z
   ekranem potwierdzenia kosztu przed właściwą analizą; szczegóły planu
-  trzymane w liście zadań sesji, nie tutaj, żeby nie duplikować).
+  trzymane w liście zadań sesji, nie tutaj, żeby nie duplikować). Dwa
+  dodatkowe wymagania ustalone dla tej fazy: 1) obrazy WEWNĄTRZ
+  analizowanego PDF-a mają być pomijane, nie analizowane (tylko sam
+  tekst); 2) analizy PDF-ów NIE mają być udostępniane publicznie w
+  przeglądarce analiz — tak jak obrazy (patrz "Przeglądarka publicznych
+  analiz" wyżej), tylko mocniej: użytkownik poprosił, żeby PDF-y w ogóle
+  nie trafiały do tego mechanizmu odkrywalności.
 - Ekran intencji zakupowej (Fake Door test).
 - Obniżanie darmowego bonusu powitalnego / limity rejestracji po IP w
   Supabase — świadomie odłożone (zasada Lean Startup: nie buduj obrony

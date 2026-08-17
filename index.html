@@ -282,7 +282,12 @@
 
             const query = sanitizeSearchQuery(rawQuery);
             const currentLang = getCurrentLanguage();
-            let request = sb.from('scans').select('id, content_hash, input_type, result, created_at').eq('language', currentLang);
+            // Obrazy (i docelowo PDF) świadomie NIE pojawiają się w publicznym
+            // przeglądaniu — bez podglądu samego pliku sama tekstowa analiza
+            // nie daje innym użytkownikom żadnego kontekstu, co właściwie było
+            // analizowane. Bezpośredni link do takiej analizy (scan.html?id=...)
+            // nadal działa dla osoby, która go ma — po prostu nie jest "odkrywalny".
+            let request = sb.from('scans').select('id, content_hash, input_type, result, created_at').eq('language', currentLang).neq('input_type', 'image');
             if (query) {
                 request = request.or('result->>source_quote.ilike.%' + query + '%,result->>summary.ilike.%' + query + '%');
             }
@@ -738,6 +743,7 @@
                     save_failed: 'err_save_failed',
                     invalid_image: 'err_invalid_image',
                     file_too_large: 'err_file_too_large',
+                    unsafe_content: 'err_unsafe_content',
                 };
                 const key = errorMessageKeys[data.error];
                 summary.innerText = key ? t(key) : t('result_generic_error');
