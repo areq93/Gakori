@@ -34,7 +34,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "Konto z tym adresem e-mail już istnieje. Spróbuj się zalogować.",
         status_check_email: "Sprawdź skrzynkę e-mail i kliknij link potwierdzający, aby dokończyć rejestrację.",
         err_email_first: "Najpierw wpisz swój e-mail powyżej.",
-        status_reset_email_sent: "Wysłaliśmy link do zresetowania hasła na Twój e-mail.",
+        status_recovery_email_sent: "Wysłaliśmy link do odzyskania hasła na Twój e-mail.",
         err_google_account_exists: "Konto z tym adresem Google już istnieje. Zaloguj się zamiast rejestrować.",
         recovery_title: "Ustaw nowe hasło do konta:",
         placeholder_new_password: "nowe hasło (min. 6 znaków)", btn_set_new_password: "Ustaw nowe hasło",
@@ -94,7 +94,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "An account with this email already exists. Try logging in.",
         status_check_email: "Check your email and click the confirmation link to finish signing up.",
         err_email_first: "Enter your email above first.",
-        status_reset_email_sent: "We sent a password reset link to your email.",
+        status_recovery_email_sent: "We sent a password recovery link to your email.",
         err_google_account_exists: "An account with this Google address already exists. Log in instead.",
         recovery_title: "Set a new password for your account:",
         placeholder_new_password: "new password (min. 6 characters)", btn_set_new_password: "Set new password",
@@ -154,7 +154,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "Ya existe una cuenta con este correo. Intenta iniciar sesión.",
         status_check_email: "Revisa tu correo y haz clic en el enlace de confirmación para completar el registro.",
         err_email_first: "Primero escribe tu correo arriba.",
-        status_reset_email_sent: "Te enviamos un enlace para restablecer tu contraseña por correo.",
+        status_recovery_email_sent: "Te enviamos un enlace para recuperar tu contraseña por correo.",
         err_google_account_exists: "Ya existe una cuenta con esta dirección de Google. Inicia sesión en su lugar.",
         recovery_title: "Establece una nueva contraseña para tu cuenta:",
         placeholder_new_password: "nueva contraseña (mín. 6 caracteres)", btn_set_new_password: "Establecer nueva contraseña",
@@ -214,7 +214,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "Ein Konto mit dieser E-Mail existiert bereits. Bitte melde dich an.",
         status_check_email: "Prüfe dein Postfach und klicke auf den Bestätigungslink, um die Registrierung abzuschließen.",
         err_email_first: "Bitte zuerst deine E-Mail oben eingeben.",
-        status_reset_email_sent: "Wir haben dir einen Link zum Zurücksetzen des Passworts per E-Mail geschickt.",
+        status_recovery_email_sent: "Wir haben dir einen Link zur Wiederherstellung deines Passworts per E-Mail geschickt.",
         err_google_account_exists: "Ein Konto mit dieser Google-Adresse existiert bereits. Bitte melde dich stattdessen an.",
         recovery_title: "Neues Passwort für dein Konto festlegen:",
         placeholder_new_password: "neues Passwort (mind. 6 Zeichen)", btn_set_new_password: "Neues Passwort festlegen",
@@ -274,7 +274,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "Un compte avec cet e-mail existe déjà. Essayez de vous connecter.",
         status_check_email: "Consultez votre e-mail et cliquez sur le lien de confirmation pour finaliser l'inscription.",
         err_email_first: "Indiquez d'abord votre e-mail ci-dessus.",
-        status_reset_email_sent: "Nous vous avons envoyé un lien de réinitialisation du mot de passe par e-mail.",
+        status_recovery_email_sent: "Nous vous avons envoyé un lien de récupération de mot de passe par e-mail.",
         err_google_account_exists: "Un compte avec cette adresse Google existe déjà. Connectez-vous plutôt.",
         recovery_title: "Définissez un nouveau mot de passe pour votre compte :",
         placeholder_new_password: "nouveau mot de passe (min. 6 caractères)", btn_set_new_password: "Définir le nouveau mot de passe",
@@ -334,7 +334,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "Аккаунт с этим e-mail уже существует. Попробуйте войти.",
         status_check_email: "Проверьте почту и перейдите по ссылке подтверждения, чтобы завершить регистрацию.",
         err_email_first: "Сначала введите свой e-mail выше.",
-        status_reset_email_sent: "Мы отправили ссылку для сброса пароля на вашу почту.",
+        status_recovery_email_sent: "Мы отправили ссылку для восстановления пароля на вашу почту.",
         err_google_account_exists: "Аккаунт с этим адресом Google уже существует. Пожалуйста, войдите.",
         recovery_title: "Задайте новый пароль для аккаунта:",
         placeholder_new_password: "новый пароль (мин. 6 символов)", btn_set_new_password: "Установить новый пароль",
@@ -394,7 +394,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "该邮箱已注册账户，请尝试登录。",
         status_check_email: "请查收邮件并点击确认链接以完成注册。",
         err_email_first: "请先在上方输入您的邮箱。",
-        status_reset_email_sent: "我们已将密码重置链接发送到您的邮箱。",
+        status_recovery_email_sent: "我们已将密码找回链接发送到您的邮箱。",
         err_google_account_exists: "该 Google 邮箱已注册账户，请改为登录。",
         recovery_title: "为您的账户设置新密码：",
         placeholder_new_password: "新密码（至少6个字符）", btn_set_new_password: "设置新密码",
@@ -454,7 +454,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "このメールアドレスのアカウントは既に存在します。ログインをお試しください。",
         status_check_email: "メールを確認し、確認リンクをクリックして登録を完了してください。",
         err_email_first: "まず上にメールアドレスを入力してください。",
-        status_reset_email_sent: "パスワード再設定用のリンクをメールで送信しました。",
+        status_recovery_email_sent: "パスワードの復旧用リンクをメールで送信しました。",
         err_google_account_exists: "このGoogleアドレスのアカウントは既に存在します。代わりにログインしてください。",
         recovery_title: "アカウントの新しいパスワードを設定してください：",
         placeholder_new_password: "新しいパスワード（6文字以上）", btn_set_new_password: "新しいパスワードを設定",
@@ -514,7 +514,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "इस ईमेल से खाता पहले से मौजूद है। कृपया लॉग इन करने का प्रयास करें।",
         status_check_email: "पंजीकरण पूरा करने के लिए अपना ईमेल जांचें और पुष्टिकरण लिंक पर क्लिक करें।",
         err_email_first: "पहले ऊपर अपना ईमेल दर्ज करें।",
-        status_reset_email_sent: "हमने आपके ईमेल पर पासवर्ड रीसेट लिंक भेज दिया है।",
+        status_recovery_email_sent: "हमने आपके ईमेल पर पासवर्ड पुनर्प्राप्ति लिंक भेज दिया है।",
         err_google_account_exists: "इस Google पते से खाता पहले से मौजूद है। कृपया इसके बजाय लॉग इन करें।",
         recovery_title: "अपने खाते के लिए नया पासवर्ड सेट करें:",
         placeholder_new_password: "नया पासवर्ड (कम से कम 6 अक्षर)", btn_set_new_password: "नया पासवर्ड सेट करें",
@@ -574,7 +574,7 @@ const TRANSLATIONS = {
         err_account_exists_login: "يوجد حساب بهذا البريد الإلكتروني بالفعل. حاول تسجيل الدخول.",
         status_check_email: "تحقق من بريدك الإلكتروني وانقر على رابط التأكيد لإتمام التسجيل.",
         err_email_first: "الرجاء إدخال بريدك الإلكتروني أعلاه أولاً.",
-        status_reset_email_sent: "لقد أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني.",
+        status_recovery_email_sent: "لقد أرسلنا رابط استعادة كلمة المرور إلى بريدك الإلكتروني.",
         err_google_account_exists: "يوجد حساب بعنوان Google هذا بالفعل. الرجاء تسجيل الدخول بدلاً من ذلك.",
         recovery_title: "قم بتعيين كلمة مرور جديدة لحسابك:",
         placeholder_new_password: "كلمة مرور جديدة (6 أحرف على الأقل)", btn_set_new_password: "تعيين كلمة المرور الجديدة",
@@ -772,7 +772,14 @@ function containsForbiddenWord(username) {
 async function ensureDefaultUsername(sb, userId, email) {
     if (!sb || !userId || !email) return;
     const { data } = await sb.from('profiles').select('username').eq('id', userId).single();
-    if (!data || data.username) return;
+    if (data && data.username) {
+        // Konto już ma nazwę — tylko upewniamy się, że metadane logowania
+        // (używane do spersonalizowania maili wysyłanych przez Supabase,
+        // np. "Cześć, {{ .Data.username }}!") są z nią zgodne, na wypadek
+        // gdyby konto dostało nazwę zanim to lustrowanie tu istniało.
+        sb.auth.updateUser({ data: { username: data.username } }).catch(() => {});
+        return;
+    }
     // Jeśli sam pierwszy człon e-maila jest zakazanym słowem (rzadkie, ale
     // się zdarza), nie próbujemy go w ogóle — zaczynamy od razu od
     // neutralnej nazwy zamiast dopisywać cyfry do obraźliwej podstawy.
@@ -785,7 +792,10 @@ async function ensureDefaultUsername(sb, userId, email) {
     for (let attempt = 0; attempt < 5; attempt++) {
         const candidate = attempt === 0 ? base : (base.slice(0, 20) + Math.floor(1000 + Math.random() * 9000));
         const { error } = await sb.from('profiles').update({ username: candidate }).eq('id', userId);
-        if (!error) return;
+        if (!error) {
+            sb.auth.updateUser({ data: { username: candidate } }).catch(() => {});
+            return;
+        }
         if (error.code !== '23505') {
             console.error('Nie udało się ustawić domyślnej nazwy użytkownika:', error);
             return;
