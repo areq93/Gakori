@@ -226,6 +226,30 @@ zanim założysz, że działa.
     2-3 warianty jako statyczny podgląd HTML, zrzut ekranu, i dać
     użytkownikowi wybrać wizualnie — dużo szybsze niż kilka rund
     poprawek "na czuja".
+- **Nazwa użytkownika**: ustawiana automatycznie przy pierwszym logowaniu
+  jako pierwszy człon adresu e-mail przed `@` (`ensureDefaultUsername()` w
+  `i18n.js`, wywoływane w `index.html` przy każdym logowaniu I w
+  `account.html` — więc backfill dla kont sprzed wprowadzenia tej funkcji
+  dzieje się sam, przy najbliższym logowaniu, bez osobnej migracji per
+  konto — jest też jednorazowe zapytanie SQL wypełniające to natychmiast
+  dla WSZYSTKICH już istniejących kont, patrz niżej, żeby nie trzeba było
+  czekać, aż się zalogują ponownie). Cel: docelowo kierowanie komunikacji
+  do użytkownika po imieniu/nazwie, którą sobie wybrał, zamiast po surowym
+  e-mailu.
+  - **Limit "zmiana raz na 14 dni" wymuszony w BAZIE, nie tylko w
+    przeglądarce** — wyzwalacz (`trigger`) na tabeli `profiles`
+    (`enforce_username_cooldown()`) odrzuca `UPDATE`, jeśli
+    `username_changed_at` jest młodsze niż 14 dni, niezależnie od tego, co
+    robi frontend. To jest ten sam "zero zaufania do przeglądarki", co przy
+    `user_id` z JWT — reguła biznesowa, którą naprawdę zależy nam
+    wyegzekwować, nie powinna polegać wyłącznie na sprawdzeniu w JS
+    (`account.html` i tak sprawdza to też po swojej stronie, dla lepszego
+    UX — pokazuje datę kolejnej możliwej zmiany zamiast czekać na błąd z
+    bazy — ale to tylko wygoda, nie zabezpieczenie).
+  - Nazwy NIE są unikalne między użytkownikami (świadomie — cel to
+    zwracanie się do KONKRETNEGO użytkownika po jego własnej nazwie, nie
+    publiczny, unikalny "handle", więc kolizje między różnymi kontami nie
+    są problemem).
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
@@ -398,6 +422,10 @@ zanim założysz, że działa.
 - `language` (text, `NOT NULL DEFAULT 'en'`) — ustawienie języka konta
 - `theme` (text, `NOT NULL DEFAULT 'light'`) — ustawienie motywu (`light`/
   `dark`), ten sam wzorzec co `language` (patrz niżej "Motyw jasny/ciemny")
+- `username` (text, nullable) — nazwa użytkownika, patrz niżej "Nazwa
+  użytkownika"
+- `username_changed_at` (timestamptz, nullable) — kiedy ostatnio zmieniono
+  `username`; używane przez wyzwalacz bazy wymuszający limit "raz na 14 dni"
 
 **`scans`** (współdzielony cache analiz, publiczny odczyt w RLS):
 - `id`, `content_hash` (klucz cache'u treści), `input_type` (`text`/`url`/

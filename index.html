@@ -542,6 +542,10 @@
             // zgłosił użytkownik (część interfejsu w innym języku niż lista).
             if (session && !consumeSignupLanguage(session)) await syncLanguageFromProfile(sb, session.user.id);
             if (session) await syncThemeFromProfile(sb, session.user.id);
+            // Nie czekamy na to (nie blokuje wyrenderowania) — w przeciwieństwie
+            // do języka/motywu nazwa użytkownika nie wpływa na to, co widać
+            // teraz na ekranie, więc nie ma po co opóźniać renderAuthUI().
+            if (session) ensureDefaultUsername(sb, session.user.id, session.user.email);
             if (event === 'PASSWORD_RECOVERY') {
                 showRecoveryForm();
             } else {
@@ -552,6 +556,7 @@
             currentSession = session;
             if (session) await syncLanguageFromProfile(sb, session.user.id);
             if (session) await syncThemeFromProfile(sb, session.user.id);
+            if (session) ensureDefaultUsername(sb, session.user.id, session.user.email);
             renderAuthUI();
         });
 
