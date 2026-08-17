@@ -168,18 +168,23 @@
                         usernameStatus.innerHTML = '<span class="status-err">' + t('err_username_length') + '</span>';
                         return;
                     }
+                    if (containsForbiddenWord(newUsername)) {
+                        usernameStatus.innerHTML = '<span class="status-err">' + t('err_username_forbidden') + '</span>';
+                        return;
+                    }
                     const { data, error } = await sb.from('profiles')
                         .update({ username: newUsername })
                         .eq('id', session.user.id)
                         .select('username_changed_at')
                         .single();
                     if (error) {
-                        // Dwa różne powody błędu z bazy: 23505 = nazwa zajęta (baza
-                        // wymusza unikalność), cokolwiek innego = najpewniej limit
-                        // "raz na 14 dni" (wyzwalacz na tabeli profiles) — to drugi,
-                        // zapasowy komunikat na wypadek, gdyby ktoś ominął sprawdzenie
-                        // w przeglądarce.
-                        const key = error.code === '23505' ? 'err_username_taken' : 'err_username_cooldown';
+                        // Sprawdzenie w przeglądarce wyżej jest tylko wygodą — prawdziwe
+                        // zabezpieczenie (nie do ominięcia) jest w bazie, w tym samym
+                        // wyzwalaczu co limit "raz na 14 dni". Rozpoznajemy powód po
+                        // kodzie/treści błędu z bazy, żeby pokazać właściwy komunikat.
+                        let key = 'err_username_cooldown';
+                        if (error.code === '23505') key = 'err_username_taken';
+                        else if (error.message && error.message.includes('username_forbidden_word')) key = 'err_username_forbidden';
                         usernameStatus.innerHTML = '<span class="status-err">' + t(key) + '</span>';
                         return;
                     }

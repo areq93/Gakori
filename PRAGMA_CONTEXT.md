@@ -268,6 +268,25 @@ zanim założysz, że działa.
       rozwiązać PRZED dodaniem ograniczenia `UNIQUE`, inaczej `ALTER TABLE`
       się nie powiedzie. SQL do tego jest w historii PR-a dodającego tę
       zmianę.
+  - **Filtr niedozwolonych słów** (wulgaryzmy, obraźliwe określenia):
+    `USERNAME_BLOCKLIST` w `i18n.js` — lista PL+EN, dopasowanie jako
+    podciąg w małych literach, funkcja `containsForbiddenWord()`. **To
+    NIE jest i nigdy nie będzie wyczerpująca lista** — pokrywa najsilniejsze,
+    najbardziej rozpoznawalne przypadki, trzeba ją z czasem rozszerzać, gdy
+    coś się prześlizgnie (nie ma w tym nic złego — to normalne dla tego typu
+    filtra, nie oznacza, że jest "zepsuty"). Sprawdzenie w przeglądarce to
+    tylko wygoda (szybki komunikat bez czekania na bazę) — prawdziwe,
+    nie-do-ominięcia zabezpieczenie to TA SAMA lista powielona w wyzwalaczu
+    bazy `enforce_username_cooldown()` (mimo nazwy, funkcja teraz sprawdza
+    trzy rzeczy na raz: limit 14 dni, listę zakazanych słów, i pośrednio —
+    przez osobne ograniczenie `UNIQUE` — unikalność). **Jeśli zmieniasz
+    listę w jednym miejscu, zmień ją też w drugim** (`i18n.js` i wyzwalacz w
+    bazie) — inaczej `ensureDefaultUsername()` (automatyczne nadawanie
+    nazwy) i ręczna zmiana w `account.html` będą się różnie zachowywać.
+    `ensureDefaultUsername()` dodatkowo: jeśli sam pierwszy człon e-maila
+    jest zakazanym słowem, w ogóle go nie próbuje — zaczyna od razu od
+    neutralnej nazwy zastępczej (`uzytkownik` + losowe cyfry) zamiast
+    dopisywać cyfry do obraźliwej podstawy.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
