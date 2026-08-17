@@ -199,6 +199,10 @@
                     if (!usernameStatus.innerText) {
                         usernameStatus.innerHTML = '<span class="status-ok">' + t('username_saved') + '</span>';
                     }
+                    // Lustrzana kopia w metadanych logowania — używana przez Supabase
+                    // do spersonalizowania maili wysyłanych automatycznie (np. przy
+                    // odzyskiwaniu hasła), patrz PRAGMA_CONTEXT.md.
+                    sb.auth.updateUser({ data: { username: newUsername } }).catch(() => {});
                 });
 
                 document.getElementById('accountEmail').innerText = session.user.email;
@@ -230,6 +234,22 @@
                     statusEl.innerHTML = '<span class="status-ok">' + t('password_changed') + '</span>';
                     document.getElementById('newPassword').value = '';
                     document.getElementById('changePasswordForm').style.display = 'none';
+                    // Powiadomienie e-mail o zmianie hasła — świadomie NIE czekamy na to
+                    // (await) i nie pokazujemy błędu, jeśli się nie uda: sama zmiana hasła
+                    // już się udała (komunikat wyżej), a mail to tylko dodatkowe
+                    // powiadomienie bezpieczeństwa, nie powinien blokować ani psuć
+                    // informacji zwrotnej o właściwej operacji.
+                    sb.auth.getSession().then(({ data: { session } }) => {
+                        if (!session) return;
+                        fetch(SUPABASE_URL + '/functions/v1/notify-password-changed', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + session.access_token,
+                                'apikey': SUPABASE_ANON_KEY,
+                            },
+                        }).catch((e) => console.error('Nie udało się wysłać powiadomienia o zmianie hasła:', e));
+                    });
                 } catch (err) {
                     statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
                 }

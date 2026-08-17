@@ -402,7 +402,17 @@
                             // Język wybrany przed rejestracją trafia do metadanych konta —
                             // przy pierwszym logowaniu (patrz consumeSignupLanguage) nadpisze
                             // domyślną wartość z bazy, zamiast być przez nią nadpisany.
-                            data: { language: getCurrentLanguage() }
+                            //
+                            // Domyślna nazwa użytkownika (pierwszy człon e-maila) trafia tu
+                            // RAZEM z rejestracją — inaczej mail powitalny (wysyłany od razu,
+                            // zanim ktokolwiek się jeszcze zaloguje) nie miałby jak zwrócić się
+                            // po imieniu (ensureDefaultUsername() w profiles ustawia się dopiero
+                            // przy pierwszym logowaniu, za późno na ten pierwszy mail). Jeśli ta
+                            // sama nazwa okaże się już zajęta, ensureDefaultUsername() i tak
+                            // dopisze do niej cyfry przy pierwszym logowaniu — powitalny mail
+                            // może więc w rzadkim przypadku pokazać nazwę odrobinę inną niż
+                            // ostateczna, to świadomie zaakceptowany, kosmetyczny kompromis.
+                            data: { language: getCurrentLanguage(), username: email.split('@')[0].slice(0, 24) }
                         }
                     });
                     if (error) throw error;
@@ -442,7 +452,7 @@
                     captchaToken: turnstileToken
                 });
                 if (error) throw error;
-                statusEl.innerHTML = '<span class="status-ok">' + t('status_reset_email_sent') + '</span>';
+                statusEl.innerHTML = '<span class="status-ok">' + t('status_recovery_email_sent') + '</span>';
             } catch (err) {
                 statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
             } finally {
