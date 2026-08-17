@@ -55,6 +55,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "Kolejną zmianę będzie można zrobić od: {date}",
         err_username_length: "Nazwa musi mieć od 2 do 24 znaków.", err_username_cooldown: "Nazwę można zmieniać tylko raz na 14 dni.",
         err_username_taken: "Ta nazwa jest już zajęta — wybierz inną.",
+        err_username_forbidden: "Ta nazwa zawiera niedozwolone słowo — wybierz inną.",
         tab_link: "Link", tab_text: "Tekst", tab_image: "Obraz",
         label_paste_link: "Wklej link do analizy:", placeholder_url: "https://...",
         label_paste_text: "Wklej tekst do analizy:", placeholder_text_content: "Wklej treść, którą chcesz przeanalizować...",
@@ -114,6 +115,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "You can change it again from: {date}",
         err_username_length: "Name must be 2–24 characters long.", err_username_cooldown: "You can only change your username once every 14 days.",
         err_username_taken: "That name is already taken — choose another one.",
+        err_username_forbidden: "That name contains a word that isn't allowed — choose another one.",
         tab_link: "Link", tab_text: "Text", tab_image: "Image",
         label_paste_link: "Paste a link to analyze:", placeholder_url: "https://...",
         label_paste_text: "Paste text to analyze:", placeholder_text_content: "Paste the content you want to analyze...",
@@ -173,6 +175,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "Podrás cambiarlo de nuevo a partir de: {date}",
         err_username_length: "El nombre debe tener entre 2 y 24 caracteres.", err_username_cooldown: "Solo puedes cambiar tu nombre de usuario una vez cada 14 días.",
         err_username_taken: "Ese nombre ya está en uso — elige otro.",
+        err_username_forbidden: "Ese nombre contiene una palabra no permitida — elige otro.",
         tab_link: "Enlace", tab_text: "Texto", tab_image: "Imagen",
         label_paste_link: "Pega un enlace para analizar:", placeholder_url: "https://...",
         label_paste_text: "Pega el texto a analizar:", placeholder_text_content: "Pega el contenido que quieres analizar...",
@@ -232,6 +235,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "Erneute Änderung möglich ab: {date}",
         err_username_length: "Der Name muss 2–24 Zeichen lang sein.", err_username_cooldown: "Der Benutzername kann nur alle 14 Tage geändert werden.",
         err_username_taken: "Dieser Name ist bereits vergeben — wähle einen anderen.",
+        err_username_forbidden: "Dieser Name enthält ein nicht erlaubtes Wort — wähle einen anderen.",
         tab_link: "Link", tab_text: "Text", tab_image: "Bild",
         label_paste_link: "Link zur Analyse einfügen:", placeholder_url: "https://...",
         label_paste_text: "Text zur Analyse einfügen:", placeholder_text_content: "Füge den Inhalt ein, den du analysieren möchtest...",
@@ -291,6 +295,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "Vous pourrez le modifier à nouveau à partir du : {date}",
         err_username_length: "Le nom doit comporter entre 2 et 24 caractères.", err_username_cooldown: "Vous ne pouvez changer votre nom d'utilisateur qu'une fois tous les 14 jours.",
         err_username_taken: "Ce nom est déjà pris — choisissez-en un autre.",
+        err_username_forbidden: "Ce nom contient un mot non autorisé — choisissez-en un autre.",
         tab_link: "Lien", tab_text: "Texte", tab_image: "Image",
         label_paste_link: "Collez un lien à analyser :", placeholder_url: "https://...",
         label_paste_text: "Collez le texte à analyser :", placeholder_text_content: "Collez le contenu que vous souhaitez analyser...",
@@ -350,6 +355,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "Сможете изменить снова начиная с: {date}",
         err_username_length: "Имя должно содержать от 2 до 24 символов.", err_username_cooldown: "Имя пользователя можно менять не чаще раза в 14 дней.",
         err_username_taken: "Это имя уже занято — выберите другое.",
+        err_username_forbidden: "Это имя содержит запрещённое слово — выберите другое.",
         tab_link: "Ссылка", tab_text: "Текст", tab_image: "Изображение",
         label_paste_link: "Вставьте ссылку для анализа:", placeholder_url: "https://...",
         label_paste_text: "Вставьте текст для анализа:", placeholder_text_content: "Вставьте содержимое, которое хотите проанализировать...",
@@ -409,6 +415,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "下次可修改时间：{date}",
         err_username_length: "名称长度须为2到24个字符。", err_username_cooldown: "用户名每14天只能修改一次。",
         err_username_taken: "该名称已被占用，请换一个。",
+        err_username_forbidden: "该名称包含不允许的词语，请换一个。",
         tab_link: "链接", tab_text: "文本", tab_image: "图片",
         label_paste_link: "粘贴要分析的链接：", placeholder_url: "https://...",
         label_paste_text: "粘贴要分析的文本：", placeholder_text_content: "粘贴您想分析的内容…",
@@ -468,6 +475,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "次に変更できるのは: {date} から",
         err_username_length: "名前は2〜24文字で入力してください。", err_username_cooldown: "ユーザー名の変更は14日に1回までです。",
         err_username_taken: "その名前はすでに使われています。別の名前を選んでください。",
+        err_username_forbidden: "その名前には使用できない単語が含まれています。別の名前を選んでください。",
         tab_link: "リンク", tab_text: "テキスト", tab_image: "画像",
         label_paste_link: "分析するリンクを貼り付けてください：", placeholder_url: "https://...",
         label_paste_text: "分析するテキストを貼り付けてください：", placeholder_text_content: "分析したい内容を貼り付けてください…",
@@ -527,6 +535,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "आप इसे फिर से बदल सकेंगे: {date} से",
         err_username_length: "नाम 2 से 24 अक्षरों के बीच होना चाहिए।", err_username_cooldown: "उपयोगकर्ता नाम हर 14 दिनों में केवल एक बार बदला जा सकता है।",
         err_username_taken: "यह नाम पहले से लिया जा चुका है — कोई और नाम चुनें।",
+        err_username_forbidden: "इस नाम में एक अस्वीकृत शब्द है — कोई और नाम चुनें।",
         tab_link: "लिंक", tab_text: "टेक्स्ट", tab_image: "छवि",
         label_paste_link: "विश्लेषण के लिए लिंक पेस्ट करें:", placeholder_url: "https://...",
         label_paste_text: "विश्लेषण के लिए टेक्स्ट पेस्ट करें:", placeholder_text_content: "वह सामग्री पेस्ट करें जिसका आप विश्लेषण करना चाहते हैं...",
@@ -586,6 +595,7 @@ const TRANSLATIONS = {
         username_cooldown_note: "يمكنك تغييره مرة أخرى ابتداءً من: {date}",
         err_username_length: "يجب أن يتكون الاسم من 2 إلى 24 حرفًا.", err_username_cooldown: "يمكن تغيير اسم المستخدم مرة واحدة كل 14 يومًا فقط.",
         err_username_taken: "هذا الاسم مُستخدم بالفعل — اختر اسمًا آخر.",
+        err_username_forbidden: "يحتوي هذا الاسم على كلمة غير مسموح بها — اختر اسمًا آخر.",
         tab_link: "رابط", tab_text: "نص", tab_image: "صورة",
         label_paste_link: "الصق رابطًا للتحليل:", placeholder_url: "https://...",
         label_paste_text: "الصق نصًا للتحليل:", placeholder_text_content: "الصق المحتوى الذي تريد تحليله...",
@@ -726,13 +736,37 @@ function syncThemeFromProfile(sb, userId) {
 // jednorazowe zapytanie SQL wypełniające to od razu dla wszystkich, patrz
 // PRAGMA_CONTEXT.md — to i tak nie zaszkodzi, zapytanie tu jest no-opem dla
 // kont, które już mają nazwę ustawioną).
+// Podstawowa lista zakazanych słów (silne wulgaryzmy + najbardziej
+// rozpoznawalne obelgi, PL + EN), dopasowywana jako podciąg w małych
+// literach. To NIE jest i nigdy nie będzie wyczerpująca lista — trzeba ją
+// z czasem rozszerzać, jeśli coś się prześlizgnie (zgłoszenie od
+// użytkowników). Ta sama lista jest (przede wszystkim, jako prawdziwe
+// zabezpieczenie) powielona w wyzwalaczu bazy danych — patrz
+// PRAGMA_CONTEXT.md. Jeśli dodajesz/usuwasz słowo, zrób to w OBU miejscach.
+const USERNAME_BLOCKLIST = [
+    'kurw', 'chuj', 'huj', 'jeban', 'jebac', 'jebał', 'jebie', 'pierdol',
+    'pizd', 'cipa', 'cipo', 'skurwysyn', 'skurwiel', 'dziwka', 'szmata',
+    'spierdalaj', 'pedał', 'ciota',
+    'fuck', 'shit', 'bitch', 'cunt', 'asshole', 'bastard', 'whore', 'slut',
+    'nigger', 'nigga', 'faggot', 'retard',
+];
+
+function containsForbiddenWord(username) {
+    const normalized = username.toLowerCase();
+    return USERNAME_BLOCKLIST.some((word) => normalized.includes(word));
+}
+
 async function ensureDefaultUsername(sb, userId, email) {
     if (!sb || !userId || !email) return;
     const { data } = await sb.from('profiles').select('username').eq('id', userId).single();
     if (!data || data.username) return;
-    const base = email.split('@')[0].slice(0, 24);
-    // Nazwy muszą być unikalne (baza to wymusza) — jeśli sam pierwszy człon
-    // e-maila jest już zajęty przez kogoś innego (np. ten sam człon w innej
+    // Jeśli sam pierwszy człon e-maila jest zakazanym słowem (rzadkie, ale
+    // się zdarza), nie próbujemy go w ogóle — zaczynamy od razu od
+    // neutralnej nazwy zamiast dopisywać cyfry do obraźliwej podstawy.
+    const emailBase = email.split('@')[0].slice(0, 24);
+    const base = containsForbiddenWord(emailBase) ? 'uzytkownik' : emailBase;
+    // Nazwy muszą być unikalne (baza to wymusza) — jeśli sama nazwa jest
+    // już zajęta przez kogoś innego (np. ten sam człon e-maila w innej
     // domenie), dopisujemy losowe cyfry i próbujemy ponownie, zamiast
     // zostawić konto bez żadnej nazwy.
     for (let attempt = 0; attempt < 5; attempt++) {
