@@ -127,12 +127,13 @@ Deno.serve(async (req: Request) => {
   }
 
   // --- Najpopularniejsze analizy (top 5 wg wyświetleń) w każdym języku, w którym coś jest ---
-  const topByLanguage: { langName: string; items: { label: string; views: number }[] }[] = []
+  const SITE_URL = 'https://areq93.github.io/pragma'
+  const topByLanguage: { langName: string; items: { label: string; views: number; url: string }[] }[] = []
   try {
     for (const lang of LANGUAGES) {
       const { data, error } = await supabase
         .from('scans')
-        .select('view_count, result, source_url')
+        .select('id, view_count, result, source_url')
         .eq('language', lang.code)
         .order('view_count', { ascending: false })
         .limit(5)
@@ -141,6 +142,7 @@ Deno.serve(async (req: Request) => {
       const items = (data as any[]).map((r) => ({
         label: String(r.result?.summary || r.source_url || 'analiza bez podsumowania').slice(0, 110),
         views: r.view_count ?? 0,
+        url: `${SITE_URL}/scan.html?id=${encodeURIComponent(r.id)}`,
       }))
       topByLanguage.push({ langName: lang.name, items })
     }
@@ -242,7 +244,7 @@ Deno.serve(async (req: Request) => {
 <div style="margin-bottom:10px;">
   <div style="font-weight:600;color:#111827;margin-bottom:4px;">${group.langName}</div>
   <ol style="margin:0;padding-left:20px;color:#374151;font-size:14px;">
-    ${group.items.map((it) => `<li style="margin-bottom:2px;">${it.label} — <strong>${it.views}</strong> wyświetleń</li>`).join('')}
+    ${group.items.map((it) => `<li style="margin-bottom:2px;"><a href="${it.url}" style="color:#2563eb;text-decoration:none;">${it.label}</a> — <strong>${it.views}</strong> wyświetleń</li>`).join('')}
   </ol>
 </div>`
           )
