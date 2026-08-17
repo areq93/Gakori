@@ -386,7 +386,17 @@ zanim założysz, że działa.
     Naprawione dopisaniem `&apikey=${Deno.env.get('SUPABASE_ANON_KEY')}`
     do końca `actionUrl` — `SUPABASE_ANON_KEY` jest dostarczany
     automatycznie przez Supabase do każdej Edge Function, nie trzeba go
-    ręcznie dodawać jako sekret. **Zawsze testuj link z prawdziwego maila
+    ręcznie dodawać jako sekret.
+  - **Pułapka — `email_data.site_url` z payloadu hooka NIE jest samym
+    adresem bazowym w tym projekcie, tylko już zawiera na końcu
+    `/auth/v1`.** Doklejenie do niego `/auth/v1/verify` (zgodnie z
+    formułą z oficjalnej dokumentacji Supabase) dawało zdublowaną
+    ścieżkę `.../auth/v1/auth/v1/verify` → 404, konto znów zostawało
+    niepotwierdzone — złapane dopiero w realnym teście linku z maila, bo
+    sam mail wyglądał poprawnie. Naprawione przez zbudowanie `actionUrl`
+    wprost z `Deno.env.get('SUPABASE_URL')` (który na pewno nie ma
+    niczego doklejonego) zamiast z `email_data.site_url`; `redirect_to`
+    nadal bierzemy z payloadu. **Zawsze testuj link z prawdziwego maila
     end-to-end (klik → potwierdzenie → udane logowanie), nie tylko
     wysyłkę samego maila** — treść może wyglądać poprawnie, a link mimo
     to nie działać.

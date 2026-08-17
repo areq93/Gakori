@@ -573,17 +573,23 @@ Deno.serve(async (req: Request) => {
 
     const langContent = EMAIL_CONTENT[language] || EMAIL_CONTENT.en
 
-    const { token_hash, redirect_to, email_action_type, site_url } = email_data
-    // Uwaga: /auth/v1/verify, mimo że to link klikany z maila (nie
-    // wywołanie z zalogowanej sesji), i tak wymaga parametru `apikey` —
-    // bez niego Supabase odpowiada "No API key found in request" i NIE
-    // potwierdza konta, mimo że link wygląda na poprawny (znaleziony
-    // empirycznie: link bez apikey w teście kończył się tym błędem, a
-    // konto zostawało niepotwierdzone). `SUPABASE_ANON_KEY` jest
+    const { token_hash, redirect_to, email_action_type } = email_data
+    // Uwaga: NIE używamy tu email_data.site_url jako adresu bazowego —
+    // w tym projekcie ta wartość sama już zawiera "/auth/v1" na końcu,
+    // więc doklejenie "/auth/v1/verify" dawało zdublowaną, błędną ścieżkę
+    // (".../auth/v1/auth/v1/verify" → 404, konto nigdy nie zostawało
+    // potwierdzone, znalezione empirycznie w realnym teście). Zamiast
+    // tego budujemy adres wprost z SUPABASE_URL, które na pewno nie ma
+    // niczego doklejonego.
+    //
+    // /auth/v1/verify, mimo że to link klikany z maila (nie wywołanie z
+    // zalogowanej sesji), i tak wymaga parametru `apikey` — bez niego
+    // Supabase odpowiada "No API key found in request" i NIE potwierdza
+    // konta (też znalezione empirycznie). `SUPABASE_ANON_KEY` jest
     // dostarczany automatycznie przez Supabase do każdej Edge Function,
     // nie trzeba go dodawać ręcznie jako sekret.
     const actionUrl = token_hash
-      ? `${site_url}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${redirect_to}&apikey=${Deno.env.get('SUPABASE_ANON_KEY')}`
+      ? `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${redirect_to}&apikey=${Deno.env.get('SUPABASE_ANON_KEY')}`
       : null
 
     let content: { subject: string } & EmailContent
