@@ -219,6 +219,17 @@ a { color: var(--accent); }
     box-shadow: var(--sticker-shadow-sm);
 }
 
+/* Stan kredytów — pigułka tuż obok ikony profilu, ten sam rytm wizualny co
+   inne odznaki w aplikacji (patrz .result-badge niżej) */
+.credit-balance {
+    position: fixed; top: 16px; right: 68px; z-index: 50; height: 44px;
+    padding: 0 14px; border-radius: 999px; box-sizing: border-box;
+    background: var(--card); color: var(--ink); border: var(--border-w) solid var(--card-border);
+    box-shadow: var(--sticker-shadow-sm);
+    align-items: center; justify-content: center; gap: 6px;
+    font-weight: 700; font-size: 15px; white-space: nowrap;
+}
+
 /* Link powrotny na dedykowanych podstronach (np. account.html) */
 .back-link {
     display: inline-block; margin-bottom: 14px; font-size: 14px; font-weight: 600;

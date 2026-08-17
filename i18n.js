@@ -44,7 +44,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Potwierdź adres e-mail — sprawdź skrzynkę i kliknij link, który wysłaliśmy.",
         err_invalid_email_format: "Nieprawidłowy format adresu e-mail.",
         err_captcha_generic: "Potwierdź, że nie jesteś robotem (zaznacz pole powyżej) i spróbuj ponownie.",
-        account_aria_label: "Twoje konto", account_back: "← Wróć do Pragmy", account_title: "Twoje konto",
+        account_aria_label: "Twoje konto", credit_balance_label: "Stan kredytów", account_back: "← Wróć do Pragmy", account_title: "Twoje konto",
         loading: "Ładowanie...", account_logged_in_as: "Zalogowano jako:",
         btn_logout: "Wyloguj", link_change_password: "Zmień hasło", btn_save_password: "Zapisz nowe hasło",
         password_changed: "Hasło zmienione.",
@@ -104,7 +104,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Confirm your email — check your inbox and click the link we sent.",
         err_invalid_email_format: "Invalid email format.",
         err_captcha_generic: "Confirm you're not a robot (check the box above) and try again.",
-        account_aria_label: "Your account", account_back: "← Back to Pragma", account_title: "Your account",
+        account_aria_label: "Your account", credit_balance_label: "Credit balance", account_back: "← Back to Pragma", account_title: "Your account",
         loading: "Loading...", account_logged_in_as: "Logged in as:",
         btn_logout: "Log out", link_change_password: "Change password", btn_save_password: "Save new password",
         password_changed: "Password changed.",
@@ -164,7 +164,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Confirma tu correo electrónico: revisa tu bandeja de entrada y haz clic en el enlace que enviamos.",
         err_invalid_email_format: "Formato de correo electrónico no válido.",
         err_captcha_generic: "Confirma que no eres un robot (marca la casilla de arriba) e inténtalo de nuevo.",
-        account_aria_label: "Tu cuenta", account_back: "← Volver a Pragma", account_title: "Tu cuenta",
+        account_aria_label: "Tu cuenta", credit_balance_label: "Créditos disponibles", account_back: "← Volver a Pragma", account_title: "Tu cuenta",
         loading: "Cargando...", account_logged_in_as: "Sesión iniciada como:",
         btn_logout: "Cerrar sesión", link_change_password: "Cambiar contraseña", btn_save_password: "Guardar nueva contraseña",
         password_changed: "Contraseña cambiada.",
@@ -224,7 +224,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Bitte bestätige deine E-Mail — prüfe dein Postfach und klicke auf den gesendeten Link.",
         err_invalid_email_format: "Ungültiges E-Mail-Format.",
         err_captcha_generic: "Bitte bestätige, dass du kein Roboter bist (Kästchen oben anklicken) und versuche es erneut.",
-        account_aria_label: "Dein Konto", account_back: "← Zurück zu Pragma", account_title: "Dein Konto",
+        account_aria_label: "Dein Konto", credit_balance_label: "Guthaben", account_back: "← Zurück zu Pragma", account_title: "Dein Konto",
         loading: "Wird geladen...", account_logged_in_as: "Angemeldet als:",
         btn_logout: "Abmelden", link_change_password: "Passwort ändern", btn_save_password: "Neues Passwort speichern",
         password_changed: "Passwort geändert.",
@@ -284,7 +284,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Confirmez votre e-mail — consultez votre boîte de réception et cliquez sur le lien envoyé.",
         err_invalid_email_format: "Format d'e-mail invalide.",
         err_captcha_generic: "Confirmez que vous n'êtes pas un robot (cochez la case ci-dessus) et réessayez.",
-        account_aria_label: "Votre compte", account_back: "← Retour à Pragma", account_title: "Votre compte",
+        account_aria_label: "Votre compte", credit_balance_label: "Solde de crédits", account_back: "← Retour à Pragma", account_title: "Votre compte",
         loading: "Chargement...", account_logged_in_as: "Connecté en tant que :",
         btn_logout: "Se déconnecter", link_change_password: "Changer le mot de passe", btn_save_password: "Enregistrer le nouveau mot de passe",
         password_changed: "Mot de passe modifié.",
@@ -344,7 +344,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Подтвердите e-mail — проверьте почту и перейдите по отправленной ссылке.",
         err_invalid_email_format: "Неверный формат e-mail.",
         err_captcha_generic: "Подтвердите, что вы не робот (отметьте галочку выше), и попробуйте снова.",
-        account_aria_label: "Ваш аккаунт", account_back: "← Назад в Pragma", account_title: "Ваш аккаунт",
+        account_aria_label: "Ваш аккаунт", credit_balance_label: "Баланс кредитов", account_back: "← Назад в Pragma", account_title: "Ваш аккаунт",
         loading: "Загрузка...", account_logged_in_as: "Вы вошли как:",
         btn_logout: "Выйти", link_change_password: "Изменить пароль", btn_save_password: "Сохранить новый пароль",
         password_changed: "Пароль изменён.",
@@ -404,7 +404,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "请确认您的邮箱——查收邮件并点击我们发送的链接。",
         err_invalid_email_format: "邮箱格式无效。",
         err_captcha_generic: "请确认您不是机器人（勾选上方方框）并重试。",
-        account_aria_label: "您的账户", account_back: "← 返回 Pragma", account_title: "您的账户",
+        account_aria_label: "您的账户", credit_balance_label: "积分余额", account_back: "← 返回 Pragma", account_title: "您的账户",
         loading: "加载中…", account_logged_in_as: "已登录为：",
         btn_logout: "退出登录", link_change_password: "修改密码", btn_save_password: "保存新密码",
         password_changed: "密码已修改。",
@@ -464,7 +464,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "メールアドレスを確認してください — 受信トレイを確認し、送信されたリンクをクリックしてください。",
         err_invalid_email_format: "メールアドレスの形式が正しくありません。",
         err_captcha_generic: "ロボットではないことを確認し（上のチェックボックスをクリック）、もう一度お試しください。",
-        account_aria_label: "アカウント", account_back: "← Pragmaに戻る", account_title: "アカウント",
+        account_aria_label: "アカウント", credit_balance_label: "クレジット残高", account_back: "← Pragmaに戻る", account_title: "アカウント",
         loading: "読み込み中…", account_logged_in_as: "ログイン中：",
         btn_logout: "ログアウト", link_change_password: "パスワードを変更", btn_save_password: "新しいパスワードを保存",
         password_changed: "パスワードを変更しました。",
@@ -524,7 +524,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "अपना ईमेल सत्यापित करें — इनबॉक्स जांचें और भेजे गए लिंक पर क्लिक करें।",
         err_invalid_email_format: "अमान्य ईमेल फॉर्मेट।",
         err_captcha_generic: "पुष्टि करें कि आप रोबोट नहीं हैं (ऊपर चेकबॉक्स चुनें) और फिर से प्रयास करें।",
-        account_aria_label: "आपका खाता", account_back: "← Pragma पर वापस जाएं", account_title: "आपका खाता",
+        account_aria_label: "आपका खाता", credit_balance_label: "क्रेडिट बैलेंस", account_back: "← Pragma पर वापस जाएं", account_title: "आपका खाता",
         loading: "लोड हो रहा है...", account_logged_in_as: "इस रूप में लॉग इन:",
         btn_logout: "लॉग आउट करें", link_change_password: "पासवर्ड बदलें", btn_save_password: "नया पासवर्ड सहेजें",
         password_changed: "पासवर्ड बदल दिया गया।",
@@ -584,7 +584,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "قم بتأكيد بريدك الإلكتروني — تحقق من صندوق الوارد وانقر على الرابط الذي أرسلناه.",
         err_invalid_email_format: "صيغة بريد إلكتروني غير صالحة.",
         err_captcha_generic: "أكّد أنك لست روبوتًا (حدد المربع أعلاه) وحاول مرة أخرى.",
-        account_aria_label: "حسابك", account_back: "← العودة إلى Pragma", account_title: "حسابك",
+        account_aria_label: "حسابك", credit_balance_label: "رصيد الأرصدة", account_back: "← العودة إلى Pragma", account_title: "حسابك",
         loading: "جارٍ التحميل...", account_logged_in_as: "تم تسجيل الدخول باسم:",
         btn_logout: "تسجيل الخروج", link_change_password: "تغيير كلمة المرور", btn_save_password: "حفظ كلمة المرور الجديدة",
         password_changed: "تم تغيير كلمة المرور.",
@@ -722,6 +722,23 @@ function syncThemeFromProfile(sb, userId) {
         if (data && data.theme && data.theme !== getCurrentTheme()) {
             localStorage.setItem('pragma_theme', data.theme);
             applyTheme();
+        }
+    });
+}
+
+// Stan kredytów: zawsze czytany na żywo z profilu (nigdy z pamięci
+// przeglądarki, w przeciwieństwie do języka/motywu) — to liczba, która
+// musi być zawsze aktualna, nie coś, co ma "pamiętać" ostatnią wartość
+// między sesjami. Wywoływane przy każdym zalogowaniu i po każdej
+// zakończonej analizie (patrz index.html), żeby wyświetlana liczba nigdy
+// nie została "w tyle" po wydaniu kredytów.
+function refreshCreditBalance(sb, userId) {
+    if (!sb || !userId) return Promise.resolve();
+    const el = document.getElementById('creditBalanceValue');
+    if (!el) return Promise.resolve();
+    return sb.from('profiles').select('wallet_balance').eq('id', userId).single().then(({ data, error }) => {
+        if (!error && data && typeof data.wallet_balance === 'number') {
+            el.textContent = data.wallet_balance;
         }
     });
 }
