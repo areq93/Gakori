@@ -269,13 +269,24 @@ zanim założysz, że działa.
       się nie powiedzie. SQL do tego jest w historii PR-a dodającego tę
       zmianę.
   - **Filtr niedozwolonych słów** (wulgaryzmy, obraźliwe określenia):
-    `USERNAME_BLOCKLIST` w `i18n.js` — lista PL+EN, dopasowanie jako
-    podciąg w małych literach, funkcja `containsForbiddenWord()`. **To
-    NIE jest i nigdy nie będzie wyczerpująca lista** — pokrywa najsilniejsze,
-    najbardziej rozpoznawalne przypadki, trzeba ją z czasem rozszerzać, gdy
-    coś się prześlizgnie (nie ma w tym nic złego — to normalne dla tego typu
-    filtra, nie oznacza, że jest "zepsuty"). Sprawdzenie w przeglądarce to
-    tylko wygoda (szybki komunikat bez czekania na bazę) — prawdziwe,
+    `USERNAME_BLOCKLIST_BY_LANG` w `i18n.js` — osobna lista dla KAŻDEGO z 10
+    obsługiwanych języków (klucze jak w `SUPPORTED_LANGUAGES`), złączona w
+    jedną płaską `USERNAME_BLOCKLIST` do faktycznego sprawdzania (dopasowanie
+    jako podciąg w małych literach, funkcja `containsForbiddenWord()`).
+    Sprawdzenie działa niezależnie od tego, jaki język ma akurat wybrany
+    interfejs — nazwa jest blokowana, jeśli zawiera zakazane słowo z
+    KTÓREGOKOLWIEK języka, nie tylko aktualnie wybranego. Dla języków spoza
+    alfabetu łacińskiego (ru/zh/ja/hi/ar) lista NIE była zweryfikowana przez
+    osobę mówiącą danym językiem natywnie — to solidna podstawa, nie
+    gwarancja bezbłędności; przy dopisywaniu chińskich/podobnych fraz uważaj
+    na krótkie, pojedyncze znaki jako wpisy (np. samo "操" łapałoby też
+    niewinne słowa jak "操作" - operacja/system — dlatego w liście są
+    dłuższe, konkretne frazy, nie pojedyncze znaki). **To NIE jest i nigdy
+    nie będzie wyczerpująca lista** — pokrywa najsilniejsze, najbardziej
+    rozpoznawalne przypadki w każdym języku, trzeba ją z czasem rozszerzać,
+    gdy coś się prześlizgnie (nie ma w tym nic złego — to normalne dla tego
+    typu filtra, nie oznacza, że jest "zepsuty"). Sprawdzenie w przeglądarce
+    to tylko wygoda (szybki komunikat bez czekania na bazę) — prawdziwe,
     nie-do-ominięcia zabezpieczenie to TA SAMA lista powielona w wyzwalaczu
     bazy `enforce_username_cooldown()` (mimo nazwy, funkcja teraz sprawdza
     trzy rzeczy na raz: limit 14 dni, listę zakazanych słów, i pośrednio —
