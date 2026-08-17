@@ -120,6 +120,12 @@
                 populateLanguageSelect();
                 document.getElementById('languageSelect').addEventListener('change', (e) => {
                     setLanguage(e.target.value, sb, session.user.id);
+                    // setLanguage() sam odświeża napisy oznaczone data-i18n (przez
+                    // applyTranslations()), ale komunikat o dacie kolejnej możliwej
+                    // zmiany nazwy jest budowany ręcznie w JS (ma wstawioną datę), więc
+                    // trzeba go świadomie przebudować w nowym języku — inaczej zostaje
+                    // w starym aż do odświeżenia strony.
+                    renderUsernameCooldown();
                 });
 
                 await syncThemeFromProfile(sb, session.user.id);

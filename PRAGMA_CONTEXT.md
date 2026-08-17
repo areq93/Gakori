@@ -449,6 +449,22 @@ zanim założysz, że działa.
   na zawieszenie strony. Interwał (`setInterval`) jest czyszczony w każdej
   gałęzi (sukces/błąd/`finally`) — pilnuj tego, jeśli będziesz przerabiać tę
   część kodu, inaczej komunikaty będą dalej migać po zakończeniu żądania.
+- **Pułapka — dynamicznie budowane napisy NIE odświeżają się same przy
+  zmianie języka**: `setLanguage()` (w `i18n.js`) wywołuje `applyTranslations()`,
+  który aktualizuje WYŁĄCZNIE elementy oznaczone `data-i18n`/
+  `data-i18n-placeholder`/`data-i18n-aria-label` w HTML-u. Każdy napis
+  budowany ręcznie w JS przez `t(...)` (np. komunikat z wstawioną datą, jak
+  `username_cooldown_note` w `account.html`) NIE jest tym mechanizmem objęty —
+  zostaje w starym języku, dopóki coś świadomie go nie przebuduje. Realny
+  błąd z tej sesji: zmiana języka w ustawieniach konta nie odświeżała
+  komunikatu o dacie kolejnej możliwej zmiany nazwy użytkownika, dopóki
+  strona nie została ręcznie przeładowana. Naprawione przez jawne
+  wywołanie funkcji renderującej ten komunikat (`renderUsernameCooldown()`)
+  zaraz po `setLanguage(...)` w handlerze zmiany języka. **Zasada na
+  przyszłość**: przy dodawaniu nowego napisu budowanego w JS przez `t(...)`
+  (nie przez `data-i18n`), sprawdź, czy powinien się przebudować przy
+  zmianie języka bez przeładowania strony — jeśli tak, jawnie wywołaj
+  funkcję renderującą go w handlerze zmiany języka, tak jak tutaj.
 - **Lokalizacja komunikatów błędów**: backend zwraca kod błędu (`error`:
   `signup_required`/`insufficient_credits`/`url_fetch_failed`/
   `save_failed`/...) — pole `message` z backendu jest zaszyte na sztywno
