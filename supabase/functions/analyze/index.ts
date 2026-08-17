@@ -18,6 +18,15 @@ const ANONYMOUS_MAX_CHARS = 3000 // limit darmowego, pierwszego anonimowego skan
 // przed wywołaniem API. Płaska stawka w przybliżeniu odpowiada dziś kosztowi
 // artykułu ~4000 znaków wg wzoru tekstowego — do skalibrowania na realnych danych.
 const URL_SCAN_COST = 6
+// Obraz: Google liczy pojedynczy obraz jako stałą liczbę tokenów (258 dla
+// ≤384px, więcej przy kafelkowaniu dużych obrazów — zweryfikowane na żywo
+// 17.08.2026 w dokumentacji Gemini), więc płaska stawka jest tu bezpieczna
+// (podobnie jak przy linku) — realny koszt Gemini to ułamek grosza, ta
+// cena ma duży margines na start, bo nie mamy jeszcze danych z użycia.
+const IMAGE_SCAN_COST = 8
+// Twardy limit rozmiaru pliku — zarówno żeby nie zapłacić za coś absurdalnie
+// dużego, jak i żeby zmieścić się w limicie rozmiaru zapytania Edge Function.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // 8 MB
 
 // Nazwy języków (po polsku, w formie "w języku X") używane do parametryzacji
 // instrukcji językowej promptu — patrz buildSystemPrompt(). Klucze muszą się
@@ -123,6 +132,37 @@ ${contentPrompt}`
   } catch {
     return []
   }
+}
+
+// Rozpoznaje PRAWDZIWY typ obrazu po pierwszych bajtach pliku (tzw.
+// "magiczne bajty") — nigdy nie ufamy temu, co przeglądarka deklaruje jako
+// typ pliku, bo to tylko etykieta, którą łatwo podać fałszywie (ten sam
+// mechanizm co zero zaufania do user_id z body — patrz PRAGMA_CONTEXT.md).
+// Zwraca prawdziwy mime_type albo null, jeśli to w ogóle nie jest jeden z
+// obsługiwanych formatów obrazu (wtedy traktujemy to jako nieprawidłowy plik,
+// niezależnie od rozszerzenia w nazwie).
+function detectImageMimeType(bytes: Uint8Array): string | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'image/jpeg'
+  }
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a
+  ) {
+    return 'image/png'
+  }
+  if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return 'image/gif'
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) {
+    return 'image/webp'
+  }
+  return null
 }
 
 // Instrukcje dla Gemini są napisane po polsku (to nie ma znaczenia — model
@@ -334,11 +374,11 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json()
-    const { content_hash, input_type, text_content, source_url, char_count, language } = body
+    const { content_hash, input_type, text_content, source_url, char_count, language, image_base64 } = body
     const outputLanguage = typeof language === 'string' && LANGUAGE_NAMES[language] ? language : DEFAULT_LANGUAGE
 
-    // Na razie obsługujemy tekst i link — obraz/pdf wracają w kolejnym kroku.
-    if (input_type !== 'text' && input_type !== 'url') {
+    // PDF wraca w kolejnym kroku — na razie tekst, link i obraz.
+    if (input_type !== 'text' && input_type !== 'url' && input_type !== 'image') {
       return new Response(
         JSON.stringify({
           error: 'not_implemented',
@@ -396,7 +436,51 @@ Deno.serve(async (req: Request) => {
     }
 
     let cost: number
-    if (input_type === 'url') {
+    let imageBytes: Uint8Array | null = null
+    let imageMimeType: string | null = null
+    if (input_type === 'image') {
+      // Tak jak link — obraz zawsze wymaga konta (płaska, wyższa stawka niż
+      // darmowy limit anonimowy dla krótkiego tekstu).
+      if (!user_id) {
+        return new Response(
+          JSON.stringify({ error: 'signup_required', message: 'Załóż konto, aby analizować obrazy.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      if (typeof image_base64 !== 'string' || !image_base64) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_image', message: 'Brak danych obrazu w zapytaniu.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      try {
+        imageBytes = Uint8Array.from(atob(image_base64), (c) => c.charCodeAt(0))
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'invalid_image', message: 'Nie udało się odczytać przesłanego pliku.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      if (imageBytes.length > MAX_IMAGE_BYTES) {
+        return new Response(
+          JSON.stringify({ error: 'file_too_large', message: 'Plik jest za duży (limit 8 MB).' }),
+          { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      // NIGDY nie ufamy mime_type/rozszerzeniu podanemu przez przeglądarkę —
+      // sami rozpoznajemy prawdziwy typ pliku po jego zawartości. Jeśli to w
+      // ogóle nie jest rozpoznawalny obraz (np. ktoś podał PDF albo dowolny
+      // inny plik jako "obraz"), odrzucamy zapytanie, zanim cokolwiek
+      // zapłacimy Gemini.
+      imageMimeType = detectImageMimeType(imageBytes)
+      if (!imageMimeType) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_image', message: 'To nie jest rozpoznawalny plik obrazu (JPEG/PNG/GIF/WEBP).' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      cost = IMAGE_SCAN_COST
+    } else if (input_type === 'url') {
       // Analiza linku wymaga konta zawsze — nie znamy długości strony z góry,
       // więc nie da się bezpiecznie zastosować limitu anonimowego (ktoś mógłby
       // podać link do bardzo dużej strony i wygenerować duży koszt API za darmo).
@@ -542,6 +626,31 @@ Deno.serve(async (req: Request) => {
             )
           }
         }
+      } else if (input_type === 'image') {
+        // Jedno wywołanie, z pełną biblioteką modeli (bez taniego etapu
+        // kategoryzacji jak przy tekście/linku — tu nie mamy z góry żadnego
+        // tekstu, po którym dałoby się zgrubnie wybrać kategorie, a płaska
+        // stawka i tak ma duży margines na dodatkowe tokeny pełnej biblioteki).
+        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+        geminiData = await callGemini(
+          {
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `${systemPrompt}\n\nPrzeanalizuj treść widoczną na przesłanym obrazie (to może być zrzut ekranu, zdjęcie tekstu, wykres, post z mediów społecznościowych itp.) — potraktuj ją dokładnie tak samo jak tekst do analizy.`,
+                  },
+                  { inlineData: { mimeType: imageMimeType, data: image_base64 } },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: RESPONSE_SCHEMA,
+            },
+          },
+          geminiKey!
+        )
       } else {
         // ETAP 1 (tani) + ETAP 2 — patrz komentarz w gałęzi "url" wyżej.
         const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!)
@@ -578,7 +687,7 @@ Deno.serve(async (req: Request) => {
         language: outputLanguage,
         is_translation: usedTranslation,
         source_url: input_type === 'url' ? source_url : null,
-        char_count: input_type === 'url' ? 0 : char_count,
+        char_count: input_type === 'text' ? char_count : 0,
         credits_charged: finalCost,
         result,
         discovered_by: user_id ?? null,

@@ -667,6 +667,19 @@
                 .join('');
         }
 
+        // 5b. Zamiana pliku na czysty base64 (do wysłania obrazu do analyze) —
+        // w kawałkach po 8000 bajtów, żeby nie wywalić limitu argumentów
+        // String.fromCharCode.apply przy dużych plikach.
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            const chunkSize = 8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            return btoa(binary);
+        }
+
         // 6. Wyświetlenie wyniku (albo przyjaznego komunikatu, jeśli backend odmówił)
         // Renderuje listę wykrytych wzorców manipulacji. Obsługuje nową strukturę
         // wyniku (result.patterns — lista {name, quote, explanation}) oraz starą,
@@ -723,6 +736,8 @@
                     insufficient_credits: 'err_insufficient_credits',
                     url_fetch_failed: 'err_url_fetch_failed',
                     save_failed: 'err_save_failed',
+                    invalid_image: 'err_invalid_image',
+                    file_too_large: 'err_file_too_large',
                 };
                 const key = errorMessageKeys[data.error];
                 summary.innerText = key ? t(key) : t('result_generic_error');
@@ -771,9 +786,14 @@
                 } else if (currentMode === 'image') {
                     const file = document.getElementById('imageInput').files[0];
                     if (!file) return alert(t('alert_choose_image'));
+                    // Ten sam limit co po stronie backendu (8 MB) — tu tylko
+                    // szybka informacja zwrotna, backend i tak sprawdza to
+                    // sam niezależnie i nigdy nie ufa samej przeglądarce.
+                    if (file.size > 8 * 1024 * 1024) return alert(t('alert_image_too_large'));
                     const buffer = await file.arrayBuffer();
                     const hash = await sha256Hex(buffer);
-                    payload = { input_type: 'image', content_hash: hash, file_name: file.name, size_kb: Math.round(file.size / 1024), language: getCurrentLanguage() };
+                    const imageBase64 = arrayBufferToBase64(buffer);
+                    payload = { input_type: 'image', content_hash: hash, image_base64: imageBase64, language: getCurrentLanguage() };
                 }
 
                 btn.disabled = true;
