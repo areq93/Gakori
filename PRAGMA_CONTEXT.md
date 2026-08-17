@@ -132,10 +132,16 @@ zanim założysz, że działa.
 - **Weryfikacja tożsamości w backendzie**: prawdziwy JWT z nagłówka
   `Authorization`, weryfikowany przez `supabase.auth.getUser()` — nie ma
   już zaufania do `user_id` przesyłanego wprost w body zapytania.
-- **Analiza tekstu i linków**: link analizowany przez wbudowane w Gemini
-  API narzędzie **URL Context** (`tools: [{ urlContext: {} }]`) — model
-  sam pobiera i czyta stronę, bez własnego scrapera. Obraz: jeszcze nie
-  zaimplementowany (`input_type: "image"` zwraca `501 not_implemented`).
+- **Analiza tekstu, linków i obrazów**: link analizowany przez wbudowane
+  w Gemini API narzędzie **URL Context** (`tools: [{ urlContext: {} }]`)
+  — model sam pobiera i czyta stronę, bez własnego scrapera. Obraz:
+  frontend wysyła prawdziwą zawartość pliku (base64, nie tylko nazwę i
+  rozmiar jak w pierwszej, tymczasowej wersji interfejsu), backend sam
+  rozpoznaje prawdziwy typ pliku po zawartości i woła Gemini
+  multimodalnie (`inlineData` z base64 + wykrytym `mimeType`), patrz
+  sekcja "Cennik" wyżej. PDF: jeszcze nie zaimplementowany (`input_type:
+  "pdf"` zwróciłby `501 not_implemented`, gdyby frontend w ogóle wysyłał
+  taki typ — na razie nie ma dla PDF żadnego pola w interfejsie).
   - **Awaryjne pobranie strony (`fetchUrlAsText()`)**: niektóre strony
     (np. duże portale newsowe typu onet.pl) odrzucają robota Google z
     ogólnym kodem `URL_RETRIEVAL_STATUS_ERROR` — bez podania konkretnego
@@ -731,20 +737,37 @@ id`), obok istniejącej reguły `SELECT`.
   ogromnej strony).
 - Pierwszy skan anonimowy (tylko tryb tekstowy): darmowy do
   `ANONYMOUS_MAX_CHARS = 3000` znaków.
+- **Obraz**: płaska stawka `IMAGE_SCAN_COST = 8` — tak jak link, wymaga
+  zawsze konta (brak trybu anonimowego). Limit rozmiaru pliku: **8 MB**,
+  egzekwowany PO OBU stronach (przeglądarka daje szybki komunikat, ale
+  prawdziwe zabezpieczenie jest w backendzie — nigdy nie ufamy samej
+  przeglądarce). Backend rozpoznaje prawdziwy typ pliku po jego
+  zawartości (magiczne bajty na początku pliku — JPEG/PNG/GIF/WEBP), nie
+  po tym, co deklaruje przeglądarka — ten sam wzorzec "zero zaufania" co
+  przy `user_id` z body. Jedno wywołanie Gemini z pełną biblioteką 100
+  modeli (bez taniego etapu kategoryzacji jak przy tekście/linku — nie ma
+  z góry żadnego tekstu, po którym dałoby się zgrubnie wybrać kategorie).
 - **Wciąż nieustalone**: ile 1 kredyt ma być wart w złotówkach/dolarach.
   Bez tego nie da się policzyć realnej marży w walucie, tylko w
   procentach. Jak wypadnie ta rozmowa — dopisz tu ustaloną wartość.
 - **Koszt API jest ułamkiem grosza względem jakiejkolwiek sensownej ceny
   za kredyt** — dla `gemini-3.5-flash-lite` ($0,30 / $2,50 za milion
-  tokenów wejścia/wyjścia, zweryfikowane na żywo 16.08.2026, zgodne z
-  ceną już wcześniej zapisaną w kodzie) pojedyncza analiza kosztuje
-  rzędu $0,0007-0,0035 zależnie od długości treści. Oznacza to, że marża
-  na pojedynczej transakcji jest z natury tego biznesu blisko 100%
-  niezależnie od tego, czy to pełna analiza, czy tanie tłumaczenie z
-  cache'u — różnica między nimi liczy się dopiero w **zsumowanym**
-  koszcie operacyjnym przy dużej skali i długich treściach, nie w
-  procencie marży na jednej analizie (patrz też sekcja "Ponowne użycie
-  przez tłumaczenie" wyżej).
+  tokenów wejścia/wyjścia, zweryfikowane na żywo 17.08.2026 — potwierdzone
+  bezpośrednio na `ai.google.dev/gemini-api/docs/pricing`, wciąż aktualne)
+  pojedyncza analiza tekstu kosztuje rzędu $0,0007-0,0035 zależnie od
+  długości treści, a obrazu podobnie mało: **obraz ≤384px w każdym
+  wymiarze to 258 tokenów; większe obrazy dzielone są na kafelki
+  768×768px, każdy też po 258 tokenów** (zweryfikowane na
+  `ai.google.dev/gemini-api/docs/tokens`) — nawet dla dużego zdjęcia to
+  rzędu $0,0015-0,002 za analizę. **PDF-y są liczone Google WEDŁUG TEJ
+  SAMEJ stawki co obrazy** (oficjalna adnotacja: "Tokens for the DOCUMENT
+  modality... are billed at the image token rate") — stąd założenie w
+  planie na fazę 2, że jedna strona PDF-a ≈ jeden obraz kosztowo. Oznacza
+  to, że marża na pojedynczej transakcji jest z natury tego biznesu
+  blisko 100% niezależnie od typu treści — różnica liczy się dopiero w
+  **zsumowanym** koszcie operacyjnym przy dużej skali, nie w procencie
+  marży na jednej analizie (patrz też sekcja "Ponowne użycie przez
+  tłumaczenie" wyżej).
 
 ## Ważne wzorce bezpieczeństwa (nie usuwać/omijać przy zmianach)
 
@@ -848,7 +871,11 @@ id`), obok istniejącej reguły `SELECT`.
 - Własna domena (naprawiłoby to markowanie Google OAuth pokazujące surową
   domenę Supabase, i brzydki adres nadawcy Brevo przy odbiciach) —
   użytkownik: "jeszcze nie".
-- Analiza obrazu/PDF.
+- Analiza PDF (obraz już DZIAŁA — patrz sekcja "Cennik" i
+  `supabase/functions/analyze/index.ts` — PDF to jedyna część tego punktu
+  wciąż odłożona na później, zaplanowana jako osobny, dwuetapowy flow z
+  ekranem potwierdzenia kosztu przed właściwą analizą; szczegóły planu
+  trzymane w liście zadań sesji, nie tutaj, żeby nie duplikować).
 - Ekran intencji zakupowej (Fake Door test).
 - Obniżanie darmowego bonusu powitalnego / limity rejestracji po IP w
   Supabase — świadomie odłożone (zasada Lean Startup: nie buduj obrony
