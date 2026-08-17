@@ -393,29 +393,49 @@ zanim założysz, że działa.
      świadomie NIE zrobione teraz (Lean Startup — nie budować/płacić za
      obronę przed ruchem, którego jeszcze nie ma).
 - **Funkcja `daily-report`** (`supabase/functions/daily-report/index.ts`)
-  — wysyła raz dziennie mail z kluczowymi metrykami MVP (nowe rejestracje
-  dziś + średnia z 7 dni + ostrzeżenie przy nietypowym skoku, analizy
-  tekstu dziś/łącznie z rozbiciem zalogowani/anonimowi i nowe/tłumaczenia,
-  średni `q_score`, liczba wykrytych wzorców manipulacji vs zdrowego
-  rozumowania, wydane kredyty, maile wysłane wg statystyk Brevo)
-  wyłącznie na adres właściciela (`REPORT_RECIPIENT_EMAIL`), nie do
+  — wysyła raz dziennie, koleżeńskim tonem (to właściciel wysyła raport
+  sam do siebie, nie oficjalna komunikacja z użytkownikiem), mail z
+  kluczowymi metrykami MVP: nowe rejestracje dziś + średnia z 7 dni +
+  ostrzeżenie przy nietypowym skoku; analizy tekstu dziś z rozbiciem
+  zalogowani/anonimowi i nowe/tłumaczenia; top 5 najczęściej oglądanych
+  analiz w KAŻDYM języku, w którym coś już jest (wg `view_count`); wydane
+  kredyty; maile wysłane dziś i suma od początku miesiąca (wg statystyk
+  Brevo). Świadomie USUNIĘTE z raportu (właściciel ocenił jako
+  niepotrzebne): łączna liczba kont, łączna liczba analiz od początku,
+  liczba wykrytych wzorców manipulacji/rozumowania, średni `q_score`.
+  Wyłącznie na adres właściciela (`REPORT_RECIPIENT_EMAIL`), nie do
   użytkowników. Każda metryka liczona i wysyłana niezależnie (osobny
   `try/catch`) — błąd jednej (np. drobna zmiana w API Brevo) nie
   przerywa reszty raportu, tylko pokazuje przy niej "brak danych".
-  Uruchamiana z zewnątrz przez **Supabase Cron Jobs** (Database → Cron
-  Jobs → HTTP Request, nagłówek `x-cron-secret` z wartością sekretu
-  `CRON_REPORT_SECRET` — żeby nikt obcy nie mógł wywoływać funkcji na
-  żądanie i generować niepotrzebnego ruchu/kosztów). Podobnie jak
-  `send-auth-email`, ma wyłączoną domyślną weryfikację JWT (Settings →
-  "Verify JWT with legacy secret" → OFF), bo wywołuje ją Supabase Cron,
-  nie zalogowany użytkownik — własny sekret w nagłówku pełni tę samą rolę.
-  **Uwaga na strefę czasową**: harmonogram w Supabase Cron Jobs jest w
-  UTC, nie w czasie polskim — np. żeby dostać mail o 16:00 czasu
-  polskiego latem (CEST, UTC+2), trzeba ustawić cron na 14:00 UTC; zimą
-  (CET, UTC+1) ten sam cron dostarczy mail o 15:00 czasu polskiego,
-  chyba że ktoś ręcznie przestawi harmonogram przy zmianie czasu —
-  świadomie zaakceptowane jako drobna niedogodność, nie warto tego
-  automatyzować na etapie MVP.
+  Uruchamiana z zewnątrz przez **pg_cron + pg_net bezpośrednio z bazy**
+  (nie przez dashboardowy UI "Cron Jobs" — w tym projekcie taka strona nie
+  istnieje w menu Database, mimo że rozszerzenie `pg_cron` jest włączone;
+  harmonogram ustawiony poleceniem SQL w SQL Editor: `select
+  cron.schedule('pragma-daily-report', '0 14 * * *', $$ select
+  net.http_post(url:='.../functions/v1/daily-report', headers:=jsonb_build_object('x-cron-secret','...'),
+  body:='{}'::jsonb) $$)`; podgląd/zmiana: `select * from cron.job;`,
+  `select cron.unschedule('pragma-daily-report');`), z nagłówkiem
+  `x-cron-secret` z wartością sekretu `CRON_REPORT_SECRET` — żeby nikt
+  obcy nie mógł wywoływać funkcji na żądanie i generować niepotrzebnego
+  ruchu/kosztów. Podobnie jak `send-auth-email`, ma wyłączoną domyślną
+  weryfikację JWT (Settings → "Verify JWT with legacy secret" → OFF), bo
+  wywołuje ją baza danych, nie zalogowany użytkownik — własny sekret w
+  nagłówku pełni tę samą rolę.
+  **Uwaga na strefę czasową**: harmonogram w `pg_cron` jest w UTC, nie w
+  czasie polskim — np. żeby dostać mail o 16:00 czasu polskiego latem
+  (CEST, UTC+2), trzeba ustawić cron na 14:00 UTC; zimą (CET, UTC+1) ten
+  sam cron dostarczy mail o 15:00 czasu polskiego, chyba że ktoś ręcznie
+  przestawi harmonogram przy zmianie czasu — świadomie zaakceptowane jako
+  drobna niedogodność, nie warto tego automatyzować na etapie MVP.
+  **Do dopisania w przyszłości, gdy te systemy powstaną** (świadomie
+  pominięte teraz, bo jeszcze nie istnieją):
+  - **Cashflow** — liczba i rodzaj kupionych pakietów (tabele
+    `packages`/`package_purchases` już istnieją w bazie, ale nie ma
+    jeszcze działającego przepływu zakupu w aplikacji) — gdy powstanie,
+    dopisać sekcję z sumą przychodu/liczbą transakcji dziennie.
+  - **Zgłaszanie błędów przez użytkowników** — taki system w ogóle
+    jeszcze nie istnieje w Pragmie (ani frontend, ani tabela w bazie) —
+    gdy powstanie, dopisać do raportu liczbę zgłoszeń dziennie.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
@@ -771,6 +791,14 @@ id`), obok istniejącej reguły `SELECT`.
 - Obniżanie darmowego bonusu powitalnego / limity rejestracji po IP w
   Supabase — świadomie odłożone (zasada Lean Startup: nie buduj obrony
   przed zagrożeniem, które się jeszcze nie zmaterializowało).
+- System zgłaszania błędów przez użytkowników (frontend + tabela w
+  bazie) — jeszcze nie istnieje. Gdy powstanie, dopisać jego statystyki
+  (liczba zgłoszeń dziennie) do `daily-report`, patrz opis tej funkcji
+  wyżej.
+- Statystyki cashflow (liczba/rodzaj kupionych pakietów) w
+  `daily-report` — tabele `packages`/`package_purchases` już są w
+  bazie, ale brak jeszcze działającego przepływu zakupu w aplikacji;
+  gdy powstanie, dopisać tę sekcję do raportu.
 
 ## Dokumenty z pomysłami biznesowymi (traktuj krytycznie)
 

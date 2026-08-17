@@ -1,39 +1,46 @@
 // PRAGMA — Edge Function "daily-report"
 // Wdrożenie: Supabase Dashboard → Edge Functions → Deploy a new function → Via Editor
 //
-// Wysyła RAZ DZIENNIE (wywoływana z zewnątrz przez Supabase Cron Jobs,
-// patrz niżej) krótki mail z najważniejszymi statystykami rozwoju MVP —
-// TYLKO na adres właściciela projektu (REPORT_RECIPIENT_EMAIL), nie do
-// zwykłych użytkowników.
+// Wysyła RAZ DZIENNIE (wywoływana z zewnątrz przez Supabase pg_cron, patrz
+// PRAGMA_CONTEXT.md — sekcja "Funkcja daily-report") krótki, koleżeński
+// mail z najważniejszymi statystykami rozwoju MVP — TYLKO na adres
+// właściciela projektu (REPORT_RECIPIENT_EMAIL), nie do zwykłych
+// użytkowników.
 //
 // Ta funkcja NIE jest wywoływana przez przeglądarkę ani przez Supabase
 // Auth — dlatego, tak jak send-auth-email, ma WYŁĄCZONĄ weryfikację JWT
 // (Edge Functions → daily-report → Settings → "Verify JWT with legacy
 // secret" → OFF), a zamiast tego sama sprawdza własny sekret w nagłówku
-// `x-cron-secret`, żeby nikt obcy nie mógł jej wywoływać (co kosztowałoby
-// zapytania do bazy i wysyłkę maila za każdym razem).
+// `x-cron-secret`, żeby nikt obcy nie mógł jej wywoływać.
 //
 // KAŻDA metryka jest liczona OSOBNO i opakowana w try/catch — jeśli jedna
-// się nie uda (np. drobna zmiana w odpowiedzi API Brevo), reszta raportu
-// i tak dojdzie, a ta jedna pozycja pokaże "brak danych" zamiast wywalić
-// całą funkcję.
+// się nie uda, reszta raportu i tak dojdzie, a ta jedna pozycja pokaże
+// "brak danych" zamiast wywalić całą funkcję.
 //
 // Wymagane sekrety (Dashboard → Edge Functions → Manage secrets):
-// - CRON_REPORT_SECRET — dowolny, wymyślony przez Ciebie długi, losowy
-//   ciąg znaków (np. wygenerowany hasłem menedżerem). Ten sam ciąg trzeba
-//   wpisać jako nagłówek `x-cron-secret` w konfiguracji Supabase Cron Job.
-// - REPORT_RECIPIENT_EMAIL — adres, na który ma przychodzić raport.
-// - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY — jak w innych funkcjach.
-// - BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME — te same, co
-//   w send-auth-email.
+// - CRON_REPORT_SECRET, REPORT_RECIPIENT_EMAIL,
+//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+//   BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME
 //
-// Jak uruchomić raz dziennie: Supabase Dashboard → Database → Cron Jobs
-// → "Create a new cron job" → typ "HTTP Request" → URL tej funkcji →
-// nagłówek `x-cron-secret: <wartość CRON_REPORT_SECRET>` → harmonogram
-// (uwaga: godziny w Supabase Cron są w UTC, nie w czasie polskim — patrz
-// wyjaśnienie przeliczenia w PRAGMA_CONTEXT.md).
+// Świadomie NIE ma tu (na razie): statystyk cashflow/kupionych pakietów
+// (system płatności jeszcze nie istnieje) ani liczby zgłoszonych błędów
+// (system zgłaszania błędów przez użytkowników jeszcze nie istnieje) —
+// gdy oba powstaną, dopisać je tutaj. Patrz PRAGMA_CONTEXT.md.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+
+const LANGUAGES: { code: string; name: string }[] = [
+  { code: 'pl', name: 'polski' },
+  { code: 'en', name: 'angielski' },
+  { code: 'es', name: 'hiszpański' },
+  { code: 'de', name: 'niemiecki' },
+  { code: 'fr', name: 'francuski' },
+  { code: 'ru', name: 'rosyjski' },
+  { code: 'zh', name: 'chiński' },
+  { code: 'ja', name: 'japoński' },
+  { code: 'hi', name: 'hindi' },
+  { code: 'ar', name: 'arabski' },
+]
 
 function since(hours: number): string {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
@@ -60,9 +67,8 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  // --- Rejestracje: dziś, łącznie, średnia z ostatnich 7 dni (do wykrywania nietypowych skoków) ---
+  // --- Rejestracje: dziś, średnia z ostatnich 7 dni (do wykrywania nietypowych skoków) ---
   let newToday: number | null = null
-  let totalUsers: number | null = null
   let avg7d: number | null = null
   let burstWarning = false
   try {
@@ -76,7 +82,6 @@ Deno.serve(async (req: Request) => {
       if (data.users.length < perPage) break
       page++
     }
-    totalUsers = allUsers.length
 
     const todayKey = dayKey(new Date().toISOString())
     newToday = allUsers.filter((u) => dayKey(u.created_at) === todayKey).length
@@ -99,53 +104,48 @@ Deno.serve(async (req: Request) => {
     // metryka rejestracji niedostępna — reszta raportu leci dalej
   }
 
-  // --- Analizy (scans): dziś (rozbicie zalogowani/anonimowi, nowe/tłumaczenia, q_score, wzorce), łącznie ---
+  // --- Analizy (scans) dziś: rozbicie zalogowani/anonimowi, nowe/tłumaczenia ---
   let scansToday: number | null = null
   let loggedScans: number | null = null
   let anonScans: number | null = null
   let newAnalyses: number | null = null
   let translations: number | null = null
-  let avgQScore: number | null = null
-  let patternsManipulation: number | null = null
-  let patternsReasoning: number | null = null
-  let totalScans: number | null = null
   try {
     const { data, error } = await supabase
       .from('scans')
-      .select('discovered_by, is_translation, result')
+      .select('discovered_by, is_translation')
       .gte('created_at', since(24))
     if (error) throw error
-    const rows = data as { discovered_by: string | null; is_translation: boolean; result: any }[]
+    const rows = data as { discovered_by: string | null; is_translation: boolean }[]
     scansToday = rows.length
     loggedScans = rows.filter((r) => r.discovered_by).length
     anonScans = scansToday - loggedScans
     translations = rows.filter((r) => r.is_translation).length
     newAnalyses = scansToday - translations
-
-    const qScores = data
-      .map((r: any) => (typeof r.result?.q_score === 'number' ? r.result.q_score : null))
-      .filter((v: number | null): v is number => v !== null)
-    avgQScore = avg(qScores)
-
-    let manip = 0
-    let reason = 0
-    for (const r of data as any[]) {
-      for (const p of r.result?.patterns ?? []) {
-        if (p?.pattern_type === 'manipulation') manip++
-        else if (p?.pattern_type === 'reasoning') reason++
-      }
-    }
-    patternsManipulation = manip
-    patternsReasoning = reason
   } catch (_err) {
     // metryki dzisiejszych analiz niedostępne — reszta raportu leci dalej
   }
+
+  // --- Najpopularniejsze analizy (top 5 wg wyświetleń) w każdym języku, w którym coś jest ---
+  const topByLanguage: { langName: string; items: { label: string; views: number }[] }[] = []
   try {
-    const { count, error } = await supabase.from('scans').select('*', { count: 'exact', head: true })
-    if (error) throw error
-    totalScans = count ?? null
+    for (const lang of LANGUAGES) {
+      const { data, error } = await supabase
+        .from('scans')
+        .select('view_count, result, source_url')
+        .eq('language', lang.code)
+        .order('view_count', { ascending: false })
+        .limit(5)
+      if (error) throw error
+      if (!data || data.length === 0) continue
+      const items = (data as any[]).map((r) => ({
+        label: String(r.result?.summary || r.source_url || 'analiza bez podsumowania').slice(0, 110),
+        views: r.view_count ?? 0,
+      }))
+      topByLanguage.push({ langName: lang.name, items })
+    }
   } catch (_err) {
-    // łączna liczba analiz niedostępna
+    // ranking popularności niedostępny — reszta raportu leci dalej
   }
 
   // --- Kredyty wydane dziś ---
@@ -159,13 +159,14 @@ Deno.serve(async (req: Request) => {
     if (error) throw error
     creditsSpentToday = data.reduce((sum: number, r: any) => sum + Math.abs(r.amount || 0), 0)
   } catch (_err) {
-    // metryka kredytów niedostępna (np. brak kolumny created_at w tej tabeli)
+    // metryka kredytów niedostępna
   }
 
-  // --- Maile wysłane dziś wg Brevo ---
+  // --- Maile: dziś i suma od początku miesiąca (wg statystyk Brevo) ---
   let emailsSentToday: number | null = null
+  let emailsSentThisMonth: number | null = null
+  const brevoKey = Deno.env.get('BREVO_API_KEY')
   try {
-    const brevoKey = Deno.env.get('BREVO_API_KEY')
     if (brevoKey) {
       const res = await fetch('https://api.brevo.com/v3/smtp/statistics/aggregatedReport?days=1', {
         headers: { accept: 'application/json', 'api-key': brevoKey },
@@ -176,39 +177,87 @@ Deno.serve(async (req: Request) => {
       }
     }
   } catch (_err) {
-    // statystyki Brevo niedostępne
+    // statystyki dzienne Brevo niedostępne
+  }
+  try {
+    if (brevoKey) {
+      const now = new Date()
+      const monthStart = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
+      const todayStr = now.toISOString().slice(0, 10)
+      const res = await fetch(
+        `https://api.brevo.com/v3/smtp/statistics/aggregatedReport?startDate=${monthStart}&endDate=${todayStr}`,
+        { headers: { accept: 'application/json', 'api-key': brevoKey } }
+      )
+      if (res.ok) {
+        const json = await res.json()
+        if (typeof json.requests === 'number') emailsSentThisMonth = json.requests
+      }
+    }
+  } catch (_err) {
+    // statystyki miesięczne Brevo niedostępne
   }
 
   // --- Budowanie treści maila ---
   const fmt = (v: number | null, unit = '') => (v === null ? 'brak danych' : `${Math.round(v * 10) / 10}${unit}`)
   const dateStr = new Date().toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' })
 
+  const card = (label: string, bodyHtml: string) => `
+<div style="background:#f4f4f5;border-radius:12px;padding:16px 20px;margin-bottom:14px;">
+  <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;font-weight:600;margin-bottom:8px;">${label}</div>
+  ${bodyHtml}
+</div>`
+
   const burstHtml = burstWarning
-    ? `<p style="color:#b91c1c;font-weight:600;">Uwaga: dzisiejsza liczba rejestracji jest wyraźnie wyższa niż zwykle (średnia z ostatnich 7 dni: ${fmt(avg7d)}) — warto sprawdzić listę kont w Supabase (Authentication → Users), czy to nie jest nietypowy, zautomatyzowany ruch.</p>`
+    ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">Hej, uwaga — dzisiaj zarejestrowało się wyraźnie więcej osób niż zwykle (średnio ostatnio: ${fmt(avg7d)}/dzień). Warto rzucić okiem na listę kont w Supabase (Authentication → Users), czy to na pewno prawdziwi ludzie.</p>`
     : ''
 
-  const htmlContent = `<h2>Pragma — raport dzienny, ${dateStr}</h2>
+  const registrationsCard = card(
+    'Rejestracje',
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(newToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">nowych kont dziś (średnio ostatnio: ${fmt(avg7d)}/dzień)</span></div>${burstHtml}`
+  )
 
-<h3>Rejestracje</h3>
-<p>Dziś: <strong>${fmt(newToday)}</strong> (średnia z ostatnich 7 dni: ${fmt(avg7d)})</p>
-<p>Łącznie kont: <strong>${fmt(totalUsers)}</strong></p>
-${burstHtml}
+  const scansCard = card(
+    'Analizy tekstu',
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(scansToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">dziś</span></div>
+<div style="font-size:14px;color:#374151;margin-top:6px;">zalogowani: ${fmt(loggedScans)} · anonimowi: ${fmt(anonScans)} · nowe: ${fmt(newAnalyses)} · tłumaczenia: ${fmt(translations)}</div>`
+  )
 
-<h3>Analizy tekstu</h3>
-<p>Dziś: <strong>${fmt(scansToday)}</strong> (zalogowani: ${fmt(loggedScans)}, anonimowi: ${fmt(anonScans)}; nowe analizy: ${fmt(newAnalyses)}, tłumaczenia: ${fmt(translations)})</p>
-<p>Łącznie analiz od początku: <strong>${fmt(totalScans)}</strong></p>
-<p>Średni wynik uczciwości tekstu dziś (q_score): ${fmt(avgQScore, '/100')}</p>
-<p>Wykryte wzorce dziś: manipulacja — ${fmt(patternsManipulation)}, zdrowe rozumowanie — ${fmt(patternsReasoning)}</p>
+  const creditsCard = card(
+    'Kredyty',
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(creditsSpentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wydanych dziś</span></div>`
+  )
 
-<h3>Kredyty</h3>
-<p>Wydane dziś: ${fmt(creditsSpentToday)}</p>
+  const emailsCard = card(
+    'Maile',
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(emailsSentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">dziś (limit dzienny Brevo: 300)</span></div>
+<div style="font-size:14px;color:#374151;margin-top:6px;">łącznie w tym miesiącu: ${fmt(emailsSentThisMonth)}</div>`
+  )
 
-<h3>Maile</h3>
-<p>Wysłane dziś (wg Brevo): ${fmt(emailsSentToday)} / 300 dziennego limitu na koncie Brevo</p>
+  const topHtml =
+    topByLanguage.length === 0
+      ? '<p style="color:#6b7280;">Brak danych o popularności analiz.</p>'
+      : topByLanguage
+          .map(
+            (group) => `
+<div style="margin-bottom:10px;">
+  <div style="font-weight:600;color:#111827;margin-bottom:4px;">${group.langName}</div>
+  <ol style="margin:0;padding-left:20px;color:#374151;font-size:14px;">
+    ${group.items.map((it) => `<li style="margin-bottom:2px;">${it.label} — <strong>${it.views}</strong> wyświetleń</li>`).join('')}
+  </ol>
+</div>`
+          )
+          .join('')
 
-<p style="color:#6b7280;font-size:13px;">Ten raport wysyła się automatycznie raz dziennie. Wygenerowała go funkcja daily-report.</p>`
+  const topCard = card('Najpopularniejsze analizy (top 5 na język)', topHtml)
 
-  const brevoKey = Deno.env.get('BREVO_API_KEY')
+  const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto Twój dzienny przegląd Pragmy — ${dateStr}.</p>
+${registrationsCard}
+${scansCard}
+${creditsCard}
+${emailsCard}
+${topCard}
+<p style="color:#9ca3af;font-size:12px;margin-top:20px;">Ten raport wysyła się automatycznie raz dziennie. Wygenerowała go funkcja daily-report.</p>`
+
   const senderEmail = Deno.env.get('BREVO_SENDER_EMAIL')
   const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Pragma — raport'
   const recipient = Deno.env.get('REPORT_RECIPIENT_EMAIL')
