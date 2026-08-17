@@ -51,6 +51,7 @@ type EmailContent = {
 }
 
 type LangContent = {
+  teamName: string
   signup: { subject: string } & EmailContent
   recovery: { subject: string } & EmailContent
   password_changed: { subject: string } & EmailContent
@@ -59,6 +60,7 @@ type LangContent = {
 
 const EMAIL_CONTENT: Record<string, LangContent> = {
   pl: {
+    teamName: 'Zespół Pragma',
     signup: {
       subject: 'Potwierdź rejestrację w Pragmie',
       greeting: (u) => `Cześć, ${u}!`,
@@ -103,6 +105,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   en: {
+    teamName: 'The Pragma Team',
     signup: {
       subject: 'Confirm your registration on Pragma',
       greeting: (u) => `Hi, ${u}!`,
@@ -147,6 +150,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   es: {
+    teamName: 'El equipo de Pragma',
     signup: {
       subject: 'Confirma tu registro en Pragma',
       greeting: (u) => `¡Hola, ${u}!`,
@@ -191,6 +195,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   de: {
+    teamName: 'Das Pragma-Team',
     signup: {
       subject: 'Bestätige deine Registrierung bei Pragma',
       greeting: (u) => `Hallo, ${u}!`,
@@ -235,6 +240,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   fr: {
+    teamName: "L'équipe Pragma",
     signup: {
       subject: 'Confirmez votre inscription sur Pragma',
       greeting: (u) => `Bonjour, ${u} !`,
@@ -279,6 +285,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   ru: {
+    teamName: 'Команда Pragma',
     signup: {
       subject: 'Подтвердите регистрацию в Pragma',
       greeting: (u) => `Привет, ${u}!`,
@@ -323,6 +330,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   zh: {
+    teamName: 'Pragma 团队',
     signup: {
       subject: '确认您在 Pragma 的注册',
       greeting: (u) => `你好，${u}！`,
@@ -367,6 +375,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   ja: {
+    teamName: 'Pragmaチーム',
     signup: {
       subject: 'Pragmaのご登録を確認してください',
       greeting: (u) => `${u}さん、こんにちは。`,
@@ -411,6 +420,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   hi: {
+    teamName: 'Pragma टीम',
     signup: {
       subject: 'Pragma पर अपना पंजीकरण पुष्ट करें',
       greeting: (u) => `नमस्ते, ${u}!`,
@@ -455,6 +465,7 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
     },
   },
   ar: {
+    teamName: 'فريق Pragma',
     signup: {
       subject: 'أكّد تسجيلك في Pragma',
       greeting: (u) => `مرحبًا يا ${u}!`,
@@ -563,8 +574,16 @@ Deno.serve(async (req: Request) => {
     const langContent = EMAIL_CONTENT[language] || EMAIL_CONTENT.en
 
     const { token_hash, redirect_to, email_action_type, site_url } = email_data
+    // Uwaga: /auth/v1/verify, mimo że to link klikany z maila (nie
+    // wywołanie z zalogowanej sesji), i tak wymaga parametru `apikey` —
+    // bez niego Supabase odpowiada "No API key found in request" i NIE
+    // potwierdza konta, mimo że link wygląda na poprawny (znaleziony
+    // empirycznie: link bez apikey w teście kończył się tym błędem, a
+    // konto zostawało niepotwierdzone). `SUPABASE_ANON_KEY` jest
+    // dostarczany automatycznie przez Supabase do każdej Edge Function,
+    // nie trzeba go dodawać ręcznie jako sekret.
     const actionUrl = token_hash
-      ? `${site_url}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${redirect_to}`
+      ? `${site_url}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${redirect_to}&apikey=${Deno.env.get('SUPABASE_ANON_KEY')}`
       : null
 
     let content: { subject: string } & EmailContent
@@ -582,7 +601,12 @@ Deno.serve(async (req: Request) => {
 
     const brevoKey = Deno.env.get('BREVO_API_KEY')
     const senderEmail = Deno.env.get('BREVO_SENDER_EMAIL')
-    const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Zespół Pragma'
+    // Nazwa nadawcy widoczna w skrzynce odbiorcy MUSI być w tym samym
+    // języku co treść maila — inaczej np. niemiecki mail podpisuje się
+    // po polsku ("Zespół Pragma"), co wygląda na pomyłkę. Każdy język w
+    // EMAIL_CONTENT ma własne teamName; zmienna środowiskowa
+    // BREVO_SENDER_NAME zostaje tylko jako ostateczny fallback.
+    const senderName = langContent.teamName || Deno.env.get('BREVO_SENDER_NAME') || 'Zespół Pragma'
 
     if (!brevoKey || !senderEmail) {
       return new Response(JSON.stringify({ error: 'not_configured' }), {

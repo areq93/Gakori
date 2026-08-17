@@ -378,6 +378,27 @@ zanim założysz, że działa.
     przestają mieć jakikolwiek efekt** dla tych trzech typów maili (są
     całkowicie zastąpione przez naszą funkcję) — można je zostawić bez
     zmian, nie trzeba ich usuwać, po prostu nie są już używane.
+  - **Pułapka — `/auth/v1/verify` wymaga parametru `apikey`, mimo że to
+    link klikany z maila, nie wywołanie z zalogowanej sesji.** Pierwsza
+    wersja `actionUrl` (bez `apikey`) w realnym teście kończyła się
+    błędem `"No API key found in request"` na stronie linku, a konto
+    ZOSTAWAŁO niepotwierdzone (użytkownik nie mógł się potem zalogować).
+    Naprawione dopisaniem `&apikey=${Deno.env.get('SUPABASE_ANON_KEY')}`
+    do końca `actionUrl` — `SUPABASE_ANON_KEY` jest dostarczany
+    automatycznie przez Supabase do każdej Edge Function, nie trzeba go
+    ręcznie dodawać jako sekret. **Zawsze testuj link z prawdziwego maila
+    end-to-end (klik → potwierdzenie → udane logowanie), nie tylko
+    wysyłkę samego maila** — treść może wyglądać poprawnie, a link mimo
+    to nie działać.
+  - **Pułapka — nazwa nadawcy (`sender.name` w Brevo) musi być
+    tłumaczona razem z resztą maila.** Pierwsza wersja miała jedną,
+    globalną nazwę (`BREVO_SENDER_NAME`, po polsku "Zespół Pragma") dla
+    WSZYSTKICH języków — w efekcie np. niemiecki mail miał poprawnie
+    przetłumaczoną treść, ale w polu "Od" nadawca i tak podpisywał się
+    po polsku, co wygląda na pomyłkę/niespójność. Naprawione przez
+    dodanie `teamName` (nazwa zespołu w danym języku) do każdego wpisu w
+    `EMAIL_CONTENT` i użycie go jako `sender.name` zamiast stałej
+    zmiennej środowiskowej.
 - **Limity wysyłki maili — DWA niezależne "kraniki", oba mogą zablokować
   rejestrację**:
   1. Supabase (Authentication → Rate Limits → "Rate limit for sending
