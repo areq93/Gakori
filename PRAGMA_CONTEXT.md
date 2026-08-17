@@ -651,7 +651,13 @@ zanim założysz, że działa.
 
 **`profiles`** (1:1 z `auth.users`, klucz `id`):
 - `id` (uuid)
-- `wallet_balance` (numeric) — saldo kredytów
+- `wallet_balance` (integer, `NOT NULL DEFAULT 20`) — saldo kredytów
+  (darmowy bonus powitalny)
+- `reputation_score` (double precision, `NOT NULL DEFAULT 1.0`) —
+  zarezerwowane pod przyszłą funkcję, nieużywane jeszcze w kodzie aplikacji
+- `trust_tier` (text, `NOT NULL DEFAULT 'nowy'`) — jw., zarezerwowane,
+  nieużywane jeszcze w kodzie
+- `created_at` (timestamptz, `DEFAULT now()`)
 - `language` (text, `NOT NULL DEFAULT 'en'`) — ustawienie języka konta
 - `theme` (text, `NOT NULL DEFAULT 'light'`) — ustawienie motywu (`light`/
   `dark`), ten sam wzorzec co `language` (patrz niżej "Motyw jasny/ciemny")
@@ -659,6 +665,31 @@ zanim założysz, że działa.
   użytkownika"
 - `username_changed_at` (timestamptz, nullable) — kiedy ostatnio zmieniono
   `username`; używane przez wyzwalacz bazy wymuszający limit "raz na 14 dni"
+
+**Jak powstaje wiersz `profiles`** (WAŻNE, poważny błąd naprawiony
+2026-08-17): wyzwalacz `on_auth_user_created` na `auth.users` (funkcja
+`public.handle_new_user()`, `SECURITY DEFINER`) wstawia wiersz do
+`profiles` (samo `id` + `language` odczytany z
+`raw_user_meta_data->>'language'`, reszta kolumn wypełnia się z
+wartości domyślnych) zaraz po każdej nowej rejestracji. **Ten
+mechanizm żyje WYŁĄCZNIE w bazie Supabase — nie ma go nigdzie w tym
+repozytorium** (żaden plik `.ts`/`.html` nie tworzy wiersza `profiles`).
+Odkryte, że przez jakiś czas (co najmniej od 14 sierpnia, prawdopodobnie
+dłużej — dokładna data nieznana) ten automat w ogóle nie istniał w
+bazie, więc ŻADNE nowe konto nie dostawało wiersza `profiles`, czyli
+też nie dostawało darmowego bonusu 20 kredytów, a synchronizacja
+języka/motywu/nazwy użytkownika cicho się nie udawała (objawiało się to
+błędami `406` z PostgREST przy `.single()` na `profiles` — 406 tam
+znaczy "zapytanie się wykonało, ale nie znalazło dokładnie jednego
+wiersza"). Naprawione: 1) jednorazowy backfill (`INSERT ... SELECT ...
+WHERE p.id IS NULL`) uzupełnił profile wszystkim istniejącym kontom,
+które go nie miały; 2) stworzony od nowa wyzwalacz `on_auth_user_created`
+zabezpiecza wszystkie przyszłe rejestracje. **Jeśli w przyszłości znowu
+pojawi się problem "nowe konto nie ma ustawień/kredytów/nazwy" — najpierw
+sprawdź, czy ten wyzwalacz nadal istnieje**
+(`select tgname from pg_trigger where tgrelid = 'auth.users'::regclass`
+— szukaj `on_auth_user_created` wśród standardowych
+`RI_ConstraintTrigger_...`), zanim zaczniesz szukać gdzie indziej.
 
 **`scans`** (współdzielony cache analiz, publiczny odczyt w RLS):
 - `id`, `content_hash` (klucz cache'u treści), `input_type` (`text`/`url`/
