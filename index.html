@@ -19,6 +19,9 @@
 <body>
 
     <a id="userMenuBtn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto">👤</a>
+    <div id="creditBalance" class="credit-balance" style="display:none;" data-i18n-aria-label="credit_balance_label" aria-label="Stan kredytów">
+        <span aria-hidden="true">🪙</span><span id="creditBalanceValue" aria-live="polite">0</span>
+    </div>
 
     <div id="appLoading" style="text-align:center; padding:60px 0; color:var(--ink-soft);">
         <p data-i18n="loading">Ładowanie...</p>
@@ -196,16 +199,20 @@
             const authCard = document.getElementById('authCard');
             const recovery = document.getElementById('authRecovery');
             const userMenuBtn = document.getElementById('userMenuBtn');
+            const creditBalance = document.getElementById('creditBalance');
             const analyzeCard = document.getElementById('analyzeCard');
             const publicScansCard = document.getElementById('publicScansCard');
             if (recovery.style.display === 'block') return; // ekran ustawiania nowego hasła ma pierwszeństwo
             if (currentSession) {
                 authCard.style.display = 'none';
                 userMenuBtn.style.display = 'flex';
+                creditBalance.style.display = 'flex';
+                refreshCreditBalance(sb, currentSession.user.id);
                 analyzeCard.style.display = 'block';
             } else {
                 authCard.style.display = 'block';
                 userMenuBtn.style.display = 'none';
+                creditBalance.style.display = 'none';
                 analyzeCard.style.display = 'none';
             }
             // Przeglądarka publicznych analiz jest widoczna zawsze — zalogowani
@@ -805,6 +812,10 @@
                 clearInterval(statusInterval);
                 statusEl.innerText = '';
                 payloadEl.innerText = JSON.stringify(data, null, 2);
+
+                // Analiza mogła kosztować kredyty — odświeżamy wyświetlaną
+                // liczbę od razu, zamiast czekać na kolejne zalogowanie.
+                if (currentSession) refreshCreditBalance(sb, currentSession.user.id);
 
                 if (data.error) {
                     // Błąd pokazujemy na tej samej stronie.

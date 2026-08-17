@@ -313,41 +313,160 @@ zanim założysz, że działa.
     miałoby szansę zadziałać przy pierwszym logowaniu). **Jeśli dodajesz
     nowe miejsce zmieniające `profiles.username`, pamiętaj o tym lustrze**
     — inaczej maile Supabase będą się zwracać po starej/pustej nazwie.
-- **Maile transakcyjne — trzy różne, wszystkie wysyłane przez Supabase**:
-  1. **Potwierdzenie rejestracji** ("Confirm signup" w Supabase Dashboard →
-     Authentication → Email Templates).
-  2. **Odzyskiwanie hasła** (w Supabase nazywa się nadal "Reset Password" —
-     to nazwa kategorii w panelu Supabase, nie da się jej zmienić, ale
-     TREŚĆ maila i teksty w naszej aplikacji świadomie mówią "odzyskiwanie",
-     nie "reset" — użytkownik poprosił o rozróżnienie od poniższego punktu
-     3, żeby się nie mylić).
-  3. **Potwierdzenie zmiany hasła z panelu zalogowanego użytkownika**
-     (`account.html`, "Zmień hasło") — Supabase ma do tego WBUDOWANĄ
-     funkcję: Authentication → Emails → sekcja "Security" → "Password
-     changed" (domyślnie wyłączona, trzeba włączyć przełącznikiem).
-     Odkryte PO zbudowaniu własnego rozwiązania (funkcja
-     `supabase/functions/notify-password-changed/index.ts` + osobne
-     wywołanie Brevo API) — świadomie porzucone na rzecz wbudowanej opcji,
-     bo jest prostsza i korzysta z tego samego, już skonfigurowanego SMTP,
-     co maile 1 i 2. **Funkcja `notify-password-changed` została w repo
-     (nieszkodliwa, ale NIEWYWOŁYWANA)** na wypadek, gdyby wbudowana opcja
-     okazała się niewystarczająca (np. brak możliwości personalizacji) —
-     jeśli kiedyś wróci do użycia, pamiętaj żeby NIE włączać jednocześnie
-     wbudowanego "Password changed" (dwa maile na tę samą zmianę).
-  - Wszystkie trzy maile są wysyłane przez Supabase przez ten sam SMTP
-    (Brevo — login/hasło w Authentication → SMTP Settings). **Sekrety
-    `BREVO_API_KEY`/`BREVO_SENDER_EMAIL`/`BREVO_SENDER_NAME` zostały
-    dodane w Supabase przy budowie porzuconego rozwiązania z punktu 3 —
-    teraz nieużywane przez żaden aktywny kod**, ale nieszkodliwe, jeśli
-    zostaną (nikt inny ich nie potrzebuje, można je zostawić albo usunąć).
-  - Wszystkie trzy maile mają ten sam ton/format (bezpośrednie zwrócenie
-    się po `{{if .Data.username}}, {{.Data.username}}{{end}}` — warunkowe,
-    bo jeśli z jakiegoś powodu nazwy brakuje w metadanych, mail i tak
-    ładnie wygląda jako samo "Cześć!" zamiast "Cześć, !" — krótko, ciepło,
-    bez żargonu, kończy się "Dziękujemy, że jesteś z nami od samego
-    początku. Zespół Pragma") — jeśli dodajesz kolejny mail, trzymaj się
-    tego wzorca. Personalizacja działa dzięki lustrowaniu nazwy w
-    `user_metadata`, patrz wyżej.
+- **Maile transakcyjne — od teraz WŁASNA funkcja `send-auth-email`, nie
+  wbudowane szablony Supabase**:
+  - Supabase ma mechanizm "Send Email" Hook (Dashboard → Authentication →
+    Hooks → "Send Email hook"). Gdy jest włączony, Supabase PRZESTAJE
+    używać swoich wbudowanych, jednojęzycznych szablonów (Email Templates:
+    "Confirm signup", "Reset Password"; oraz przełącznik "Password
+    changed" w sekcji Security) i zamiast tego woła NASZĄ funkcję
+    `supabase/functions/send-auth-email/index.ts` przy KAŻDYM mailu
+    związanym z logowaniem/rejestracją. Dzięki temu mail wychodzi w
+    języku, jaki użytkownik faktycznie ma ustawiony w aplikacji — a nie w
+    jednym, na sztywno wybranym języku dla wszystkich.
+  - Ta jedna funkcja obsługuje wszystkie trzy potrzebne maile (rozróżnia
+    je po polu `email_data.email_action_type` z zapytania od Supabase):
+    1. **Potwierdzenie rejestracji** (`signup`).
+    2. **Odzyskiwanie hasła** (`recovery` — w kodzie/UI/mailu świadomie
+       "odzyskiwanie", nie "reset", żeby nie mylić z punktem 3 poniżej).
+    3. **Potwierdzenie zmiany hasła z panelu zalogowanego użytkownika**
+       (`password_changed_notification` — Supabase wysyła ten typ maila
+       automatycznie, gdy w Dashboardzie Authentication → Emails →
+       sekcja "Security" włączony jest przełącznik "Password changed";
+       po włączeniu hooka ten przełącznik nie wysyła już swojej starej,
+       wbudowanej treści, tylko każe wywołać naszą funkcję).
+    Każdy inny, nieoczekiwany typ (np. `email_change`, `magiclink`) dostaje
+    ogólny szablon zapasowy (`generic` w kodzie), żeby żaden mail nigdy nie
+    "zniknął" po cichu.
+  - **Język i nazwa użytkownika w mailu** — kolejność sprawdzania:
+    - język: `user.user_metadata.language` (wybrany PRZED rejestracją,
+      zanim istnieje jeszcze profil) → `profiles.language` (ustawiony w
+      panelu po zalogowaniu) → `'en'` jako ostatnia deska ratunku.
+    - nazwa: `profiles.username` → `user.user_metadata.username` → część
+      e-maila przed `@`.
+    To ta sama logika/te same pola, co lustrowanie opisane wyżej — hook
+    korzysta z `SUPABASE_SERVICE_ROLE_KEY`, żeby odczytać `profiles`
+    bezpośrednio (nie ma tu sesji użytkownika, to wywołanie serwer-serwer
+    od Supabase, nie z przeglądarki).
+  - **`notify-password-changed`** (starsza, osobno wywoływana funkcja z
+    `account.html`) została w repo jako NIEUŻYWANA — to była pierwsza,
+    porzucona próba rozwiązania punktu 3, zanim odkryto najpierw wbudowany
+    przełącznik "Password changed", a potem hook. Nieszkodliwa, jeśli
+    zostanie.
+  - Wszystkie maile są nadal wysyłane przez Brevo, ale teraz NASZ kod sam
+    woła Brevo API (`BREVO_API_KEY`/`BREVO_SENDER_EMAIL`/
+    `BREVO_SENDER_NAME` — te same sekrety, które wcześniej były
+    skonfigurowane "na zapas" pod `notify-password-changed`, teraz w
+    aktywnym użyciu) — Supabase już nie wysyła nic samo przez swój SMTP
+    dla tych trzech typów maili.
+  - **Weryfikacja podpisu**: Supabase podpisuje każde wywołanie hooka
+    (biblioteka `standardwebhooks`, sekret `SEND_EMAIL_HOOK_SECRET` w
+    formacie `v1,whsec_...`, generowany automatycznie przez Supabase przy
+    włączaniu hooka w Dashboardzie — trzeba go wkleić jako sekret funkcji).
+    Bez poprawnego sekretu funkcja odrzuca zapytanie (401) — to chroni
+    przed tym, żeby ktoś obcy mógł kazać naszej funkcji wysłać dowolny
+    mail w naszym imieniu.
+  - Ton/format wszystkich maili: krótkie, ciepłe, bez żargonu, zawsze z
+    bezpośrednim zwróceniem się po nazwie użytkownika, kończą się
+    odpowiednikiem "Dziękujemy, że jesteś z nami od samego początku.
+    Zespół Pragma" w danym języku. Treść każdego z 3 typów × 10 języków
+    jest zapisana wprost w kodzie funkcji (`EMAIL_CONTENT`) — jeśli trzeba
+    poprawić tekst maila, edytuje się ten plik, nie panel Supabase (panel
+    już nie ma wpływu na treść tych maili, dopóki hook jest włączony).
+  - **Ważne — po włączeniu hooka w Supabase Dashboardzie, treść wpisana w
+    Authentication → Email Templates i przełącznik "Password changed"
+    przestają mieć jakikolwiek efekt** dla tych trzech typów maili (są
+    całkowicie zastąpione przez naszą funkcję) — można je zostawić bez
+    zmian, nie trzeba ich usuwać, po prostu nie są już używane.
+  - **Pułapka — `/auth/v1/verify` wymaga parametru `apikey`, mimo że to
+    link klikany z maila, nie wywołanie z zalogowanej sesji.** Pierwsza
+    wersja `actionUrl` (bez `apikey`) w realnym teście kończyła się
+    błędem `"No API key found in request"` na stronie linku, a konto
+    ZOSTAWAŁO niepotwierdzone (użytkownik nie mógł się potem zalogować).
+    Naprawione dopisaniem `&apikey=${Deno.env.get('SUPABASE_ANON_KEY')}`
+    do końca `actionUrl` — `SUPABASE_ANON_KEY` jest dostarczany
+    automatycznie przez Supabase do każdej Edge Function, nie trzeba go
+    ręcznie dodawać jako sekret.
+  - **Pułapka — `email_data.site_url` z payloadu hooka NIE jest samym
+    adresem bazowym w tym projekcie, tylko już zawiera na końcu
+    `/auth/v1`.** Doklejenie do niego `/auth/v1/verify` (zgodnie z
+    formułą z oficjalnej dokumentacji Supabase) dawało zdublowaną
+    ścieżkę `.../auth/v1/auth/v1/verify` → 404, konto znów zostawało
+    niepotwierdzone — złapane dopiero w realnym teście linku z maila, bo
+    sam mail wyglądał poprawnie. Naprawione przez zbudowanie `actionUrl`
+    wprost z `Deno.env.get('SUPABASE_URL')` (który na pewno nie ma
+    niczego doklejonego) zamiast z `email_data.site_url`; `redirect_to`
+    nadal bierzemy z payloadu. **Zawsze testuj link z prawdziwego maila
+    end-to-end (klik → potwierdzenie → udane logowanie), nie tylko
+    wysyłkę samego maila** — treść może wyglądać poprawnie, a link mimo
+    to nie działać.
+  - **Pułapka — nazwa nadawcy (`sender.name` w Brevo) musi być
+    tłumaczona razem z resztą maila.** Pierwsza wersja miała jedną,
+    globalną nazwę (`BREVO_SENDER_NAME`, po polsku "Zespół Pragma") dla
+    WSZYSTKICH języków — w efekcie np. niemiecki mail miał poprawnie
+    przetłumaczoną treść, ale w polu "Od" nadawca i tak podpisywał się
+    po polsku, co wygląda na pomyłkę/niespójność. Naprawione przez
+    dodanie `teamName` (nazwa zespołu w danym języku) do każdego wpisu w
+    `EMAIL_CONTENT` i użycie go jako `sender.name` zamiast stałej
+    zmiennej środowiskowej.
+- **Limity wysyłki maili — DWA niezależne "kraniki", oba mogą zablokować
+  rejestrację**:
+  1. Supabase (Authentication → Rate Limits → "Rate limit for sending
+     emails") — domyślnie bardzo nisko (`2` maile/h), co realnie blokowało
+     rejestracje już przy drugiej próbie w ciągu godziny. Podniesione do
+     `300`/h.
+  2. Brevo (darmowy plan) — **300 maili na DOBĘ, łącznie wszystkie typy**
+     (rejestracja + odzyskiwanie + zmiana hasła + cokolwiek przyszłego),
+     nie per-użytkownik. To twardszy limit niż powyższy (godzinowy) —
+     przy stałym ruchu przez wiele godzin dziennie wyczerpie się szybciej
+     niż limit Supabase. Do podniesienia: przejście na płatny plan Brevo
+     (Starter itd.), gdy realny ruch będzie się do tego zbliżał —
+     świadomie NIE zrobione teraz (Lean Startup — nie budować/płacić za
+     obronę przed ruchem, którego jeszcze nie ma).
+- **Funkcja `daily-report`** (`supabase/functions/daily-report/index.ts`)
+  — wysyła raz dziennie, koleżeńskim tonem (to właściciel wysyła raport
+  sam do siebie, nie oficjalna komunikacja z użytkownikiem), mail z
+  kluczowymi metrykami MVP: nowe rejestracje dziś + średnia z 7 dni +
+  ostrzeżenie przy nietypowym skoku; analizy tekstu dziś z rozbiciem
+  zalogowani/anonimowi i nowe/tłumaczenia; top 5 najczęściej oglądanych
+  analiz w KAŻDYM języku, w którym coś już jest (wg `view_count`); wydane
+  kredyty; maile wysłane dziś i suma od początku miesiąca (wg statystyk
+  Brevo). Świadomie USUNIĘTE z raportu (właściciel ocenił jako
+  niepotrzebne): łączna liczba kont, łączna liczba analiz od początku,
+  liczba wykrytych wzorców manipulacji/rozumowania, średni `q_score`.
+  Wyłącznie na adres właściciela (`REPORT_RECIPIENT_EMAIL`), nie do
+  użytkowników. Każda metryka liczona i wysyłana niezależnie (osobny
+  `try/catch`) — błąd jednej (np. drobna zmiana w API Brevo) nie
+  przerywa reszty raportu, tylko pokazuje przy niej "brak danych".
+  Uruchamiana z zewnątrz przez **pg_cron + pg_net bezpośrednio z bazy**
+  (nie przez dashboardowy UI "Cron Jobs" — w tym projekcie taka strona nie
+  istnieje w menu Database, mimo że rozszerzenie `pg_cron` jest włączone;
+  harmonogram ustawiony poleceniem SQL w SQL Editor: `select
+  cron.schedule('pragma-daily-report', '0 14 * * *', $$ select
+  net.http_post(url:='.../functions/v1/daily-report', headers:=jsonb_build_object('x-cron-secret','...'),
+  body:='{}'::jsonb) $$)`; podgląd/zmiana: `select * from cron.job;`,
+  `select cron.unschedule('pragma-daily-report');`), z nagłówkiem
+  `x-cron-secret` z wartością sekretu `CRON_REPORT_SECRET` — żeby nikt
+  obcy nie mógł wywoływać funkcji na żądanie i generować niepotrzebnego
+  ruchu/kosztów. Podobnie jak `send-auth-email`, ma wyłączoną domyślną
+  weryfikację JWT (Settings → "Verify JWT with legacy secret" → OFF), bo
+  wywołuje ją baza danych, nie zalogowany użytkownik — własny sekret w
+  nagłówku pełni tę samą rolę.
+  **Uwaga na strefę czasową**: harmonogram w `pg_cron` jest w UTC, nie w
+  czasie polskim — np. żeby dostać mail o 16:00 czasu polskiego latem
+  (CEST, UTC+2), trzeba ustawić cron na 14:00 UTC; zimą (CET, UTC+1) ten
+  sam cron dostarczy mail o 15:00 czasu polskiego, chyba że ktoś ręcznie
+  przestawi harmonogram przy zmianie czasu — świadomie zaakceptowane jako
+  drobna niedogodność, nie warto tego automatyzować na etapie MVP.
+  **Do dopisania w przyszłości, gdy te systemy powstaną** (świadomie
+  pominięte teraz, bo jeszcze nie istnieją):
+  - **Cashflow** — liczba i rodzaj kupionych pakietów (tabele
+    `packages`/`package_purchases` już istnieją w bazie, ale nie ma
+    jeszcze działającego przepływu zakupu w aplikacji) — gdy powstanie,
+    dopisać sekcję z sumą przychodu/liczbą transakcji dziennie.
+  - **Zgłaszanie błędów przez użytkowników** — taki system w ogóle
+    jeszcze nie istnieje w Pragmie (ani frontend, ani tabela w bazie) —
+    gdy powstanie, dopisać do raportu liczbę zgłoszeń dziennie.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
@@ -532,7 +651,13 @@ zanim założysz, że działa.
 
 **`profiles`** (1:1 z `auth.users`, klucz `id`):
 - `id` (uuid)
-- `wallet_balance` (numeric) — saldo kredytów
+- `wallet_balance` (integer, `NOT NULL DEFAULT 20`) — saldo kredytów
+  (darmowy bonus powitalny)
+- `reputation_score` (double precision, `NOT NULL DEFAULT 1.0`) —
+  zarezerwowane pod przyszłą funkcję, nieużywane jeszcze w kodzie aplikacji
+- `trust_tier` (text, `NOT NULL DEFAULT 'nowy'`) — jw., zarezerwowane,
+  nieużywane jeszcze w kodzie
+- `created_at` (timestamptz, `DEFAULT now()`)
 - `language` (text, `NOT NULL DEFAULT 'en'`) — ustawienie języka konta
 - `theme` (text, `NOT NULL DEFAULT 'light'`) — ustawienie motywu (`light`/
   `dark`), ten sam wzorzec co `language` (patrz niżej "Motyw jasny/ciemny")
@@ -540,6 +665,31 @@ zanim założysz, że działa.
   użytkownika"
 - `username_changed_at` (timestamptz, nullable) — kiedy ostatnio zmieniono
   `username`; używane przez wyzwalacz bazy wymuszający limit "raz na 14 dni"
+
+**Jak powstaje wiersz `profiles`** (WAŻNE, poważny błąd naprawiony
+2026-08-17): wyzwalacz `on_auth_user_created` na `auth.users` (funkcja
+`public.handle_new_user()`, `SECURITY DEFINER`) wstawia wiersz do
+`profiles` (samo `id` + `language` odczytany z
+`raw_user_meta_data->>'language'`, reszta kolumn wypełnia się z
+wartości domyślnych) zaraz po każdej nowej rejestracji. **Ten
+mechanizm żyje WYŁĄCZNIE w bazie Supabase — nie ma go nigdzie w tym
+repozytorium** (żaden plik `.ts`/`.html` nie tworzy wiersza `profiles`).
+Odkryte, że przez jakiś czas (co najmniej od 14 sierpnia, prawdopodobnie
+dłużej — dokładna data nieznana) ten automat w ogóle nie istniał w
+bazie, więc ŻADNE nowe konto nie dostawało wiersza `profiles`, czyli
+też nie dostawało darmowego bonusu 20 kredytów, a synchronizacja
+języka/motywu/nazwy użytkownika cicho się nie udawała (objawiało się to
+błędami `406` z PostgREST przy `.single()` na `profiles` — 406 tam
+znaczy "zapytanie się wykonało, ale nie znalazło dokładnie jednego
+wiersza"). Naprawione: 1) jednorazowy backfill (`INSERT ... SELECT ...
+WHERE p.id IS NULL`) uzupełnił profile wszystkim istniejącym kontom,
+które go nie miały; 2) stworzony od nowa wyzwalacz `on_auth_user_created`
+zabezpiecza wszystkie przyszłe rejestracje. **Jeśli w przyszłości znowu
+pojawi się problem "nowe konto nie ma ustawień/kredytów/nazwy" — najpierw
+sprawdź, czy ten wyzwalacz nadal istnieje**
+(`select tgname from pg_trigger where tgrelid = 'auth.users'::regclass`
+— szukaj `on_auth_user_created` wśród standardowych
+`RI_ConstraintTrigger_...`), zanim zaczniesz szukać gdzie indziej.
 
 **`scans`** (współdzielony cache analiz, publiczny odczyt w RLS):
 - `id`, `content_hash` (klucz cache'u treści), `input_type` (`text`/`url`/
@@ -703,6 +853,14 @@ id`), obok istniejącej reguły `SELECT`.
 - Obniżanie darmowego bonusu powitalnego / limity rejestracji po IP w
   Supabase — świadomie odłożone (zasada Lean Startup: nie buduj obrony
   przed zagrożeniem, które się jeszcze nie zmaterializowało).
+- System zgłaszania błędów przez użytkowników (frontend + tabela w
+  bazie) — jeszcze nie istnieje. Gdy powstanie, dopisać jego statystyki
+  (liczba zgłoszeń dziennie) do `daily-report`, patrz opis tej funkcji
+  wyżej.
+- Statystyki cashflow (liczba/rodzaj kupionych pakietów) w
+  `daily-report` — tabele `packages`/`package_purchases` już są w
+  bazie, ale brak jeszcze działającego przepływu zakupu w aplikacji;
+  gdy powstanie, dopisać tę sekcję do raportu.
 
 ## Dokumenty z pomysłami biznesowymi (traktuj krytycznie)
 
