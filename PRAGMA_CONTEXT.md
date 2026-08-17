@@ -313,41 +313,71 @@ zanim założysz, że działa.
     miałoby szansę zadziałać przy pierwszym logowaniu). **Jeśli dodajesz
     nowe miejsce zmieniające `profiles.username`, pamiętaj o tym lustrze**
     — inaczej maile Supabase będą się zwracać po starej/pustej nazwie.
-- **Maile transakcyjne — trzy różne, wszystkie wysyłane przez Supabase**:
-  1. **Potwierdzenie rejestracji** ("Confirm signup" w Supabase Dashboard →
-     Authentication → Email Templates).
-  2. **Odzyskiwanie hasła** (w Supabase nazywa się nadal "Reset Password" —
-     to nazwa kategorii w panelu Supabase, nie da się jej zmienić, ale
-     TREŚĆ maila i teksty w naszej aplikacji świadomie mówią "odzyskiwanie",
-     nie "reset" — użytkownik poprosił o rozróżnienie od poniższego punktu
-     3, żeby się nie mylić).
-  3. **Potwierdzenie zmiany hasła z panelu zalogowanego użytkownika**
-     (`account.html`, "Zmień hasło") — Supabase ma do tego WBUDOWANĄ
-     funkcję: Authentication → Emails → sekcja "Security" → "Password
-     changed" (domyślnie wyłączona, trzeba włączyć przełącznikiem).
-     Odkryte PO zbudowaniu własnego rozwiązania (funkcja
-     `supabase/functions/notify-password-changed/index.ts` + osobne
-     wywołanie Brevo API) — świadomie porzucone na rzecz wbudowanej opcji,
-     bo jest prostsza i korzysta z tego samego, już skonfigurowanego SMTP,
-     co maile 1 i 2. **Funkcja `notify-password-changed` została w repo
-     (nieszkodliwa, ale NIEWYWOŁYWANA)** na wypadek, gdyby wbudowana opcja
-     okazała się niewystarczająca (np. brak możliwości personalizacji) —
-     jeśli kiedyś wróci do użycia, pamiętaj żeby NIE włączać jednocześnie
-     wbudowanego "Password changed" (dwa maile na tę samą zmianę).
-  - Wszystkie trzy maile są wysyłane przez Supabase przez ten sam SMTP
-    (Brevo — login/hasło w Authentication → SMTP Settings). **Sekrety
-    `BREVO_API_KEY`/`BREVO_SENDER_EMAIL`/`BREVO_SENDER_NAME` zostały
-    dodane w Supabase przy budowie porzuconego rozwiązania z punktu 3 —
-    teraz nieużywane przez żaden aktywny kod**, ale nieszkodliwe, jeśli
-    zostaną (nikt inny ich nie potrzebuje, można je zostawić albo usunąć).
-  - Wszystkie trzy maile mają ten sam ton/format (bezpośrednie zwrócenie
-    się po `{{if .Data.username}}, {{.Data.username}}{{end}}` — warunkowe,
-    bo jeśli z jakiegoś powodu nazwy brakuje w metadanych, mail i tak
-    ładnie wygląda jako samo "Cześć!" zamiast "Cześć, !" — krótko, ciepło,
-    bez żargonu, kończy się "Dziękujemy, że jesteś z nami od samego
-    początku. Zespół Pragma") — jeśli dodajesz kolejny mail, trzymaj się
-    tego wzorca. Personalizacja działa dzięki lustrowaniu nazwy w
-    `user_metadata`, patrz wyżej.
+- **Maile transakcyjne — od teraz WŁASNA funkcja `send-auth-email`, nie
+  wbudowane szablony Supabase**:
+  - Supabase ma mechanizm "Send Email" Hook (Dashboard → Authentication →
+    Hooks → "Send Email hook"). Gdy jest włączony, Supabase PRZESTAJE
+    używać swoich wbudowanych, jednojęzycznych szablonów (Email Templates:
+    "Confirm signup", "Reset Password"; oraz przełącznik "Password
+    changed" w sekcji Security) i zamiast tego woła NASZĄ funkcję
+    `supabase/functions/send-auth-email/index.ts` przy KAŻDYM mailu
+    związanym z logowaniem/rejestracją. Dzięki temu mail wychodzi w
+    języku, jaki użytkownik faktycznie ma ustawiony w aplikacji — a nie w
+    jednym, na sztywno wybranym języku dla wszystkich.
+  - Ta jedna funkcja obsługuje wszystkie trzy potrzebne maile (rozróżnia
+    je po polu `email_data.email_action_type` z zapytania od Supabase):
+    1. **Potwierdzenie rejestracji** (`signup`).
+    2. **Odzyskiwanie hasła** (`recovery` — w kodzie/UI/mailu świadomie
+       "odzyskiwanie", nie "reset", żeby nie mylić z punktem 3 poniżej).
+    3. **Potwierdzenie zmiany hasła z panelu zalogowanego użytkownika**
+       (`password_changed_notification` — Supabase wysyła ten typ maila
+       automatycznie, gdy w Dashboardzie Authentication → Emails →
+       sekcja "Security" włączony jest przełącznik "Password changed";
+       po włączeniu hooka ten przełącznik nie wysyła już swojej starej,
+       wbudowanej treści, tylko każe wywołać naszą funkcję).
+    Każdy inny, nieoczekiwany typ (np. `email_change`, `magiclink`) dostaje
+    ogólny szablon zapasowy (`generic` w kodzie), żeby żaden mail nigdy nie
+    "zniknął" po cichu.
+  - **Język i nazwa użytkownika w mailu** — kolejność sprawdzania:
+    - język: `user.user_metadata.language` (wybrany PRZED rejestracją,
+      zanim istnieje jeszcze profil) → `profiles.language` (ustawiony w
+      panelu po zalogowaniu) → `'en'` jako ostatnia deska ratunku.
+    - nazwa: `profiles.username` → `user.user_metadata.username` → część
+      e-maila przed `@`.
+    To ta sama logika/te same pola, co lustrowanie opisane wyżej — hook
+    korzysta z `SUPABASE_SERVICE_ROLE_KEY`, żeby odczytać `profiles`
+    bezpośrednio (nie ma tu sesji użytkownika, to wywołanie serwer-serwer
+    od Supabase, nie z przeglądarki).
+  - **`notify-password-changed`** (starsza, osobno wywoływana funkcja z
+    `account.html`) została w repo jako NIEUŻYWANA — to była pierwsza,
+    porzucona próba rozwiązania punktu 3, zanim odkryto najpierw wbudowany
+    przełącznik "Password changed", a potem hook. Nieszkodliwa, jeśli
+    zostanie.
+  - Wszystkie maile są nadal wysyłane przez Brevo, ale teraz NASZ kod sam
+    woła Brevo API (`BREVO_API_KEY`/`BREVO_SENDER_EMAIL`/
+    `BREVO_SENDER_NAME` — te same sekrety, które wcześniej były
+    skonfigurowane "na zapas" pod `notify-password-changed`, teraz w
+    aktywnym użyciu) — Supabase już nie wysyła nic samo przez swój SMTP
+    dla tych trzech typów maili.
+  - **Weryfikacja podpisu**: Supabase podpisuje każde wywołanie hooka
+    (biblioteka `standardwebhooks`, sekret `SEND_EMAIL_HOOK_SECRET` w
+    formacie `v1,whsec_...`, generowany automatycznie przez Supabase przy
+    włączaniu hooka w Dashboardzie — trzeba go wkleić jako sekret funkcji).
+    Bez poprawnego sekretu funkcja odrzuca zapytanie (401) — to chroni
+    przed tym, żeby ktoś obcy mógł kazać naszej funkcji wysłać dowolny
+    mail w naszym imieniu.
+  - Ton/format wszystkich maili: krótkie, ciepłe, bez żargonu, zawsze z
+    bezpośrednim zwróceniem się po nazwie użytkownika, kończą się
+    odpowiednikiem "Dziękujemy, że jesteś z nami od samego początku.
+    Zespół Pragma" w danym języku. Treść każdego z 3 typów × 10 języków
+    jest zapisana wprost w kodzie funkcji (`EMAIL_CONTENT`) — jeśli trzeba
+    poprawić tekst maila, edytuje się ten plik, nie panel Supabase (panel
+    już nie ma wpływu na treść tych maili, dopóki hook jest włączony).
+  - **Ważne — po włączeniu hooka w Supabase Dashboardzie, treść wpisana w
+    Authentication → Email Templates i przełącznik "Password changed"
+    przestają mieć jakikolwiek efekt** dla tych trzech typów maili (są
+    całkowicie zastąpione przez naszą funkcję) — można je zostawić bez
+    zmian, nie trzeba ich usuwać, po prostu nie są już używane.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
