@@ -213,6 +213,19 @@ zanim założysz, że działa.
     ustawionym ciemnym. Funkcje w `i18n.js` (`applyTheme()` itd.) tylko
     PODTRZYMUJĄ/ZMIENIAJĄ motyw po starcie strony — nie odpowiadają za to
     pierwsze, natychmiastowe ustawienie.
+  - **Ważna lekcja projektowa — NIE odwracaj po prostu kolorów**: pierwsza
+    wersja trybu ciemnego robiła dokładnie to (ciemne tło ↔ jasne, prawie
+    białe obramowanie kart) — użytkownik trafnie ocenił, że wygląda to jak
+    "negatyw zdjęcia", nie jak przemyślany ciemny motyw. Poprawiona wersja
+    ("Nocny plakat") ma PRZYGASZONE, matowe, brązowawe obramowanie
+    (`--card-border: #6b5c42`), nie jaskrawą biel — nadal widoczne na
+    ciemnym tle, ale bez efektu negatywu. Cień (`--shadow-color`) jest
+    dobierany OSOBNO od koloru obramowania (prawie czarny w obu motywach),
+    żeby nadal czytał się jako cień, a nie poświata. Metoda, która się
+    sprawdziła przy podejmowaniu takich decyzji: zamiast zgadywać, zrobić
+    2-3 warianty jako statyczny podgląd HTML, zrzut ekranu, i dać
+    użytkownikowi wybrać wizualnie — dużo szybsze niż kilka rund
+    poprawek "na czuja".
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
