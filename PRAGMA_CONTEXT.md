@@ -378,6 +378,44 @@ zanim założysz, że działa.
     przestają mieć jakikolwiek efekt** dla tych trzech typów maili (są
     całkowicie zastąpione przez naszą funkcję) — można je zostawić bez
     zmian, nie trzeba ich usuwać, po prostu nie są już używane.
+- **Limity wysyłki maili — DWA niezależne "kraniki", oba mogą zablokować
+  rejestrację**:
+  1. Supabase (Authentication → Rate Limits → "Rate limit for sending
+     emails") — domyślnie bardzo nisko (`2` maile/h), co realnie blokowało
+     rejestracje już przy drugiej próbie w ciągu godziny. Podniesione do
+     `300`/h.
+  2. Brevo (darmowy plan) — **300 maili na DOBĘ, łącznie wszystkie typy**
+     (rejestracja + odzyskiwanie + zmiana hasła + cokolwiek przyszłego),
+     nie per-użytkownik. To twardszy limit niż powyższy (godzinowy) —
+     przy stałym ruchu przez wiele godzin dziennie wyczerpie się szybciej
+     niż limit Supabase. Do podniesienia: przejście na płatny plan Brevo
+     (Starter itd.), gdy realny ruch będzie się do tego zbliżał —
+     świadomie NIE zrobione teraz (Lean Startup — nie budować/płacić za
+     obronę przed ruchem, którego jeszcze nie ma).
+- **Funkcja `daily-report`** (`supabase/functions/daily-report/index.ts`)
+  — wysyła raz dziennie mail z kluczowymi metrykami MVP (nowe rejestracje
+  dziś + średnia z 7 dni + ostrzeżenie przy nietypowym skoku, analizy
+  tekstu dziś/łącznie z rozbiciem zalogowani/anonimowi i nowe/tłumaczenia,
+  średni `q_score`, liczba wykrytych wzorców manipulacji vs zdrowego
+  rozumowania, wydane kredyty, maile wysłane wg statystyk Brevo)
+  wyłącznie na adres właściciela (`REPORT_RECIPIENT_EMAIL`), nie do
+  użytkowników. Każda metryka liczona i wysyłana niezależnie (osobny
+  `try/catch`) — błąd jednej (np. drobna zmiana w API Brevo) nie
+  przerywa reszty raportu, tylko pokazuje przy niej "brak danych".
+  Uruchamiana z zewnątrz przez **Supabase Cron Jobs** (Database → Cron
+  Jobs → HTTP Request, nagłówek `x-cron-secret` z wartością sekretu
+  `CRON_REPORT_SECRET` — żeby nikt obcy nie mógł wywoływać funkcji na
+  żądanie i generować niepotrzebnego ruchu/kosztów). Podobnie jak
+  `send-auth-email`, ma wyłączoną domyślną weryfikację JWT (Settings →
+  "Verify JWT with legacy secret" → OFF), bo wywołuje ją Supabase Cron,
+  nie zalogowany użytkownik — własny sekret w nagłówku pełni tę samą rolę.
+  **Uwaga na strefę czasową**: harmonogram w Supabase Cron Jobs jest w
+  UTC, nie w czasie polskim — np. żeby dostać mail o 16:00 czasu
+  polskiego latem (CEST, UTC+2), trzeba ustawić cron na 14:00 UTC; zimą
+  (CET, UTC+1) ten sam cron dostarczy mail o 15:00 czasu polskiego,
+  chyba że ktoś ręcznie przestawi harmonogram przy zmianie czasu —
+  świadomie zaakceptowane jako drobna niedogodność, nie warto tego
+  automatyzować na etapie MVP.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
