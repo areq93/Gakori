@@ -36,21 +36,26 @@
    wczytaniem tego pliku CSS), żeby uniknąć "błysku" złego motywu przy
    ładowaniu strony. */
 :root[data-theme="dark"] {
-    --ink: #f3ead9;
-    --ink-soft: #cbbfa4;
-    --paper: #211d17;
-    --card: #2c261d;
-    --card-border: #f3ead9;
-    --accent: #e97b8b;
-    --accent-dark: #f6c9cf;
-    --accent-soft: #4a2a30;
-    --primary: #4fb3ad;
-    --primary-dark: #a8ddd9;
-    --primary-soft: #1f3d3b;
-    --input-bg: #1c1812;
-    --debug-bg: #3a3327;
+    /* "Nocny plakat" — NIE zwykłe odwrócenie jasnego motywu (to wyglądało
+       jak negatyw zdjęcia i użytkownikowi się nie podobało). Obramowanie
+       jest przygaszonym, matowym brązem zamiast jaskrawej bieli — dalej
+       widoczne, ale bez efektu "negatywu". Cień zostaje osobno dobrany,
+       prawie czarny, żeby nadal czytał się jako cień, nie poświata. */
+    --ink: #f0e6d4;
+    --ink-soft: #a99b7e;
+    --paper: #1d1a16;
+    --card: #2a241c;
+    --card-border: #6b5c42;
+    --accent: #d9748a;
+    --accent-dark: #e79aab;
+    --accent-soft: #3d2a2e;
+    --primary: #3fa39a;
+    --primary-dark: #8fd6cd;
+    --primary-soft: #1f3a37;
+    --input-bg: #201b14;
+    --debug-bg: #332b20;
     --debug-border: #55492f;
-    --shadow-color: #0d0b08;
+    --shadow-color: #0e0c09;
     --paper-dot-color: 255,240,214;
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
