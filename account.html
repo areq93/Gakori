@@ -174,10 +174,13 @@
                         .select('username_changed_at')
                         .single();
                     if (error) {
-                        // "raz na 14 dni" jest wymuszane też (i przede wszystkim) w bazie
-                        // (wyzwalacz na tabeli profiles) — to jest tylko drugi, zapasowy
-                        // komunikat na wypadek, gdyby ktoś ominął sprawdzenie w przeglądarce.
-                        usernameStatus.innerHTML = '<span class="status-err">' + t('err_username_cooldown') + '</span>';
+                        // Dwa różne powody błędu z bazy: 23505 = nazwa zajęta (baza
+                        // wymusza unikalność), cokolwiek innego = najpewniej limit
+                        // "raz na 14 dni" (wyzwalacz na tabeli profiles) — to drugi,
+                        // zapasowy komunikat na wypadek, gdyby ktoś ominął sprawdzenie
+                        // w przeglądarce.
+                        const key = error.code === '23505' ? 'err_username_taken' : 'err_username_cooldown';
+                        usernameStatus.innerHTML = '<span class="status-err">' + t(key) + '</span>';
                         return;
                     }
                     usernameChangedAt = data.username_changed_at;
