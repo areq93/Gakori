@@ -246,10 +246,28 @@ zanim założysz, że działa.
     (`account.html` i tak sprawdza to też po swojej stronie, dla lepszego
     UX — pokazuje datę kolejnej możliwej zmiany zamiast czekać na błąd z
     bazy — ale to tylko wygoda, nie zabezpieczenie).
-  - Nazwy NIE są unikalne między użytkownikami (świadomie — cel to
-    zwracanie się do KONKRETNEGO użytkownika po jego własnej nazwie, nie
-    publiczny, unikalny "handle", więc kolizje między różnymi kontami nie
-    są problemem).
+  - **Nazwy SĄ unikalne między użytkownikami** — wymuszone ograniczeniem
+    `UNIQUE` na `profiles.username` w bazie (nie tylko sprawdzeniem w
+    przeglądarce). Pierwsza wersja tej funkcji celowo NIE miała unikalności
+    (uznaliśmy, że cel to zwracanie się do KONKRETNEGO użytkownika po jego
+    własnej nazwie, więc kolizje nie są problemem) — użytkownik zdecydował
+    się to jednak zmienić.
+    - `ensureDefaultUsername()` w `i18n.js` sam radzi sobie z kolizją przy
+      automatycznym nadawaniu nazwy: jeśli pierwszy człon e-maila jest już
+      zajęty (np. ten sam człon w innej domenie), dopisuje losowe 4 cyfry i
+      próbuje ponownie (do 5 prób), rozpoznając kolizję po kodzie błędu
+      Postgresa `23505` (unique_violation).
+    - Ręczna zmiana w `account.html` przy tym samym kodzie błędu (`23505`)
+      pokazuje użytkownikowi komunikat "ta nazwa jest już zajęta" zamiast
+      automatycznie modyfikować to, co wpisał — w przeciwieństwie do
+      automatycznego nadawania, tu chcemy, żeby użytkownik świadomie wybrał
+      inną nazwę, nie dostał czegoś z dopisanymi cyframi bez pytania.
+    - Ponieważ pierwsza wersja (bez unikalności) była już wdrożona i
+      backfillowana z e-maili, mogły powstać duplikaty (np. dwa konta z tym
+      samym pierwszym członem maila w różnych domenach) — trzeba je
+      rozwiązać PRZED dodaniem ograniczenia `UNIQUE`, inaczej `ALTER TABLE`
+      się nie powiedzie. SQL do tego jest w historii PR-a dodającego tę
+      zmianę.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
