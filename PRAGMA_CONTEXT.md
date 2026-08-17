@@ -178,6 +178,24 @@ zanim założysz, że działa.
       w `i18n.js`, wszystkie 10 języków) i od razu odświeża widoczny stan
       kredytów (patrz "Stan kredytów" wyżej), żeby liczba na ekranie
       zgadzała się z tym, co faktycznie pobrano.
+  - **Wynik obrazu pokazywany od razu, na tej samej stronie, razem z
+    obrazem**: w przeciwieństwie do linku/tekstu, dla obrazu frontend NIE
+    przekierowuje na `scan.html?id=...` po udanej analizie — obraz istnieje
+    tylko w pamięci przeglądarki osoby analizującej (nigdy nie trafia na
+    serwer do przechowania, patrz decyzja o kosztach Storage niżej), więc
+    tylko `index.html` może go od razu pokazać razem z wynikiem
+    (`#resultImage`, źródło: ten sam podgląd co przy wyborze pliku). Pod
+    obrazem stoi krótka informacja (`image_not_saved_notice` w `i18n.js`),
+    że to jedyna okazja, żeby zobaczyć wynik razem z obrazem — bezpośredni
+    link do samego wpisu w cache'u nadal istnieje (`scans.id`), ale bez
+    obrazu nie ma po co go pokazywać w tym miejscu.
+    - **Świadomie NIE trzymamy plików obrazów na serwerze** — rozważaliśmy
+      to (żeby analiza była "odkrywalna" publicznie tak jak tekst/link), ale
+      koszt przechowywania (Supabase Storage) rósłby bez górnego limitu wraz
+      z liczbą analiz, a nasza własna moderacja i tak nie łapie wszystkiego,
+      co mogłoby być problematyczne do publicznego pokazania (np. czyjeś
+      prywatne zdjęcie bez zgody) — zbyt duże ryzyko kosztowe i prawne
+      względem korzyści, więc świadomie zrezygnowaliśmy.
   - PDF: jeszcze nie zaimplementowany (`input_type: "pdf"` zwróciłby
     `501 not_implemented`, gdyby frontend w ogóle wysyłał taki typ — na
     razie nie ma dla PDF żadnego pola w interfejsie). Moderacja opisana

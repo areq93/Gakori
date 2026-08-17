@@ -93,6 +93,8 @@
     </div>
 
     <div id="resultCard" class="result-card">
+        <img id="resultImage" alt="">
+        <p id="resultImageNotice" class="image-not-saved-notice"></p>
         <div id="resultBadge" class="result-badge"></div>
         <div id="resultPatterns"></div>
         <p id="resultSummary" class="result-summary"></p>
@@ -722,12 +724,29 @@
             }
         }
 
-        function renderResult(data) {
+        function renderResult(data, imageDataUrl) {
             const card = document.getElementById('resultCard');
             const badge = document.getElementById('resultBadge');
             const patternsEl = document.getElementById('resultPatterns');
             const summary = document.getElementById('resultSummary');
+            const imageEl = document.getElementById('resultImage');
+            const imageNoticeEl = document.getElementById('resultImageNotice');
             patternsEl.innerHTML = '';
+
+            // Obraz pokazujemy TYLKO temu, kto go właśnie przesłał, prosto z
+            // pliku w jego przeglądarce — nigdy nie zapisujemy go na serwerze
+            // (patrz notatka pod spodem), więc nie da się go pokazać nikomu
+            // innemu ani wrócić do niego później.
+            if (imageDataUrl && !data.error) {
+                imageEl.src = imageDataUrl;
+                imageEl.style.display = 'block';
+                imageNoticeEl.innerText = t('image_not_saved_notice');
+                imageNoticeEl.style.display = 'block';
+            } else {
+                imageEl.style.display = 'none';
+                imageEl.src = '';
+                imageNoticeEl.style.display = 'none';
+            }
 
             if (data.error) {
                 card.style.display = 'block';
@@ -775,6 +794,7 @@
 
             let payload = null;
             let statusInterval = null;
+            let imageDataUrl = null;
 
             try {
                 if (currentMode === 'url') {
@@ -800,6 +820,11 @@
                     const hash = await sha256Hex(buffer);
                     const imageBase64 = arrayBufferToBase64(buffer);
                     payload = { input_type: 'image', content_hash: hash, image_base64: imageBase64, language: getCurrentLanguage() };
+                    // Zapamiętujemy obraz TYLKO w pamięci tej strony (ten sam
+                    // podgląd, co przy wyborze pliku) — żeby po analizie pokazać
+                    // go razem z wynikiem. Nigdy nie wysyłamy go nigdzie indziej
+                    // ani nie zapisujemy trwale — patrz renderResult().
+                    imageDataUrl = document.getElementById('imagePreview').src;
                 }
 
                 btn.disabled = true;
@@ -846,6 +871,12 @@
                 if (data.error) {
                     // Błąd pokazujemy na tej samej stronie.
                     renderResult(data);
+                } else if (currentMode === 'image') {
+                    // Analizy obrazu NIE przenosimy na scan.html — obraz istnieje
+                    // tylko w pamięci tej strony (nigdy nie trafia na serwer do
+                    // przechowania), więc wynik pokazujemy tu, od razu, razem z
+                    // obrazem i informacją, że to jedyna okazja, żeby go zobaczyć.
+                    renderResult(data, imageDataUrl);
                 } else {
                     // Przechodzimy w TEJ SAMEJ karcie na stronę z wynikiem
                     // (nie otwieramy nowej karty przeglądarki).
