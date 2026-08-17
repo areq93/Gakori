@@ -51,6 +51,9 @@ const TRANSLATIONS = {
         account_load_error: "Nie udało się wczytać danych konta (sprawdź połączenie z internetem i odśwież stronę).",
         language_label: "Język aplikacji",
         theme_label: "Motyw", theme_light: "Jasny", theme_dark: "Ciemny",
+        username_label: "Nazwa użytkownika", btn_save_username: "Zapisz nazwę", username_saved: "Nazwa użytkownika zapisana.",
+        username_cooldown_note: "Kolejną zmianę będzie można zrobić od: {date}",
+        err_username_length: "Nazwa musi mieć od 2 do 24 znaków.", err_username_cooldown: "Nazwę można zmieniać tylko raz na 14 dni.",
         tab_link: "Link", tab_text: "Tekst", tab_image: "Obraz",
         label_paste_link: "Wklej link do analizy:", placeholder_url: "https://...",
         label_paste_text: "Wklej tekst do analizy:", placeholder_text_content: "Wklej treść, którą chcesz przeanalizować...",
@@ -106,6 +109,9 @@ const TRANSLATIONS = {
         account_load_error: "Couldn't load your account (check your connection and reload the page).",
         language_label: "App language",
         theme_label: "Theme", theme_light: "Light", theme_dark: "Dark",
+        username_label: "Username", btn_save_username: "Save name", username_saved: "Username saved.",
+        username_cooldown_note: "You can change it again from: {date}",
+        err_username_length: "Name must be 2–24 characters long.", err_username_cooldown: "You can only change your username once every 14 days.",
         tab_link: "Link", tab_text: "Text", tab_image: "Image",
         label_paste_link: "Paste a link to analyze:", placeholder_url: "https://...",
         label_paste_text: "Paste text to analyze:", placeholder_text_content: "Paste the content you want to analyze...",
@@ -161,6 +167,9 @@ const TRANSLATIONS = {
         account_load_error: "No se pudieron cargar los datos de tu cuenta (revisa tu conexión y recarga la página).",
         language_label: "Idioma de la aplicación",
         theme_label: "Tema", theme_light: "Claro", theme_dark: "Oscuro",
+        username_label: "Nombre de usuario", btn_save_username: "Guardar nombre", username_saved: "Nombre de usuario guardado.",
+        username_cooldown_note: "Podrás cambiarlo de nuevo a partir de: {date}",
+        err_username_length: "El nombre debe tener entre 2 y 24 caracteres.", err_username_cooldown: "Solo puedes cambiar tu nombre de usuario una vez cada 14 días.",
         tab_link: "Enlace", tab_text: "Texto", tab_image: "Imagen",
         label_paste_link: "Pega un enlace para analizar:", placeholder_url: "https://...",
         label_paste_text: "Pega el texto a analizar:", placeholder_text_content: "Pega el contenido que quieres analizar...",
@@ -216,6 +225,9 @@ const TRANSLATIONS = {
         account_load_error: "Kontodaten konnten nicht geladen werden (Verbindung prüfen und Seite neu laden).",
         language_label: "App-Sprache",
         theme_label: "Thema", theme_light: "Hell", theme_dark: "Dunkel",
+        username_label: "Benutzername", btn_save_username: "Namen speichern", username_saved: "Benutzername gespeichert.",
+        username_cooldown_note: "Erneute Änderung möglich ab: {date}",
+        err_username_length: "Der Name muss 2–24 Zeichen lang sein.", err_username_cooldown: "Der Benutzername kann nur alle 14 Tage geändert werden.",
         tab_link: "Link", tab_text: "Text", tab_image: "Bild",
         label_paste_link: "Link zur Analyse einfügen:", placeholder_url: "https://...",
         label_paste_text: "Text zur Analyse einfügen:", placeholder_text_content: "Füge den Inhalt ein, den du analysieren möchtest...",
@@ -271,6 +283,9 @@ const TRANSLATIONS = {
         account_load_error: "Impossible de charger les données du compte (vérifiez votre connexion et rechargez la page).",
         language_label: "Langue de l'application",
         theme_label: "Thème", theme_light: "Clair", theme_dark: "Sombre",
+        username_label: "Nom d'utilisateur", btn_save_username: "Enregistrer le nom", username_saved: "Nom d'utilisateur enregistré.",
+        username_cooldown_note: "Vous pourrez le modifier à nouveau à partir du : {date}",
+        err_username_length: "Le nom doit comporter entre 2 et 24 caractères.", err_username_cooldown: "Vous ne pouvez changer votre nom d'utilisateur qu'une fois tous les 14 jours.",
         tab_link: "Lien", tab_text: "Texte", tab_image: "Image",
         label_paste_link: "Collez un lien à analyser :", placeholder_url: "https://...",
         label_paste_text: "Collez le texte à analyser :", placeholder_text_content: "Collez le contenu que vous souhaitez analyser...",
@@ -326,6 +341,9 @@ const TRANSLATIONS = {
         account_load_error: "Не удалось загрузить данные аккаунта (проверьте подключение и обновите страницу).",
         language_label: "Язык приложения",
         theme_label: "Тема", theme_light: "Светлая", theme_dark: "Тёмная",
+        username_label: "Имя пользователя", btn_save_username: "Сохранить имя", username_saved: "Имя пользователя сохранено.",
+        username_cooldown_note: "Сможете изменить снова начиная с: {date}",
+        err_username_length: "Имя должно содержать от 2 до 24 символов.", err_username_cooldown: "Имя пользователя можно менять не чаще раза в 14 дней.",
         tab_link: "Ссылка", tab_text: "Текст", tab_image: "Изображение",
         label_paste_link: "Вставьте ссылку для анализа:", placeholder_url: "https://...",
         label_paste_text: "Вставьте текст для анализа:", placeholder_text_content: "Вставьте содержимое, которое хотите проанализировать...",
@@ -381,6 +399,9 @@ const TRANSLATIONS = {
         account_load_error: "无法加载账户数据（请检查网络连接并刷新页面）。",
         language_label: "应用语言",
         theme_label: "主题", theme_light: "浅色", theme_dark: "深色",
+        username_label: "用户名", btn_save_username: "保存名称", username_saved: "用户名已保存。",
+        username_cooldown_note: "下次可修改时间：{date}",
+        err_username_length: "名称长度须为2到24个字符。", err_username_cooldown: "用户名每14天只能修改一次。",
         tab_link: "链接", tab_text: "文本", tab_image: "图片",
         label_paste_link: "粘贴要分析的链接：", placeholder_url: "https://...",
         label_paste_text: "粘贴要分析的文本：", placeholder_text_content: "粘贴您想分析的内容…",
@@ -436,6 +457,9 @@ const TRANSLATIONS = {
         account_load_error: "アカウント情報を読み込めませんでした（接続を確認してページを再読み込みしてください）。",
         language_label: "アプリの言語",
         theme_label: "テーマ", theme_light: "ライト", theme_dark: "ダーク",
+        username_label: "ユーザー名", btn_save_username: "名前を保存", username_saved: "ユーザー名を保存しました。",
+        username_cooldown_note: "次に変更できるのは: {date} から",
+        err_username_length: "名前は2〜24文字で入力してください。", err_username_cooldown: "ユーザー名の変更は14日に1回までです。",
         tab_link: "リンク", tab_text: "テキスト", tab_image: "画像",
         label_paste_link: "分析するリンクを貼り付けてください：", placeholder_url: "https://...",
         label_paste_text: "分析するテキストを貼り付けてください：", placeholder_text_content: "分析したい内容を貼り付けてください…",
@@ -491,6 +515,9 @@ const TRANSLATIONS = {
         account_load_error: "खाते का डेटा लोड नहीं हो सका (कनेक्शन जांचें और पेज रीलोड करें)।",
         language_label: "ऐप की भाषा",
         theme_label: "थीम", theme_light: "हल्की", theme_dark: "गहरी",
+        username_label: "उपयोगकर्ता नाम", btn_save_username: "नाम सहेजें", username_saved: "उपयोगकर्ता नाम सहेजा गया।",
+        username_cooldown_note: "आप इसे फिर से बदल सकेंगे: {date} से",
+        err_username_length: "नाम 2 से 24 अक्षरों के बीच होना चाहिए।", err_username_cooldown: "उपयोगकर्ता नाम हर 14 दिनों में केवल एक बार बदला जा सकता है।",
         tab_link: "लिंक", tab_text: "टेक्स्ट", tab_image: "छवि",
         label_paste_link: "विश्लेषण के लिए लिंक पेस्ट करें:", placeholder_url: "https://...",
         label_paste_text: "विश्लेषण के लिए टेक्स्ट पेस्ट करें:", placeholder_text_content: "वह सामग्री पेस्ट करें जिसका आप विश्लेषण करना चाहते हैं...",
@@ -546,6 +573,9 @@ const TRANSLATIONS = {
         account_load_error: "تعذّر تحميل بيانات الحساب (تحقق من الاتصال وأعد تحميل الصفحة).",
         language_label: "لغة التطبيق",
         theme_label: "المظهر", theme_light: "فاتح", theme_dark: "داكن",
+        username_label: "اسم المستخدم", btn_save_username: "حفظ الاسم", username_saved: "تم حفظ اسم المستخدم.",
+        username_cooldown_note: "يمكنك تغييره مرة أخرى ابتداءً من: {date}",
+        err_username_length: "يجب أن يتكون الاسم من 2 إلى 24 حرفًا.", err_username_cooldown: "يمكن تغيير اسم المستخدم مرة واحدة كل 14 يومًا فقط.",
         tab_link: "رابط", tab_text: "نص", tab_image: "صورة",
         label_paste_link: "الصق رابطًا للتحليل:", placeholder_url: "https://...",
         label_paste_text: "الصق نصًا للتحليل:", placeholder_text_content: "الصق المحتوى الذي تريد تحليله...",
@@ -672,6 +702,27 @@ function syncThemeFromProfile(sb, userId) {
         if (data && data.theme && data.theme !== getCurrentTheme()) {
             localStorage.setItem('pragma_theme', data.theme);
             applyTheme();
+        }
+    });
+}
+
+// Nazwa użytkownika: w przeciwieństwie do języka/motywu NIE ma domyślnej
+// wartości trzymanej lokalnie — dotyczy tylko zalogowanych, więc zawsze
+// czyta się/zapisuje wprost z profilu (patrz account.html). Jeśli konto
+// (nowe albo już istniejące sprzed wprowadzenia tej funkcji) jeszcze nie ma
+// nazwy, ustawia domyślną — pierwszy człon adresu e-mail przed "@". Dzięki
+// wywoływaniu tego przy KAŻDYM logowaniu, backfill dla starych kont dzieje
+// się sam, bez osobnej migracji dla każdego konta z osobna (choć jest też
+// jednorazowe zapytanie SQL wypełniające to od razu dla wszystkich, patrz
+// PRAGMA_CONTEXT.md — to i tak nie zaszkodzi, zapytanie tu jest no-opem dla
+// kont, które już mają nazwę ustawioną).
+function ensureDefaultUsername(sb, userId, email) {
+    if (!sb || !userId || !email) return Promise.resolve();
+    return sb.from('profiles').select('username').eq('id', userId).single().then(({ data }) => {
+        if (data && !data.username) {
+            return sb.from('profiles').update({ username: email.split('@')[0] }).eq('id', userId).then(({ error }) => {
+                if (error) console.error('Nie udało się ustawić domyślnej nazwy użytkownika:', error);
+            });
         }
     });
 }

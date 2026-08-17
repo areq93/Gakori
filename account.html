@@ -43,6 +43,13 @@
                 </select>
             </div>
 
+            <div style="margin-top:16px;">
+                <label for="usernameInput" style="display:block; font-size:13px; color:var(--ink-soft); margin-bottom:6px;" data-i18n="username_label">Nazwa użytkownika</label>
+                <input type="text" id="usernameInput" maxlength="24" style="margin:0;">
+                <button id="saveUsernameBtn" type="button" data-i18n="btn_save_username" style="margin-top:8px;">Zapisz nazwę</button>
+                <div id="usernameStatus" style="font-size:13px; margin-top:4px;"></div>
+            </div>
+
             <div style="text-align:center; margin-top:14px;">
                 <a href="#" id="changePasswordLink" style="font-size:13px;" data-i18n="link_change_password">Zmień hasło</a>
             </div>
@@ -120,6 +127,66 @@
                 document.getElementById('themeSelect').addEventListener('change', (e) => {
                     setTheme(e.target.value, sb, session.user.id);
                 });
+
+                // Nazwa użytkownika: jeśli konto (nowe albo już istniejące
+                // sprzed wprowadzenia tej funkcji) jeszcze jej nie ma,
+                // ustawiamy domyślną teraz (pierwszy człon e-maila przed
+                // "@") — dzięki temu backfill dla starych kont dzieje się
+                // sam przy najbliższym wejściu w ustawienia, bez osobnej
+                // migracji dla każdego konta.
+                await ensureDefaultUsername(sb, session.user.id, session.user.email);
+                const usernameInput = document.getElementById('usernameInput');
+                const usernameStatus = document.getElementById('usernameStatus');
+                const saveUsernameBtn = document.getElementById('saveUsernameBtn');
+                let usernameChangedAt = null;
+
+                function renderUsernameCooldown() {
+                    if (!usernameChangedAt) {
+                        usernameStatus.innerText = '';
+                        saveUsernameBtn.disabled = false;
+                        return;
+                    }
+                    const nextChangeDate = new Date(usernameChangedAt);
+                    nextChangeDate.setDate(nextChangeDate.getDate() + 14);
+                    if (nextChangeDate > new Date()) {
+                        usernameStatus.innerText = t('username_cooldown_note', { date: nextChangeDate.toLocaleDateString(getCurrentLanguage()) });
+                        saveUsernameBtn.disabled = true;
+                    } else {
+                        usernameStatus.innerText = '';
+                        saveUsernameBtn.disabled = false;
+                    }
+                }
+
+                const { data: usernameProfile } = await sb.from('profiles').select('username, username_changed_at').eq('id', session.user.id).single();
+                usernameInput.value = (usernameProfile && usernameProfile.username) || '';
+                usernameChangedAt = usernameProfile && usernameProfile.username_changed_at;
+                renderUsernameCooldown();
+
+                saveUsernameBtn.addEventListener('click', async () => {
+                    const newUsername = usernameInput.value.trim();
+                    if (newUsername.length < 2 || newUsername.length > 24) {
+                        usernameStatus.innerHTML = '<span class="status-err">' + t('err_username_length') + '</span>';
+                        return;
+                    }
+                    const { data, error } = await sb.from('profiles')
+                        .update({ username: newUsername })
+                        .eq('id', session.user.id)
+                        .select('username_changed_at')
+                        .single();
+                    if (error) {
+                        // "raz na 14 dni" jest wymuszane też (i przede wszystkim) w bazie
+                        // (wyzwalacz na tabeli profiles) — to jest tylko drugi, zapasowy
+                        // komunikat na wypadek, gdyby ktoś ominął sprawdzenie w przeglądarce.
+                        usernameStatus.innerHTML = '<span class="status-err">' + t('err_username_cooldown') + '</span>';
+                        return;
+                    }
+                    usernameChangedAt = data.username_changed_at;
+                    renderUsernameCooldown();
+                    if (!usernameStatus.innerText) {
+                        usernameStatus.innerHTML = '<span class="status-ok">' + t('username_saved') + '</span>';
+                    }
+                });
+
                 document.getElementById('accountEmail').innerText = session.user.email;
                 document.getElementById('accountLoading').style.display = 'none';
                 document.getElementById('accountContent').style.display = 'block';
