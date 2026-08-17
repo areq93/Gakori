@@ -902,3 +902,14 @@ zupełnie inna liczba, i to ta druga jest poprawna.
   ręcznego wdrożenia (backend, migracje SQL) — nie fragmenty/diffy.
 - Po każdej większej zmianie: zaktualizuj ten plik (`PRAGMA_CONTEXT.md`)
   w tym samym PR-ze, żeby nie stał się nieaktualny.
+- **Pragma to przede wszystkim aplikacja mobilna (PWA)** — przy KAŻDEJ
+  zmianie wizualnej/UI pilnuj responsywności na telefonach, nie tylko na
+  desktopie/tablecie (użytkownik świadomie o to poprosił). W praktyce:
+  `style.css` na razie nie ma żadnych `@media` (celowo — układ jest
+  płynny, jedna kolumna kart o ograniczonej `max-width`, co dotąd
+  wystarczało), ale przy dodawaniu nowych elementów, zwłaszcza
+  `position: fixed` (jak `#userMenuBtn`/`.credit-balance` w prawym
+  górnym rogu), sprawdź w myślach (albo realnie, w narzędziach
+  deweloperskich przeglądarki, w trybie widoku mobilnego) wąski ekran
+  (~320-360px szerokości) — czy elementy się nie nachodzą, nie wychodzą
+  poza ekran, tekst się nie przycina w nieczytelny sposób.
