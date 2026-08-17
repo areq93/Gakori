@@ -313,41 +313,41 @@ zanim założysz, że działa.
     miałoby szansę zadziałać przy pierwszym logowaniu). **Jeśli dodajesz
     nowe miejsce zmieniające `profiles.username`, pamiętaj o tym lustrze**
     — inaczej maile Supabase będą się zwracać po starej/pustej nazwie.
-- **Maile transakcyjne — trzy różne, świadomie oddzielone**:
+- **Maile transakcyjne — trzy różne, wszystkie wysyłane przez Supabase**:
   1. **Potwierdzenie rejestracji** ("Confirm signup" w Supabase Dashboard →
-     Authentication → Email Templates) — Supabase wysyła sam, przez SMTP
-     (Brevo, ale to "stary" mechanizm, patrz "Brevo: dwa różne klucze"
-     niżej).
+     Authentication → Email Templates).
   2. **Odzyskiwanie hasła** (w Supabase nazywa się nadal "Reset Password" —
      to nazwa kategorii w panelu Supabase, nie da się jej zmienić, ale
      TREŚĆ maila i teksty w naszej aplikacji świadomie mówią "odzyskiwanie",
      nie "reset" — użytkownik poprosił o rozróżnienie od poniższego punktu
-     3, żeby się nie mylić). Też wysyłane samo przez Supabase przez SMTP.
+     3, żeby się nie mylić).
   3. **Potwierdzenie zmiany hasła z panelu zalogowanego użytkownika**
-     (`account.html`, "Zmień hasło") — to NOWY, osobny mechanizm, bo
-     logowanie z poziomu panelu (`sb.auth.updateUser({password})`) w ogóle
-     nie wysyła żadnego maila domyślnie (to nie jest "reset przez link",
-     tylko bezpośrednia zmiana przez już zalogowaną osobę). Wysyłany przez
-     WŁASNĄ funkcję `supabase/functions/notify-password-changed/index.ts`,
-     wywoływaną z `account.html` zaraz po udanej zmianie hasła (bez
-     czekania na wynik — nieudane wysłanie maila nie może zepsuć
-     informacji zwrotnej o udanej zmianie hasła, to tylko dodatkowe
-     powiadomienie bezpieczeństwa).
-  - **Brevo: dwa różne, niezależne klucze, nie mylić**: (a) SMTP
-    login/hasło skonfigurowane już wcześniej w Supabase Dashboard →
-    Authentication → SMTP Settings — używane WYŁĄCZNIE przez Supabase do
-    wysyłki maili 1 i 2 wyżej, nasz kod nigdy go nie widzi ani nie używa;
-    (b) `BREVO_API_KEY` — osobny klucz API (Brevo → ikona koła zębatego →
-    SMTP & API → API Keys), sekret w Supabase Edge Functions, używany
-    WYŁĄCZNIE przez `notify-password-changed` do samodzielnego wywołania
-    Brevo przez HTTP (`POST https://api.brevo.com/v3/smtp/email`). Do tego
-    dochodzą sekrety `BREVO_SENDER_EMAIL` (zweryfikowany w Brevo adres
-    nadawcy) i opcjonalnie `BREVO_SENDER_NAME` (domyślnie "Zespół Pragma").
+     (`account.html`, "Zmień hasło") — Supabase ma do tego WBUDOWANĄ
+     funkcję: Authentication → Emails → sekcja "Security" → "Password
+     changed" (domyślnie wyłączona, trzeba włączyć przełącznikiem).
+     Odkryte PO zbudowaniu własnego rozwiązania (funkcja
+     `supabase/functions/notify-password-changed/index.ts` + osobne
+     wywołanie Brevo API) — świadomie porzucone na rzecz wbudowanej opcji,
+     bo jest prostsza i korzysta z tego samego, już skonfigurowanego SMTP,
+     co maile 1 i 2. **Funkcja `notify-password-changed` została w repo
+     (nieszkodliwa, ale NIEWYWOŁYWANA)** na wypadek, gdyby wbudowana opcja
+     okazała się niewystarczająca (np. brak możliwości personalizacji) —
+     jeśli kiedyś wróci do użycia, pamiętaj żeby NIE włączać jednocześnie
+     wbudowanego "Password changed" (dwa maile na tę samą zmianę).
+  - Wszystkie trzy maile są wysyłane przez Supabase przez ten sam SMTP
+    (Brevo — login/hasło w Authentication → SMTP Settings). **Sekrety
+    `BREVO_API_KEY`/`BREVO_SENDER_EMAIL`/`BREVO_SENDER_NAME` zostały
+    dodane w Supabase przy budowie porzuconego rozwiązania z punktu 3 —
+    teraz nieużywane przez żaden aktywny kod**, ale nieszkodliwe, jeśli
+    zostaną (nikt inny ich nie potrzebuje, można je zostawić albo usunąć).
   - Wszystkie trzy maile mają ten sam ton/format (bezpośrednie zwrócenie
-    się po `{{ .Data.username }}` / rzeczywistej nazwie z `profiles`,
-    krótko, ciepło, bez żargonu, kończy się "Dziękujemy, że jesteś z nami
-    od samego początku. Zespół Pragma") — jeśli dodajesz kolejny mail,
-    trzymaj się tego wzorca.
+    się po `{{if .Data.username}}, {{.Data.username}}{{end}}` — warunkowe,
+    bo jeśli z jakiegoś powodu nazwy brakuje w metadanych, mail i tak
+    ładnie wygląda jako samo "Cześć!" zamiast "Cześć, !" — krótko, ciepło,
+    bez żargonu, kończy się "Dziękujemy, że jesteś z nami od samego
+    początku. Zespół Pragma") — jeśli dodajesz kolejny mail, trzymaj się
+    tego wzorca. Personalizacja działa dzięki lustrowaniu nazwy w
+    `user_metadata`, patrz wyżej.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
