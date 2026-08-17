@@ -743,13 +743,26 @@ function syncThemeFromProfile(sb, userId) {
 // użytkowników). Ta sama lista jest (przede wszystkim, jako prawdziwe
 // zabezpieczenie) powielona w wyzwalaczu bazy danych — patrz
 // PRAGMA_CONTEXT.md. Jeśli dodajesz/usuwasz słowo, zrób to w OBU miejscach.
-const USERNAME_BLOCKLIST = [
-    'kurw', 'chuj', 'huj', 'jeban', 'jebac', 'jebał', 'jebie', 'pierdol',
-    'pizd', 'cipa', 'cipo', 'skurwysyn', 'skurwiel', 'dziwka', 'szmata',
-    'spierdalaj', 'pedał', 'ciota',
-    'fuck', 'shit', 'bitch', 'cunt', 'asshole', 'bastard', 'whore', 'slut',
-    'nigger', 'nigga', 'faggot', 'retard',
-];
+// Uporządkowane wg języka (kody jak w SUPPORTED_LANGUAGES) — łatwiej
+// rozszerzać/poprawiać pojedynczy język, niż grzebać w jednej wielkiej
+// nieposegregowanej liście. Dla języków spoza alfabetu łacińskiego (ru, zh,
+// ja, hi, ar) lista jest solidną podstawą, ale nie była sprawdzona przez
+// osobę mówiącą danym językiem natywnie — jeśli coś jest nietrafione albo
+// czegoś brakuje, popraw/dopisz tutaj (i w tej samej liście w wyzwalaczu
+// bazy danych, patrz PRAGMA_CONTEXT.md).
+const USERNAME_BLOCKLIST_BY_LANG = {
+    pl: ['kurw', 'chuj', 'huj', 'jeban', 'jebac', 'jebał', 'jebie', 'pierdol', 'pizd', 'cipa', 'cipo', 'skurwysyn', 'skurwiel', 'dziwka', 'szmata', 'spierdalaj', 'pedał', 'ciota'],
+    en: ['fuck', 'shit', 'bitch', 'cunt', 'asshole', 'bastard', 'whore', 'slut', 'nigger', 'nigga', 'faggot', 'retard'],
+    es: ['puta', 'put', 'mierda', 'cabron', 'cabrón', 'joder', 'gilipollas', 'pendejo', 'maricon', 'maricón', 'coño', 'verga', 'chinga', 'zorra'],
+    de: ['scheiße', 'scheisse', 'arschloch', 'hurensohn', 'wichser', 'fotze', 'schlampe', 'hure', 'ficker', 'fick dich'],
+    fr: ['merde', 'putain', 'salope', 'connard', 'connasse', 'enculé', 'encule', 'bâtard', 'batard', 'pute', 'con'],
+    ru: ['сука', 'блять', 'блядь', 'хуй', 'пизда', 'ебать', 'ебан', 'мудак', 'пидор', 'гандон', 'шлюха'],
+    zh: ['操你', '妈的', '傻逼', '婊子', '狗屎', '王八蛋', '贱人', '混蛋', '去死'],
+    ja: ['死ね', 'ちんこ', 'まんこ', 'くたばれ', 'ぶす', 'やりまん'],
+    hi: ['मादरचोद', 'भोसड़ी', 'चूतिया', 'रंडी', 'गांडू', 'लौड़ा', 'कुतिया'],
+    ar: ['خرا', 'زبي', 'عاهرة', 'منيك', 'شرموطة'],
+};
+const USERNAME_BLOCKLIST = Object.values(USERNAME_BLOCKLIST_BY_LANG).flat();
 
 function containsForbiddenWord(username) {
     const normalized = username.toLowerCase();
