@@ -648,7 +648,36 @@
                 document.getElementById('urlInput').value = found ? found[0] : sharedUrl;
                 setMode('url');
             }
+
+            receiveSharedImage(params);
         });
+
+        // 2b. Przechwytywanie udostępnionego OBRAZU (np. "Udostępnij" na zrzucie
+        // ekranu → wybór Pragmy z listy). Service Worker (sw.js,
+        // handleShareTarget) już wyjął go z przesłanej "paczki" i przytrzymał
+        // chwilowo we własnym, tymczasowym miejscu — tu go odbieramy, wstawiamy
+        // jako wybrany obraz (dokładnie tak, jakby użytkownik sam wybrał plik
+        // albo go wkleił — patrz setSelectedImageFile) i od razu sprzątamy po
+        // sobie, żeby ten sam obraz nie próbował się wczytać drugi raz przy
+        // np. odświeżeniu strony.
+        async function receiveSharedImage(params) {
+            if (params.get('shared_image') !== '1' || !('caches' in window)) return;
+            window.history.replaceState({}, '', window.location.pathname);
+            try {
+                const cache = await caches.open('pragma-share-target-v1');
+                const res = await cache.match('/shared-image');
+                if (!res) return;
+                await cache.delete('/shared-image');
+                const blob = await res.blob();
+                const file = new File([blob], 'udostepniony-obraz.jpg', { type: blob.type || 'image/jpeg' });
+                document.getElementById('share-data').innerHTML =
+                    '<span class="status-ok">✅ Otrzymano obraz (' + Math.round(file.size / 1024) + ' KB)</span>';
+                setMode('image');
+                setSelectedImageFile(file);
+            } catch (err) {
+                console.error('Pragma: nie udało się odebrać udostępnionego obrazu', err);
+            }
+        }
 
         // 3. Przełączanie zakładek (Link / Tekst / Obraz)
         let currentMode = 'url';
