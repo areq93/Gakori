@@ -747,8 +747,9 @@ zanim założysz, że działa.
        zapytanie z listą tylko 15 NAZW kategorii (bez opisów modeli),
        pytające zgrubnie "do których kategorii pasuje ta treść?".
     2. **Etap 2 (właściwy)** — `buildSystemPrompt()` dostaje już tylko
-       przefiltrowaną bibliotekę (`buildMentalModelsLibrary()`) z 1-4
-       wybranych kategorii, nie wszystkich 15.
+       przefiltrowaną bibliotekę (`buildMentalModelsLibrary()`) z kategorii
+       wybranych w etapie 1 (patrz niżej — bez sztywnego limitu ich liczby),
+       nie wszystkich 15.
     - **Dlaczego to NIE podwaja kosztu** (użytkownik świadomie o to pytał):
       etap 1 jest tani (tylko nazwy kategorii, nie 100 opisów modeli), a
       etap 2 jest TAŃSZY niż dawne pojedyncze zapytanie (mniejsza,
@@ -761,6 +762,26 @@ zanim założysz, że działa.
       listę kategorii (błąd, awaria, coś nieparsowalnego),
       `buildMentalModelsLibrary()` automatycznie wraca do PEŁNEJ biblioteki
       wszystkich 15 kategorii — nigdy nie blokuje analizy.
+    - **Poprawka jakości 2026-08-18 (zgłoszona na żywo: za mało wykrytych
+      wzorców — zwykle tylko 2-3 — i wciąż te same, popularne modele)**:
+      etap 1 początkowo miał sztywny limit "wybierz 1-4 kategorie", co
+      systematycznie zawężało pulę modeli dostępną w etapie 2 do tych
+      samych, oczywistych dziedzin (głównie psychologia/perswazja),
+      pomijając np. EKONOMIA/MATEMATYKA I STATYSTYKA nawet w tekstach
+      finansowych, gdzie wyraźnie pasowały. Naprawione: (1) usunięto sztywny
+      limit liczby kategorii — prompt każe teraz ocenić dopasowanie KAŻDEJ z
+      15 kategorii Z OSOBNA i wybrać wszystkie, które faktycznie pasują (bez
+      górnej ani dolnej granicy); (2) w `buildSystemPrompt()` dodano sekcję
+      "DOKŁADNOŚĆ I RÓŻNORODNOŚĆ" każącą przeglądać tekst akapit po akapicie
+      zamiast poprzestawać na 2-3 najbardziej oczywistych wzorcach, z
+      wyraźnym wskazaniem, żeby w tekstach finansowych/ekonomicznych aktywnie
+      szukać też wzorców z kategorii EKONOMIA/MATEMATYKA I STATYSTYKA, nie
+      tylko psychologicznych. **Świadomie NIE wprowadzono sztywnego minimum
+      liczby wzorców w wyniku** — wymuszanie minimum groziłoby tym, że model
+      zacząłby "na siłę" wymyślać słabe/naciągane wzorce tam, gdzie ich
+      naprawdę nie ma, co złamałoby zasadę wierności źródłu (patrz "WIERNOŚĆ
+      CYTATU" wyżej) — jakość i uczciwość analizy są tu nadrzędne nad samą
+      liczbą wykrytych wzorców.
     - **Ścieżka awaryjnego pobrania strony** (`fetchUrlAsText`, patrz niżej)
       ma własny, POŁĄCZONY etap 1: `siftFallbackText()` jednym zapytaniem
       naraz (a) czyści surowy, zaszumiony tekst z menu/stopki/reklam
