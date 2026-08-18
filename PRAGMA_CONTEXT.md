@@ -1195,6 +1195,23 @@ bez żadnego przychodu.
   `.js` i `manifest.json` są na strategii **network-first** (zawsze
   próbują pobrać świeżą wersję z sieci, cache tylko jako fallback offline)
   — tylko ikony zostały na cache-first.
+  **POPRAWKA 2026-08-18(c)**: samo "network-first" nie wystarczyło — po
+  wdrożeniu rundy 2 stylu "Rzeźba" część telefonów dalej pokazywała stary
+  `style.css` (brakującą regułę `.pragma-backdrop` widać było jako
+  ogromny, nierozmyty, nieprzezroczysty kształt zamiast delikatnej poświaty
+  w tle). Przyczyna: zwykłe `fetch(event.request)` w Service Workerze
+  respektuje **wewnętrzną pamięć podręczną przeglądarki (HTTP cache)** —
+  to zupełnie inny mechanizm niż `Cache Storage`/`CACHE_NAME`, na który SW
+  ma kontrolę. Jeśli serwer (GitHub Pages) wysłał nagłówek pozwalający na
+  krótkie cache'owanie pliku, przeglądarka mogła oddać starą, podręcznie
+  zapisaną wersję `style.css`, mimo że kod SW "próbował" pobrać z sieci —
+  fetch nigdy faktycznie nie dotarł do serwera. Naprawione przez dodanie
+  `{ cache: 'reload' }` do wywołania `fetch()` dla plików `.html`/`.css`/
+  `.js`/`manifest.json` — to jawnie każe przeglądarce pominąć HTTP cache i
+  zapytać serwer o świeżą wersję. Ogólna zasada na przyszłość: "network-
+  first" w Service Workerze musi jawnie wymuszać pominięcie HTTP cache
+  (`cache: 'reload'` lub `'no-store'`), inaczej "sieć" może po cichu
+  oznaczać "stara wersja z podręcznej pamięci przeglądarki".
 - **bfcache** (przeglądarkowy "zamrożony" powrót przyciskiem Wstecz) może
   przywrócić nieaktualny stan DOM (np. pustą listę bez suwaka) —
   nasłuchujemy `pageshow` z `event.persisted === true` i wymuszamy

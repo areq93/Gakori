@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pragma-v11';
+const CACHE_NAME = 'pragma-v12';
 // Osobny, tymczasowy "schowek" na obraz udostępniony z innej aplikacji
 // (patrz handleShareTarget niżej) — celowo NIE ten sam co CACHE_NAME, żeby
 // czyszczenie starych wersji aplikacji (patrz "activate" niżej) nigdy
@@ -94,9 +94,16 @@ self.addEventListener('fetch', (event) => {
   if (needsFreshContent) {
     // NETWORK-FIRST: HTML, manifest i style muszą zawsze być świeże, inaczej
     // zmiany wgrane na serwer nigdy nie dotrą do telefonu (tak jak stary
-    // style.css utknął w cache'u aż do wersji pragma-v7).
+    // style.css utknął w cache'u aż do wersji pragma-v7). WAŻNE:
+    // `cache: 'reload'` jest tu konieczne — zwykłe `fetch()` samo w sobie
+    // wciąż może dostać odpowiedź z wewnętrznej pamięci podręcznej
+    // przeglądarki (HTTP cache, niezależnej od Cache Storage Service
+    // Workera) i NIGDY nie dotrzeć do sieci, jeśli GitHub Pages ustawił
+    // czasowy nagłówek cache dla pliku — dokładnie ten mechanizm sprawiał,
+    // że po zmianie style.css część telefonów dalej widziała stary wygląd
+    // mimo podbicia CACHE_NAME (2026-08-18).
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'reload' })
         .then((networkResponse) => {
           const clone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
