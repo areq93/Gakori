@@ -178,17 +178,22 @@ zanim założysz, że działa.
       w `i18n.js`, wszystkie 10 języków) i od razu odświeża widoczny stan
       kredytów (patrz "Stan kredytów" wyżej), żeby liczba na ekranie
       zgadzała się z tym, co faktycznie pobrano.
-  - **Wynik obrazu pokazywany od razu, na tej samej stronie, razem z
-    obrazem**: w przeciwieństwie do linku/tekstu, dla obrazu frontend NIE
-    przekierowuje na `scan.html?id=...` po udanej analizie — obraz istnieje
-    tylko w pamięci przeglądarki osoby analizującej (nigdy nie trafia na
-    serwer do przechowania, patrz decyzja o kosztach Storage niżej), więc
-    tylko `index.html` może go od razu pokazać razem z wynikiem
-    (`#resultImage`, źródło: ten sam podgląd co przy wyborze pliku). Pod
-    obrazem stoi krótka informacja (`image_not_saved_notice` w `i18n.js`),
-    że to jedyna okazja, żeby zobaczyć wynik razem z obrazem — bezpośredni
-    link do samego wpisu w cache'u nadal istnieje (`scans.id`), ale bez
-    obrazu nie ma po co go pokazywać w tym miejscu.
+  - **Obraz pokazywany na górze wyniku na `scan.html`, ale TYLKO temu, kto
+    go właśnie przesłał**: tak jak link/tekst, po udanej analizie obrazu
+    frontend też przekierowuje na `scan.html?id=...` (użytkownik prosił, żeby
+    to zachować). Sam plik obrazu nigdy nie trafia na serwer (patrz decyzja o
+    kosztach Storage niżej) — więc żeby mimo to pokazać go na `scan.html`,
+    `index.html` tuż przed przekierowaniem robi z niego pomniejszoną miniaturę
+    (`makeImagePreview()` — canvas, maks. 1000px, JPEG ~0,72 jakości, żeby
+    zmieściła się w limicie `sessionStorage`) i zapisuje ją na chwilę pod
+    kluczem `pragma_scan_image_<id>` w `sessionStorage` (dane w pamięci JS nie
+    przetrwałyby pełnej nawigacji na inną stronę). `scan.html` odczytuje ją
+    pod tym samym kluczem, pokazuje na górze (`#scanImage` +
+    `image_not_saved_notice` w `i18n.js`) i OD RAZU usuwa z `sessionStorage` —
+    jednorazowy podgląd, zniknie np. po odświeżeniu strony albo dla kogoś
+    innego, kto dostanie ten sam link. Wpis w cache'u (`scans.id`) i sam
+    tekstowy wynik istnieją normalnie jak zawsze — tylko obraz nigdy nie jest
+    trwale nigdzie zapisany.
     - **Świadomie NIE trzymamy plików obrazów na serwerze** — rozważaliśmy
       to (żeby analiza była "odkrywalna" publicznie tak jak tekst/link), ale
       koszt przechowywania (Supabase Storage) rósłby bez górnego limitu wraz

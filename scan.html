@@ -30,6 +30,8 @@
         </div>
 
         <div id="scanContent" style="display:none;">
+            <img id="scanImage" alt="">
+            <p id="scanImageNotice" class="image-not-saved-notice"></p>
             <p id="scanSource" class="scan-source-box" style="display:none;"></p>
             <div id="scanBadge" class="result-badge"></div>
             <div id="scanPatterns"></div>
@@ -79,6 +81,26 @@
                             showNotFound();
                             return;
                         }
+                        // Jeśli to WŁAŚNIE ta osoba przed chwilą przesłała ten obraz do
+                        // analizy, index.html zostawił jego pomniejszoną miniaturę w
+                        // sessionStorage (patrz index.html, sekcja 7) — pokazujemy ją tu,
+                        // na górze, i od razu kasujemy: to jednorazowy podgląd, obraz
+                        // nigdy nie trafia na serwer, więc nie da się go zobaczyć ponownie
+                        // (np. po odświeżeniu strony albo z innego urządzenia/karty).
+                        if (data.input_type === 'image') {
+                            const previewKey = 'pragma_scan_image_' + scanId;
+                            const preview = sessionStorage.getItem(previewKey);
+                            if (preview) {
+                                sessionStorage.removeItem(previewKey);
+                                const imgEl = document.getElementById('scanImage');
+                                imgEl.src = preview;
+                                imgEl.style.display = 'block';
+                                const noticeEl = document.getElementById('scanImageNotice');
+                                noticeEl.innerText = t('image_not_saved_notice');
+                                noticeEl.style.display = 'block';
+                            }
+                        }
+
                         const r = data.result;
                         const score = r.q_score;
                         let badgeClass = 'badge-red', label = t('badge_manipulation', { score: score });

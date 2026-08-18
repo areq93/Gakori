@@ -126,10 +126,11 @@ button:disabled { background: #a89e88; border-color: #a89e88; box-shadow: none; 
 #imagePreview { max-width: 100%; border-radius: 4px; margin-top: 8px; display: none; }
 #fileName { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
 
-/* Obraz pokazany razem z wynikiem analizy (tylko lokalnie, u tego kto go
-   przesłał — plik obrazu nigdy nie trafia na serwer do przechowania) oraz
-   informacja o tym pod spodem. */
-#resultImage { max-width: 100%; border-radius: var(--radius-sm); margin-bottom: 12px; display: none; }
+/* Obraz pokazany na górze scan.html, TYLKO temu, kto go właśnie przesłał
+   (jednorazowy podgląd z sessionStorage — plik obrazu nigdy nie trafia na
+   serwer do przechowania, patrz index.html/scan.html) oraz informacja o
+   tym pod spodem. */
+#scanImage { max-width: 100%; border-radius: var(--radius-sm); margin-bottom: 12px; display: none; }
 .image-not-saved-notice {
     font-size: 12.5px; color: var(--ink-soft); background: var(--paper);
     border: 1.5px dashed var(--card-border); border-radius: var(--radius-sm);
