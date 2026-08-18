@@ -387,6 +387,35 @@ zanim założysz, że działa.
     zasób cache'owany, patrz pułapka "Service Worker cache" niżej).
     `theme-color` w `<meta>` na wszystkich 3 stronach HTML zaktualizowany
     do nowego `--ink` (`#2b2a27`, wcześniej `#241f18`).
+  - **POPRAWKA 2026-08-18(b) — Runda 2**: pierwsza wersja została wprost
+    odrzucona przez użytkownika ("wyszło marnie, za mało kontekstu, wygląda
+    jakbyśmy się cofnęli do UI sprzed rzeźby, logo pokazuje inny świat niż
+    aplikacja w środku"). Poprawione cztery rzeczy:
+    1. Kolory sygnałowe wyniku (`.badge-green/yellow/red`, obramowanie
+       `.pattern-item.pattern-reasoning`, `mark.source-highlight-reasoning`,
+       `.status-ok/.status-err`) — jednak PRZYGASZONE do tej samej,
+       ziemistej "rodziny materiału" co reszta UI (nowe zmienne
+       `--ok-bg/--ok-text/--ok-border`, `--warn-*`, `--danger-*`, osobne dla
+       jasnego/ciemnego motywu), zamiast zostawiania ich jaskrawymi — to
+       odwraca decyzję z pierwszej rundy opisaną wyżej. Kontrast
+       sprawdzony (tekst na tle ok. 5,6:1), więc czytelność wyniku
+       (kluczowa dla bezpieczeństwa użytkownika) nie ucierpiała.
+    2. `.card`, `.result-card`, `button`, `.tab-btn.active`, `#userMenuBtn`
+       dostały subtelny `linear-gradient(160deg, ...)` zamiast płaskiego,
+       jednolitego koloru — to one budują wrażenie światła padającego na
+       zaokrągloną powierzchnię, którego brakowało w pierwszej rundzie.
+    3. `--sculpt-shadow`/`--sculpt-shadow-sm` dostały dodatkową warstwę
+       `inset 0 1px 0 var(--highlight-edge)` — jasna obwódka u góry karty,
+       razem z gradientem daje wrażenie uniesionej, oświetlonej bryły.
+    4. Nowy, duży, mocno rozmyty kształt `.pragma-backdrop` (ten sam SVG
+       "kropli" co `.pragma-mark`, tylko w dużej skali, `position: fixed`,
+       `opacity: 0.16`/`0.22` w ciemnym, `filter: blur(38px)`, `z-index: 0`
+       — karty mają `z-index: 1`, żeby były nad nim) w tle strony startowej
+       — bezpośrednia odpowiedź na "logo pokazuje inny świat niż aplikacja
+       w środku": teraz kształt loga jest widoczny w tle całej aplikacji,
+       nie tylko jako mały znaczek przy nagłówku.
+    `sw.js` `CACHE_NAME` podbite dalej do `pragma-v11` (kolejna zmiana
+    `style.css`).
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
