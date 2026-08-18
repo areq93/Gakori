@@ -126,6 +126,18 @@ button:disabled { background: #a89e88; border-color: #a89e88; box-shadow: none; 
 #imagePreview { max-width: 100%; border-radius: 4px; margin-top: 8px; display: none; }
 #fileName { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
 
+/* Strefa wklejania obrazu ze schowka (Ctrl+V / "Wklej" na telefonie) —
+   contenteditable, żeby telefony w ogóle pokazały opcję wklejania, ale
+   stylizowana tak, żeby wyglądała jak zwykły obszar do kliknięcia, nie
+   pole tekstowe. */
+.paste-zone {
+    border: 1.5px dashed var(--card-border); border-radius: var(--radius-sm);
+    padding: 14px; text-align: center; font-size: 13.5px; color: var(--ink-soft);
+    cursor: text; outline: none; min-height: 20px;
+}
+.paste-zone:empty::before { content: attr(data-placeholder); }
+.paste-zone:focus { border-color: var(--accent); }
+
 /* Obraz pokazany na górze scan.html, TYLKO temu, kto go właśnie przesłał
    (jednorazowy podgląd z sessionStorage — plik obrazu nigdy nie trafia na
    serwer do przechowania, patrz index.html/scan.html) oraz informacja o

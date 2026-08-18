@@ -201,6 +201,22 @@ zanim założysz, że działa.
       co mogłoby być problematyczne do publicznego pokazania (np. czyjeś
       prywatne zdjęcie bez zgody) — zbyt duże ryzyko kosztowe i prawne
       względem korzyści, więc świadomie zrezygnowaliśmy.
+  - **Wybór obrazu: przycisk (plik) ALBO wklejenie ze schowka** — obok
+    przycisku "Wybierz zdjęcie" jest druga strefa (`#imagePasteZone`,
+    `contenteditable`, celowo widoczny/klikalny element, nie niewidoczny
+    nasłuch na całej stronie — telefony bez skupionego, edytowalnego pola w
+    ogóle nie pokazują opcji "Wklej"), do której można wkleić obraz ze
+    schowka (Ctrl+V na komputerze, "Wklej" z menu dotykowego na telefonie) —
+    np. świeży zrzut ekranu skopiowany w innej aplikacji, bez zapisywania go
+    najpierw jako plik. Oba źródła trafiają do tej samej zmiennej
+    (`selectedImageFile` w `index.html`), więc reszta kodu (przycisk
+    "Analizuj") nie musi wiedzieć, skąd plik pochodzi. **To NIE jest
+    integracja z systemowym "Udostępnij" telefonu** (Android/iOS share sheet
+    z galerii wprost do Pragmy) — to osobna, większa funkcja (wymagałaby
+    zmian w `manifest.json` — `share_target` z plikami i metodą `POST` —
+    oraz w Service Workerze), świadomie odłożona, bo wklejanie ze schowka w
+    pełni pokrywa zgłoszoną potrzebę ("wkleić ostatni zrzut ekranu z
+    pamięci").
   - PDF: jeszcze nie zaimplementowany (`input_type: "pdf"` zwróciłby
     `501 not_implemented`, gdyby frontend w ogóle wysyłał taki typ — na
     razie nie ma dla PDF żadnego pola w interfejsie). Moderacja opisana
