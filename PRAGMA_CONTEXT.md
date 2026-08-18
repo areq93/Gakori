@@ -761,6 +761,19 @@ zanim założysz, że działa.
       (odwołanie do modelu GIGO w bibliotece) i (b) wskazuje kategorie —
       połączone w jedno zapytanie celowo, żeby ta ścieżka też miała tylko 2
       zapytania do Gemini, nie 3.
+    - **Limity czasu (`fetchWithTimeout`), zdiagnozowane na żywo z
+      użytkownikiem** — analiza linku do wolnej/nieodpowiadającej strony
+      potrafiła czekać ponad 2 minuty, zanim w ogóle pojawił się jakikolwiek
+      komunikat, bo ŻADNE z wywołań sieciowych (ani do Gemini, ani awaryjny
+      `fetch` strony) nie miało limitu czasu — pojedyncze zawieszone żądanie
+      trzymało całą analizę bez ograniczeń. `callGemini()` ma teraz twardy
+      limit `GEMINI_TIMEOUT_MS = 20000` (przy przekroczeniu zwraca pusty
+      obiekt, więc dalszy kod traktuje to jak zwykły błąd Gemini — nie
+      wywala się nieobsłużonym wyjątkiem), `fetchUrlAsText()` ma
+      `FALLBACK_FETCH_TIMEOUT_MS = 10000`. Analiza linku w najgorszym razie
+      robi 5 kolejnych zapytań sieciowych (kategoryzacja → właściwa analiza
+      → awaryjne pobranie strony → sito → druga właściwa analiza) — z tymi
+      limitami górna granica całości to ok. 90s, nie "bez ograniczeń".
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
@@ -787,13 +800,18 @@ zanim założysz, że działa.
 - **Zmieniające się komunikaty podczas oczekiwania na analizę**: skoro
   pełna analiza to teraz kilka kolejnych zapytań do AI (kategoryzacja →
   właściwa analiza → czasem jeszcze awaryjne pobranie strony), potrafi to
-  trwać kilka-kilkanaście sekund. Zamiast martwego "Analizuję...", `index.html`
-  co ok. 2,2s podmienia tekst statusu na kolejny z listy 6 komunikatów
-  (`status_step_1`...`status_step_6` w `i18n.js`, np. "Sprawdzam, czy ktoś
-  już to analizował...", "Czytam treść uważnie...") — ten sam trik, którego
-  używają czaty AI pokazując "co właśnie robię", żeby czekanie nie wyglądało
-  na zawieszenie strony. Interwał (`setInterval`) jest czyszczony w każdej
-  gałęzi (sukces/błąd/`finally`) — pilnuj tego, jeśli będziesz przerabiać tę
+  trwać kilka-kilkanaście sekund (albo, przy wolnych stronach, nawet
+  blisko minuty — patrz limity czasu w sekcji o analizie linku wyżej).
+  Zamiast martwego "Analizuję...", `index.html` co ok. 2,8s podmienia tekst
+  statusu na kolejny z listy 12 komunikatów (`status_step_1`...`status_step_12`
+  w `i18n.js`, np. "Sprawdzam, czy ktoś już to analizował...", "Czytam
+  treść uważnie...") — ten sam trik, którego używają czaty AI pokazując "co
+  właśnie robię", żeby czekanie nie wyglądało na zawieszenie strony.
+  Rozszerzone z 6 do 12 komunikatów i spowolnione z 2,2s do 2,8s (zgłoszone
+  na żywo: przy dłuższych analizach 6 komunikatów co 2,2s zdążało się
+  powtórzyć kilka razy i wyglądało na zapętlone/zepsute). Interwał
+  (`setInterval`) jest czyszczony w każdej gałęzi (sukces/błąd/`finally`) —
+  pilnuj tego, jeśli będziesz przerabiać tę
   część kodu, inaczej komunikaty będą dalej migać po zakończeniu żądania.
 - **Pułapka — dynamicznie budowane napisy NIE odświeżają się same przy
   zmianie języka**: `setLanguage()` (w `i18n.js`) wywołuje `applyTranslations()`,

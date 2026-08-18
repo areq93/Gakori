@@ -990,13 +990,20 @@
                 // zmieniające się komunikaty, żeby czekanie nie wydawało się
                 // zawieszeniem strony (ten sam trik, którego używają czaty
                 // AI pokazując "co właśnie robię").
-                const statusSteps = ['status_step_1', 'status_step_2', 'status_step_3', 'status_step_4', 'status_step_5', 'status_step_6'];
+                // 12 komunikatów (nie 6) i wolniejsze tempo (2,8s, nie 2,2s) — przy
+                // dłuższych analizach (duże artykuły, wolne strony) 6 komunikatów co
+                // 2,2s zdążało się powtórzyć kilka razy i wyglądało na zepsute/w kółko.
+                const statusSteps = [
+                    'status_step_1', 'status_step_2', 'status_step_3', 'status_step_4',
+                    'status_step_5', 'status_step_6', 'status_step_7', 'status_step_8',
+                    'status_step_9', 'status_step_10', 'status_step_11', 'status_step_12',
+                ];
                 let stepIndex = 0;
                 statusEl.innerText = t(statusSteps[0]);
                 statusInterval = setInterval(() => {
                     stepIndex = (stepIndex + 1) % statusSteps.length;
                     statusEl.innerText = t(statusSteps[stepIndex]);
-                }, 2200);
+                }, 2800);
 
                 // Zalogowany użytkownik: prawdziwy token sesji (serwer sam rozpozna, kim jest).
                 // Niezalogowany: publiczny klucz projektu — serwer potraktuje to jak anonima.
