@@ -180,9 +180,11 @@ zanim założysz, że działa.
        trafiają w domyślne kategorie blokowane automatycznie przez
        samego dostawcę (np. "katastrofy", "zranienia").
     - **Kara za samą próbę**: w OBU przypadkach wykrycia konto zostaje
-      obciążone **pełną stawką `IMAGE_SCAN_COST`, tak jak za normalną,
-      udaną analizę** (funkcja `respondUnsafeContent()`) — świadomy
-      odstraszacz na wyraźną prośbę użytkownika, nie pomyłka. Transakcja
+      obciążone **pełną, zsumowaną stawką za CAŁY przesłany zestaw obrazów
+      (`IMAGE_SCAN_COST × liczba obrazów`), tak jak za normalną, udaną
+      analizę** (funkcja `respondUnsafeContent()`) — świadomy odstraszacz
+      na wyraźną prośbę użytkownika, nie pomyłka; dotyczy całego zestawu,
+      nawet jeśli tylko JEDEN z kilku obrazów był niedozwolony. Transakcja
       w `wallet_transactions` ma `type: 'unsafe_content_penalty'`
       (odróżnialna od zwykłego `'spend'` w razie potrzeby analizy
       później) i `related_scan_id: null`.
@@ -196,22 +198,26 @@ zanim założysz, że działa.
       w `i18n.js`, wszystkie 10 języków) i od razu odświeża widoczny stan
       kredytów (patrz "Stan kredytów" wyżej), żeby liczba na ekranie
       zgadzała się z tym, co faktycznie pobrano.
-  - **Obraz pokazywany na górze wyniku na `scan.html`, ale TYLKO temu, kto
-    go właśnie przesłał**: tak jak link/tekst, po udanej analizie obrazu
+  - **Obraz(y) pokazywane na górze wyniku na `scan.html`, ale TYLKO temu, kto
+    je właśnie przesłał**: tak jak link/tekst, po udanej analizie obrazu
     frontend też przekierowuje na `scan.html?id=...` (użytkownik prosił, żeby
-    to zachować). Sam plik obrazu nigdy nie trafia na serwer (patrz decyzja o
-    kosztach Storage niżej) — więc żeby mimo to pokazać go na `scan.html`,
-    `index.html` tuż przed przekierowaniem robi z niego pomniejszoną miniaturę
-    (`makeImagePreview()` — canvas, maks. 1000px, JPEG ~0,72 jakości, żeby
-    zmieściła się w limicie `sessionStorage`) i zapisuje ją na chwilę pod
+    to zachować). Same pliki obrazów nigdy nie trafiają na serwer (patrz
+    decyzja o kosztach Storage niżej) — więc żeby mimo to pokazać je na
+    `scan.html`, `index.html` tuż przed przekierowaniem robi z KAŻDEGO z nich
+    pomniejszoną miniaturę (`makeImagePreview()` — canvas, maks. 1000px, JPEG
+    ~0,72 jakości, żeby zmieściły się w limicie `sessionStorage`) i zapisuje
+    całą listę miniatur (jako JSON, `imagePreviewDataUrls`) na chwilę pod
     kluczem `pragma_scan_image_<id>` w `sessionStorage` (dane w pamięci JS nie
     przetrwałyby pełnej nawigacji na inną stronę). `scan.html` odczytuje ją
-    pod tym samym kluczem, pokazuje na górze (`#scanImage` +
-    `image_not_saved_notice` w `i18n.js`) i OD RAZU usuwa z `sessionStorage` —
+    pod tym samym kluczem, renderuje jedną miniaturę na obraz w
+    `#scanImageList` (siatka, `.scan-image-list` w `style.css`) +
+    `image_not_saved_notice` w `i18n.js`, i OD RAZU usuwa z `sessionStorage` —
     jednorazowy podgląd, zniknie np. po odświeżeniu strony albo dla kogoś
-    innego, kto dostanie ten sam link. Wpis w cache'u (`scans.id`) i sam
-    tekstowy wynik istnieją normalnie jak zawsze — tylko obraz nigdy nie jest
-    trwale nigdzie zapisany.
+    innego, kto dostanie ten sam link (kod ma też wsteczną zgodność: jeśli
+    trafi na stary, pojedynczy string zamiast tablicy JSON, potraktuje go jak
+    listę z jednym elementem). Wpis w cache'u (`scans.id`) i sam tekstowy
+    wynik istnieją normalnie jak zawsze — tylko obrazy nigdy nie są trwale
+    nigdzie zapisane.
     - **Świadomie NIE trzymamy plików obrazów na serwerze** — rozważaliśmy
       to (żeby analiza była "odkrywalna" publicznie tak jak tekst/link), ale
       koszt przechowywania (Supabase Storage) rósłby bez górnego limitu wraz
@@ -990,16 +996,37 @@ bez żadnego przychodu.
   ogromnej strony).
 - Pierwszy skan anonimowy (tylko tryb tekstowy): darmowy do
   `ANONYMOUS_MAX_CHARS = 3000` znaków.
-- **Obraz**: płaska stawka `IMAGE_SCAN_COST = 8` — tak jak link, wymaga
-  zawsze konta (brak trybu anonimowego). Limit rozmiaru pliku: **8 MB**,
-  egzekwowany PO OBU stronach (przeglądarka daje szybki komunikat, ale
-  prawdziwe zabezpieczenie jest w backendzie — nigdy nie ufamy samej
-  przeglądarce). Backend rozpoznaje prawdziwy typ pliku po jego
-  zawartości (magiczne bajty na początku pliku — JPEG/PNG/GIF/WEBP), nie
-  po tym, co deklaruje przeglądarka — ten sam wzorzec "zero zaufania" co
-  przy `user_id` z body. Jedno wywołanie Gemini z pełną biblioteką 100
-  modeli (bez taniego etapu kategoryzacji jak przy tekście/linku — nie ma
-  z góry żadnego tekstu, po którym dałoby się zgrubnie wybrać kategorie).
+- **Obraz**: stawka `IMAGE_SCAN_COST = 8` **za każdy obraz z osobna**, tak
+  jak link wymaga zawsze konta (brak trybu anonimowego). Od 2026-08-18
+  można wybrać **więcej niż jeden obraz naraz** (do `MAX_IMAGES_PER_SCAN =
+  6`, ta sama liczba musi się zgadzać w `index.html` jako
+  `MAX_SELECTED_IMAGES` — jeśli zmieniasz limit, zmień w obu miejscach) —
+  koszt to `IMAGE_SCAN_COST × liczba obrazów`, ale **analiza jest jedna,
+  wspólna dla wszystkich obrazów razem** (jedna lista wzorców, bez
+  przypisania który wzorzec pochodzi z którego obrazu — świadoma decyzja
+  na rzecz prostoty, patrz decyzja użytkownika z 2026-08-18: "bez
+  przypisania" zamiast dodatkowego pola i UI na numer obrazu). Limit
+  rozmiaru pliku: **8 MB na obraz** + dodatkowy, ostrożny limit **20 MB
+  łącznie** (`MAX_TOTAL_IMAGE_BYTES`) dla całego zestawu — oba egzekwowane
+  PO OBU stronach (przeglądarka daje szybki komunikat, ale prawdziwe
+  zabezpieczenie jest w backendzie — nigdy nie ufamy samej przeglądarce).
+  Backend rozpoznaje prawdziwy typ pliku po jego zawartości (magiczne
+  bajty na początku pliku — JPEG/PNG/GIF/WEBP), nie po tym, co deklaruje
+  przeglądarka — ten sam wzorzec "zero zaufania" co przy `user_id` z body
+  — sprawdzane dla KAŻDEGO obrazu z osobna. Jedno wywołanie Gemini (ze
+  wszystkimi obrazami jako kolejne części `inlineData` w tej samej
+  wiadomości) z pełną biblioteką 100 modeli (bez taniego etapu
+  kategoryzacji jak przy tekście/linku — nie ma z góry żadnego tekstu, po
+  którym dałoby się zgrubnie wybrać kategorie). Moderacja niedozwolonej
+  treści (patrz niżej) sprawdza WSZYSTKIE obrazy naraz — jeśli
+  którykolwiek jest niedozwolony, cała próba (wszystkie obrazy w tym
+  zestawie) jest karana pełną, zsumowaną stawką, tak jak dziś dla
+  pojedynczego obrazu. `content_hash` dla cache'u to hash CAŁEGO zestawu
+  (konkatenacja hashów poszczególnych obrazów w kolejności wyboru, potem
+  zahashowana ponownie) — inny zestaw albo inna kolejność to inna,
+  osobno wyceniona analiza. Podglądy w `scan.html` (jednorazowe, z
+  sessionStorage, nigdy nie trafiają na serwer) też są teraz tablicą,
+  jedną na obraz.
 - **Wciąż nieustalone**: ile 1 kredyt ma być wart w złotówkach/dolarach.
   Bez tego nie da się policzyć realnej marży w walucie, tylko w
   procentach. Jak wypadnie ta rozmowa — dopisz tu ustaloną wartość.

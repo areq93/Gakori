@@ -76,12 +76,12 @@
 
         <div class="mode-panel" id="panel-image">
             <p data-i18n="label_choose_image">Wybierz zdjęcie do analizy:</p>
-            <input type="file" id="imageInput" accept="image/*" style="display:none;">
+            <input type="file" id="imageInput" accept="image/*" multiple style="display:none;">
             <button type="button" id="imageInputTrigger" data-i18n="btn_choose_image" style="background:#fff; color:#333; border:1px solid #ccc;">Wybierz zdjęcie</button>
             <div id="imagePasteDivider" style="text-align:center; color:#999; font-size:12px; margin:10px 0;" data-i18n="divider_or">— lub —</div>
             <div id="imagePasteZone" class="paste-zone" contenteditable="true" tabindex="0" data-i18n-content-placeholder="label_paste_image_zone" data-i18n-aria-label="label_paste_image_zone"></div>
-            <div id="fileName"></div>
-            <img id="imagePreview" alt="podgląd">
+            <div id="imageSelectionInfo"></div>
+            <div id="imagePreviewList" class="image-preview-list"></div>
         </div>
 
         <button id="analyzeBtn" data-i18n="btn_analyze">Analizuj</button>
@@ -657,7 +657,7 @@
         // handleShareTarget) już wyjął go z przesłanej "paczki" i przytrzymał
         // chwilowo we własnym, tymczasowym miejscu — tu go odbieramy, wstawiamy
         // jako wybrany obraz (dokładnie tak, jakby użytkownik sam wybrał plik
-        // albo go wkleił — patrz setSelectedImageFile) i od razu sprzątamy po
+        // albo go wkleił — patrz addSelectedImageFiles) i od razu sprzątamy po
         // sobie, żeby ten sam obraz nie próbował się wczytać drugi raz przy
         // np. odświeżeniu strony.
         async function receiveSharedImage(params) {
@@ -673,7 +673,7 @@
                 document.getElementById('share-data').innerHTML =
                     '<span class="status-ok">✅ Otrzymano obraz (' + Math.round(file.size / 1024) + ' KB)</span>';
                 setMode('image');
-                setSelectedImageFile(file);
+                addSelectedImageFiles([file]);
             } catch (err) {
                 console.error('Pragma: nie udało się odebrać udostępnionego obrazu', err);
             }
@@ -698,43 +698,72 @@
             btn.addEventListener('click', () => setMode(btn.dataset.mode));
         });
 
-        // 4. Wybór obrazu — ręcznie z pliku (przycisk) ALBO wklejony ze schowka
-        // (np. świeży zrzut ekranu skopiowany w innej aplikacji) — oba trafiają
-        // do tej samej zmiennej i tego samego podglądu, żeby reszta kodu
-        // (przycisk "Analizuj") nie musiała wiedzieć, skąd plik pochodzi.
-        let selectedImageFile = null;
-        function setSelectedImageFile(file) {
-            selectedImageFile = file;
-            const preview = document.getElementById('imagePreview');
-            const fileNameEl = document.getElementById('fileName');
+        // 4. Wybór obrazów — ręcznie z pliku (przycisk, można zaznaczyć kilka
+        // naraz), wklejone ze schowka (jeden na raz — tak działa wklejanie) ALBO
+        // odebrane przez systemowe "Udostępnij" — wszystkie trafiają do tej
+        // samej listy i tych samych miniatur, żeby reszta kodu (przycisk
+        // "Analizuj") nie musiała wiedzieć, skąd który plik pochodzi. Limit
+        // MAX_SELECTED_IMAGES musi być zgodny z MAX_IMAGES_PER_SCAN w
+        // analyze/index.ts — jeśli zmieniasz jedno, zmień drugie.
+        const MAX_SELECTED_IMAGES = 6;
+        let selectedImageFiles = [];
+
+        function renderImagePreviewList() {
+            const listEl = document.getElementById('imagePreviewList');
+            const infoEl = document.getElementById('imageSelectionInfo');
             const pasteDivider = document.getElementById('imagePasteDivider');
             const pasteZone = document.getElementById('imagePasteZone');
-            if (!file) {
-                preview.style.display = 'none';
-                fileNameEl.innerText = '';
-                pasteDivider.style.display = '';
-                pasteZone.style.display = '';
+            listEl.innerHTML = '';
+
+            selectedImageFiles.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'image-preview-item';
+                const img = document.createElement('img');
+                img.alt = '';
+                const reader = new FileReader();
+                reader.onload = (ev) => { img.src = ev.target.result; };
+                reader.readAsDataURL(file);
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'image-preview-remove';
+                removeBtn.innerText = '×';
+                removeBtn.setAttribute('aria-label', t('btn_remove_image'));
+                removeBtn.addEventListener('click', () => {
+                    selectedImageFiles.splice(index, 1);
+                    renderImagePreviewList();
+                });
+                item.appendChild(img);
+                item.appendChild(removeBtn);
+                listEl.appendChild(item);
+            });
+
+            // Skoro chociaż jeden obraz jest już wybrany, zaproszenie do
+            // wklejenia kolejnego zostaje widoczne, dopóki nie osiągniemy
+            // limitu — dopiero wtedy chowamy je, żeby nie sugerować, że
+            // można dodać więcej.
+            if (selectedImageFiles.length > 0) {
+                infoEl.innerText = t('label_images_selected', { count: selectedImageFiles.length, max: MAX_SELECTED_IMAGES });
+            } else {
+                infoEl.innerText = '';
+            }
+            const atLimit = selectedImageFiles.length >= MAX_SELECTED_IMAGES;
+            pasteDivider.style.display = atLimit ? 'none' : '';
+            pasteZone.style.display = atLimit ? 'none' : '';
+        }
+
+        function addSelectedImageFiles(files) {
+            const incoming = Array.from(files || []).filter((f) => f && f.type && f.type.indexOf('image/') === 0);
+            if (incoming.length === 0) return;
+            const room = MAX_SELECTED_IMAGES - selectedImageFiles.length;
+            if (room <= 0) {
+                alert(t('alert_max_images', { max: MAX_SELECTED_IMAGES }));
                 return;
             }
-            // Skoro obraz jest już wybrany (niezależnie skąd — plik, wklejenie
-            // czy systemowe "Udostępnij"), zaproszenie do wklejenia innego jest
-            // tylko mylącym, pustym polem obok — chowamy je, dopóki ktoś nie
-            // usunie/zmieni wyboru (wtedy wracamy do stanu wyjściowego).
-            pasteDivider.style.display = 'none';
-            pasteZone.style.display = 'none';
-            const sizeKb = Math.round(file.size / 1024);
-            // Wklejony ze schowka plik często nie ma nazwy (albo ma taką samą,
-            // ogólną dla każdego zrzutu ekranu) — wtedy pokazujemy neutralny opis
-            // zamiast pustego/mylącego tekstu.
-            fileNameEl.innerText = file.name
-                ? file.name + ' (' + sizeKb + ' KB)'
-                : t('label_pasted_image', { size: sizeKb });
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                preview.src = ev.target.result;
-                preview.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
+            if (incoming.length > room) {
+                alert(t('alert_max_images', { max: MAX_SELECTED_IMAGES }));
+            }
+            selectedImageFiles = selectedImageFiles.concat(incoming.slice(0, room));
+            renderImagePreviewList();
         }
 
         // Prawdziwe pole <input type="file"> jest ukryte — przeglądarka i tak
@@ -746,7 +775,10 @@
             document.getElementById('imageInput').click();
         });
         document.getElementById('imageInput').addEventListener('change', (e) => {
-            setSelectedImageFile(e.target.files[0] || null);
+            addSelectedImageFiles(e.target.files);
+            // Reset wartości pola — inaczej wybranie DOKŁADNIE TEGO SAMEGO
+            // pliku drugi raz z rzędu nie wywołałoby w ogóle zdarzenia "change".
+            e.target.value = '';
         });
 
         // 4b. Wklejanie obrazu ze schowka (Ctrl+V na komputerze, "Wklej" z menu
@@ -782,7 +814,7 @@
                 }
             }
             if (imageFile) {
-                setSelectedImageFile(imageFile);
+                addSelectedImageFiles([imageFile]);
             } else {
                 // Zdiagnozowane na żywo z użytkownikiem: na części telefonów to,
                 // co system nazywa "skopiowaniem zrzutu ekranu", w ogóle nie
@@ -956,6 +988,7 @@
                     invalid_image: 'err_invalid_image',
                     file_too_large: 'err_file_too_large',
                     unsafe_content: 'err_unsafe_content',
+                    too_many_images: 'err_too_many_images',
                 };
                 const key = errorMessageKeys[data.error];
                 summary.innerText = key ? t(key) : t('result_generic_error');
@@ -987,7 +1020,7 @@
 
             let payload = null;
             let statusInterval = null;
-            let imagePreviewDataUrl = null;
+            let imagePreviewDataUrls = null;
 
             try {
                 if (currentMode === 'url') {
@@ -1003,27 +1036,37 @@
                     payload = { input_type: 'text', content_hash: hash, char_count: text.length, text_content: text, language: getCurrentLanguage() };
 
                 } else if (currentMode === 'image') {
-                    const file = selectedImageFile;
-                    if (!file) return alert(t('alert_choose_image'));
-                    // Ten sam limit co po stronie backendu (8 MB) — tu tylko
-                    // szybka informacja zwrotna, backend i tak sprawdza to
+                    const files = selectedImageFiles;
+                    if (files.length === 0) return alert(t('alert_choose_image'));
+                    // Ten sam limit co po stronie backendu (8 MB na obraz) — tu
+                    // tylko szybka informacja zwrotna, backend i tak sprawdza to
                     // sam niezależnie i nigdy nie ufa samej przeglądarce.
-                    if (file.size > 8 * 1024 * 1024) return alert(t('alert_image_too_large'));
-                    const buffer = await file.arrayBuffer();
-                    const hash = await sha256Hex(buffer);
-                    const imageBase64 = arrayBufferToBase64(buffer);
-                    payload = { input_type: 'image', content_hash: hash, image_base64: imageBase64, language: getCurrentLanguage() };
-                    // Osobna, pomniejszona miniatura (nie pełna rozdzielczość
-                    // wysyłana wyżej do analizy) — tylko po to, żeby pokazać
-                    // obraz na stronie z wynikiem (scan.html), do której zaraz
-                    // przejdziemy. Musi być mała, bo trafi na chwilę do
-                    // sessionStorage (limit paru MB w niektórych przeglądarkach),
-                    // a oryginalne zdjęcia z telefonu bywają blisko limitu 8 MB.
-                    try {
-                        imagePreviewDataUrl = await makeImagePreview(file);
-                    } catch {
-                        imagePreviewDataUrl = null; // brak podglądu nie blokuje samej analizy
+                    if (files.some((f) => f.size > 8 * 1024 * 1024)) return alert(t('alert_image_too_large'));
+                    const imagesBase64 = [];
+                    const hashParts = [];
+                    imagePreviewDataUrls = [];
+                    for (const file of files) {
+                        const buffer = await file.arrayBuffer();
+                        hashParts.push(await sha256Hex(buffer));
+                        imagesBase64.push(arrayBufferToBase64(buffer));
+                        // Osobna, pomniejszona miniatura (nie pełna rozdzielczość
+                        // wysyłana wyżej do analizy) — tylko po to, żeby pokazać
+                        // obrazy na stronie z wynikiem (scan.html), do której zaraz
+                        // przejdziemy. Musi być mała, bo trafi na chwilę do
+                        // sessionStorage (limit paru MB w niektórych
+                        // przeglądarkach), a oryginalne zdjęcia z telefonu bywają
+                        // blisko limitu 8 MB — a teraz może być ich kilka naraz.
+                        try {
+                            imagePreviewDataUrls.push(await makeImagePreview(file));
+                        } catch {
+                            imagePreviewDataUrls.push(null); // brak podglądu nie blokuje samej analizy
+                        }
                     }
+                    // Hash całego ZESTAWU obrazów (nie pojedynczego pliku) — inny
+                    // zestaw albo inna kolejność to inna analiza, więc musi dać
+                    // inny content_hash w cache'u.
+                    const combinedHash = await sha256Hex(new TextEncoder().encode(hashParts.join(':')));
+                    payload = { input_type: 'image', content_hash: combinedHash, images_base64: imagesBase64, language: getCurrentLanguage() };
                 }
 
                 btn.disabled = true;
@@ -1078,15 +1121,15 @@
                     // Błąd pokazujemy na tej samej stronie.
                     renderResult(data);
                 } else {
-                    // Miniaturę obrazu przekazujemy do scan.html przez sessionStorage
+                    // Miniatury obrazów przekazujemy do scan.html przez sessionStorage
                     // (dane w pamięci JS nie przetrwałyby pełnego przejścia na inną
                     // stronę) — TYLKO na chwilę, do jednorazowego odczytania tam;
-                    // scan.html sam ją usuwa zaraz po wyświetleniu (patrz tamtejszy
-                    // kod). Gdyby się nie zmieściła (bardzo rzadki limit przeglądarki),
-                    // po prostu nie pokaże się obraz — reszta wyniku działa normalnie.
-                    if (currentMode === 'image' && imagePreviewDataUrl) {
+                    // scan.html sam je usuwa zaraz po wyświetleniu (patrz tamtejszy
+                    // kod). Gdyby się nie zmieściły (bardzo rzadki limit przeglądarki),
+                    // po prostu nie pokażą się obrazy — reszta wyniku działa normalnie.
+                    if (currentMode === 'image' && imagePreviewDataUrls && imagePreviewDataUrls.some(Boolean)) {
                         try {
-                            sessionStorage.setItem('pragma_scan_image_' + data.id, imagePreviewDataUrl);
+                            sessionStorage.setItem('pragma_scan_image_' + data.id, JSON.stringify(imagePreviewDataUrls));
                         } catch {
                             // limit miejsca w sessionStorage — pomijamy podgląd, nie blokujemy przejścia
                         }

@@ -30,7 +30,7 @@
         </div>
 
         <div id="scanContent" style="display:none;">
-            <img id="scanImage" alt="">
+            <div id="scanImageList" class="scan-image-list"></div>
             <p id="scanImageNotice" class="image-not-saved-notice"></p>
             <p id="scanSource" class="scan-source-box" style="display:none;"></p>
             <details id="scanTextSource" class="scan-text-source" style="display:none;">
@@ -245,23 +245,39 @@
                             showNotFound();
                             return;
                         }
-                        // Jeśli to WŁAŚNIE ta osoba przed chwilą przesłała ten obraz do
-                        // analizy, index.html zostawił jego pomniejszoną miniaturę w
-                        // sessionStorage (patrz index.html, sekcja 7) — pokazujemy ją tu,
-                        // na górze, i od razu kasujemy: to jednorazowy podgląd, obraz
-                        // nigdy nie trafia na serwer, więc nie da się go zobaczyć ponownie
-                        // (np. po odświeżeniu strony albo z innego urządzenia/karty).
+                        // Jeśli to WŁAŚNIE ta osoba przed chwilą przesłała te obrazy do
+                        // analizy, index.html zostawił ich pomniejszone miniatury w
+                        // sessionStorage jako tablicę JSON (patrz index.html, sekcja 7) —
+                        // pokazujemy je tu, na górze, i od razu kasujemy: to jednorazowy
+                        // podgląd, obrazy nigdy nie trafiają na serwer, więc nie da się
+                        // ich zobaczyć ponownie (np. po odświeżeniu strony albo z innego
+                        // urządzenia/karty).
                         if (data.input_type === 'image') {
                             const previewKey = 'pragma_scan_image_' + scanId;
                             const preview = sessionStorage.getItem(previewKey);
                             if (preview) {
                                 sessionStorage.removeItem(previewKey);
-                                const imgEl = document.getElementById('scanImage');
-                                imgEl.src = preview;
-                                imgEl.style.display = 'block';
-                                const noticeEl = document.getElementById('scanImageNotice');
-                                noticeEl.innerText = t('image_not_saved_notice');
-                                noticeEl.style.display = 'block';
+                                let urls = [];
+                                try {
+                                    const parsed = JSON.parse(preview);
+                                    urls = Array.isArray(parsed) ? parsed : [preview];
+                                } catch {
+                                    urls = [preview]; // wsteczna zgodność ze starym, pojedynczym formatem
+                                }
+                                urls = urls.filter(Boolean);
+                                if (urls.length > 0) {
+                                    const listEl = document.getElementById('scanImageList');
+                                    urls.forEach((url) => {
+                                        const imgEl = document.createElement('img');
+                                        imgEl.src = url;
+                                        imgEl.alt = '';
+                                        listEl.appendChild(imgEl);
+                                    });
+                                    listEl.style.display = 'flex';
+                                    const noticeEl = document.getElementById('scanImageNotice');
+                                    noticeEl.innerText = t('image_not_saved_notice');
+                                    noticeEl.style.display = 'block';
+                                }
                             }
                         }
 
