@@ -483,6 +483,36 @@ zanim założysz, że działa.
        spójne", jak i "panel konta nie dorównuje głównej" — obie strony
        współdzielą tę samą klasę.
     `sw.js` `CACHE_NAME` podbite do `pragma-v15`.
+  - **POPRAWKA 2026-08-18(g) — runda 5**: użytkownik dalej zgłosił, że
+    panel konta "nigdy nie dociąga spójności z głównym menu". Prawdziwa
+    przyczyna, przeoczona w rundzie 4: `account.html` i `scan.html` w
+    ogóle NIE MIAŁY górnego paska (ikonka profilu `#userMenuBtn` + pigułka
+    kredytów `#creditBalance`) — ten element istniał wyłącznie w
+    `index.html`. Żadna zmiana koloru/tekstury nie mogła tego naprawić,
+    bo problem był strukturalny, nie wizualny: wchodząc na konto, cały
+    "główny pasek" po prostu znikał. Dodany dokładnie ten sam pasek (ta
+    sama struktura HTML + `refreshCreditBalance()` z `i18n.js`) na obu
+    podstronach: na `account.html` zawsze widoczny (strona już wymaga
+    zalogowania, patrz `getSession()` w skrypcie), na `scan.html` — TYLKO
+    dla zalogowanych, bo ta strona jest publiczna (każdy z linkiem może
+    obejrzeć analizę bez logowania), więc pasek sprawdza sesję osobno i
+    nie blokuje pokazania wyniku, jeśli sesji nie ma.
+    Przy okazji, w tym samym zgłoszeniu: (a) aktywna zakładka trybu
+    analizy (Link/Tekst/Obraz) używała terakotowego `--accent` jako tła
+    ("pomarańczowa obramówka/tło przycisku, które nie pasuje do reszty")
+    zamiast czarnej/białej rodziny reszty przycisków — poprawione na
+    `var(--primary)`, tak jak każdy inny przycisk; `--accent` zostaje
+    tylko tam, gdzie już był (linki, lewy pasek wzorca manipulacji), NIE
+    jako pełne tło przycisku. (b) `button.btn-secondary` z rundy 4 był
+    płaskim obrysem bez cienia/gradientu — "za mało gry światła" — dostał
+    tę samą subtelną, dwuwarstwową grę światła (gradient `--card-2`→`--card`
+    + `--sculpt-shadow-sm` w spoczynku) co karty i główny przycisk. (c)
+    kolorowe emoji na zakładkach (🔗📝🖼️) zastąpione minimalistycznymi
+    ikonami liniowymi (inline SVG, `stroke="currentColor"` — automatycznie
+    dziedziczą kolor tekstu przycisku, więc też się odwracają z motywem)
+    — platformowe emoji (różne na różnych telefonach, kolorowe wbrew
+    reszcie stonowanej palety) nie pasowały do konceptu prestiżu z logo.
+    `sw.js` `CACHE_NAME` podbite do `pragma-v16`.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze

@@ -28,6 +28,15 @@
         <path transform="rotate(-18 50 50)" fill="url(#pragmaBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
     </svg>
 
+    <!-- Ten sam górny pasek co index.html/account.html — TYLKO gdy ktoś jest
+         zalogowany (patrz JS niżej: ta strona, w przeciwieństwie do
+         account.html, jest publiczna — każdy z linkiem może obejrzeć
+         analizę bez logowania, więc pasek nie może zakładać sesji z góry). -->
+    <a id="userMenuBtn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto">👤</a>
+    <div id="creditBalance" class="credit-balance" style="display:none;" data-i18n-aria-label="credit_balance_label" aria-label="Stan kredytów">
+        <span aria-hidden="true">💰</span><span id="creditBalanceValue" aria-live="polite">0</span>
+    </div>
+
     <div class="card" style="max-width:400px; width:100%;">
         <a href="index.html" class="back-link" data-i18n="account_back">← Wróć do Pragmy</a>
 
@@ -76,6 +85,16 @@
             document.getElementById('scanLoading').innerHTML =
                 '<p class="status-err">' + t('scan_load_error') + '</p>';
         } else {
+            // Pasek profilu/kredytów — niezależnie od reszty strony (nie
+            // blokuje pokazania wyniku skanu), tylko dla zalogowanych.
+            sb.auth.getSession().then(({ data: { session } }) => {
+                if (session) {
+                    document.getElementById('userMenuBtn').style.display = 'flex';
+                    document.getElementById('creditBalance').style.display = 'flex';
+                    refreshCreditBalance(sb, session.user.id);
+                }
+            });
+
             const scanId = new URLSearchParams(window.location.search).get('id');
 
             function showNotFound() {

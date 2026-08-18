@@ -194,27 +194,35 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
    perła / biała perła" rodziny co przycisk główny (border+tekst =
    var(--ink), czyli dokładnie ten sam odcień, który motyw już odwraca) —
    inaczej w trybie ciemnym wygląda jak zapomniana, jasna "dziura" wklejona
-   z innego UI (dokładnie ten błąd zgłoszony 2026-08-18: najpierw twardo
-   wpisane #fff/#eee/#333 inline w HTML ignorujące motyw, potem płaskie
-   jasne tło niespójne z czarnym przyciskiem głównym). Po najechaniu
-   WYPEŁNIA się tym samym kolorem co przycisk główny — spójność, nie tylko
+   z innego UI. MUSI mieć tę samą grę światła co reszta (delikatny
+   gradient + cień w spoczynku, dokładnie 2026-08-18: sam obrys bez
+   cienia/gradientu wyglądał płasko obok reszty aplikacji) — po najechaniu
+   WYPEŁNIA się tym samym kolorem co przycisk główny, spójność nie tylko
    podobieństwo. */
 button.btn-secondary {
-    background: var(--card); color: var(--ink);
+    background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 55%, var(--card) 100%);
+    color: var(--ink);
     border: 1.5px solid var(--ink);
-    box-shadow: none;
+    box-shadow: var(--sculpt-shadow-sm);
 }
-button.btn-secondary:hover { filter: none; background: var(--ink); color: var(--paper); box-shadow: var(--sculpt-shadow-sm); }
-button.btn-secondary:active { filter: none; background: var(--ink); color: var(--paper); }
+button.btn-secondary:hover { filter: none; background: var(--ink); color: var(--paper); box-shadow: var(--sculpt-shadow); }
+button.btn-secondary:active { filter: none; background: var(--ink); color: var(--paper); box-shadow: var(--sculpt-shadow-sm); }
 
 .tabs { display: flex; gap: 6px; margin: 10px 0; }
 .tab-btn {
     flex: 1; padding: 11px 4px; font-size: 13.5px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     background: var(--paper); color: var(--ink-soft); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
     cursor: pointer; width: auto; margin: 0; box-shadow: none;
 }
+.tab-icon { flex-shrink: 0; }
+/* Aktywna zakładka trzyma się TEJ SAMEJ czarnej/białej "perłowej" rodziny
+   co reszta przycisków (dawniej używała terakotowego --accent — zgłoszone
+   2026-08-18 jako "pomarańczowe tło przycisku, które nie pasuje do
+   reszty"). --accent zostaje gdzie indziej (linki, lewy pasek wzorca
+   manipulacji), ale NIE jako pełne tło przycisku. */
 .tab-btn.active {
-    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 90%, white) 0%, var(--accent) 50%, var(--accent-dark) 100%);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 50%, var(--primary-dark) 100%);
     color: var(--btn-text); border-color: transparent; box-shadow: var(--sculpt-shadow-sm);
 }
 
