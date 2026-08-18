@@ -888,13 +888,27 @@
             }
         }
 
-        // Zamienia liczbę minut z backendu (patrz RATE_LIMIT_TIER_MINUTES w
-        // analyze/index.ts) na czytelny, prosty tekst — sama liczba minut
-        // wygląda niezręcznie przy dłuższych blokadach (np. "1440 minut").
-        function formatRetryDuration(minutes) {
-            if (!minutes || minutes < 60) return t('retry_minutes', { minutes: minutes || 1 });
-            if (minutes < 24 * 60) return t('retry_hours', { hours: Math.ceil(minutes / 60) });
-            return t('retry_days', { days: Math.ceil(minutes / (24 * 60)) });
+        // Żywy licznik odliczający do końca blokady (patrz "too_many_failed_attempts"
+        // niżej) — trzymany na poziomie modułu, żeby dało się go zatrzymać przy
+        // każdym kolejnym renderResult(), inaczej stare liczniki tykałyby dalej
+        // w tle po nadpisaniu treści karty wyniku.
+        let rateLimitCountdownTimer = null;
+
+        // Krótki, czytelny format pozostałego czasu: mm:ss przy mniej niż
+        // godzinie (żeby licznik faktycznie "tykał"), a przy dłuższych
+        // blokadach zaokrąglone godziny/dni (tykanie co sekundę przy blokadzie
+        // liczonej w dniach nie miałoby sensu).
+        function formatCountdown(remainingMs) {
+            const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+            if (totalSeconds < 3600) {
+                const m = Math.floor(totalSeconds / 60);
+                const s = totalSeconds % 60;
+                return m + ':' + String(s).padStart(2, '0');
+            }
+            if (totalSeconds < 24 * 3600) {
+                return t('retry_hours', { hours: Math.ceil(totalSeconds / 3600) });
+            }
+            return t('retry_days', { days: Math.ceil(totalSeconds / (24 * 3600)) });
         }
 
         function renderResult(data) {
@@ -904,10 +918,33 @@
             const summary = document.getElementById('resultSummary');
             patternsEl.innerHTML = '';
 
+            if (rateLimitCountdownTimer) {
+                clearInterval(rateLimitCountdownTimer);
+                rateLimitCountdownTimer = null;
+            }
+
             if (data.error) {
                 card.style.display = 'block';
                 badge.className = 'result-badge badge-yellow';
                 badge.innerText = t('badge_info');
+
+                if (data.error === 'too_many_failed_attempts' && data.blocked_until) {
+                    const targetTime = new Date(data.blocked_until).getTime();
+                    const tick = () => {
+                        const remainingMs = targetTime - Date.now();
+                        if (remainingMs <= 0) {
+                            clearInterval(rateLimitCountdownTimer);
+                            rateLimitCountdownTimer = null;
+                            summary.innerText = t('rate_limit_expired');
+                            return;
+                        }
+                        summary.innerText = t('err_too_many_failed_attempts', { time: formatCountdown(remainingMs) });
+                    };
+                    tick();
+                    rateLimitCountdownTimer = setInterval(tick, 1000);
+                    return;
+                }
+
                 // Komunikat błędu tłumaczymy PO KODZIE błędu (ten sam system co
                 // reszta interfejsu) — nie ufamy data.message, bo backend zwraca
                 // go na sztywno po polsku, niezależnie od wybranego języka.
@@ -919,12 +956,9 @@
                     invalid_image: 'err_invalid_image',
                     file_too_large: 'err_file_too_large',
                     unsafe_content: 'err_unsafe_content',
-                    too_many_failed_attempts: 'err_too_many_failed_attempts',
                 };
                 const key = errorMessageKeys[data.error];
-                summary.innerText = key
-                    ? t(key, { time: formatRetryDuration(data.retry_after_minutes) })
-                    : t('result_generic_error');
+                summary.innerText = key ? t(key) : t('result_generic_error');
                 return;
             }
 

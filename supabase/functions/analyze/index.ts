@@ -399,14 +399,21 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
 // zapytania do Gemini, ale nic nie zarabiamy — kredyty ściągamy dopiero po
 // sukcesie (sekcja 7 niżej). Bez ograniczenia ktoś mógłby (przez pomyłkę
 // albo celowo) zasypywać nas nieudanymi próbami bez końca. Próg wyzwalający
-// blokadę jest zawsze ten sam (5 nieudanych prób w 10 minut), ale CZAS
-// TRWANIA blokady rośnie z każdą kolejną blokadą tego samego konta w ciągu
-// ostatnich 7 dni — jeśli konto przez 7 dni nie zbiera nowych blokad, kara
-// wraca do najniższego poziomu (patrz logFailedAttempt() w Deno.serve niżej).
+// blokadę jest zawsze ten sam (15 nieudanych prób w 10 minut — przy tak
+// tanim modelu jak Flash-Lite realny koszt finansowy nawet tej liczby prób
+// jest znikomy, więc próg może być wysoki, żeby nie łapać prawdziwych
+// użytkowników przez przypadek), ale CZAS TRWANIA blokady rośnie
+// TRZYKROTNIE z każdą kolejną blokadą tego samego konta w ciągu ostatnich
+// RATE_LIMIT_STRIKE_RESET_DAYS dni (10 min → 30 min → 1,5h → 4,5h → ...,
+// z sufitem RATE_LIMIT_MAX_MINUTES) — jeśli konto przez ten czas nie
+// zbiera nowych blokad, kara wraca do najniższego poziomu (patrz
+// logFailedAttempt() w Deno.serve niżej).
 const RATE_LIMIT_WINDOW_MINUTES = 10
-const RATE_LIMIT_FAILURE_THRESHOLD = 5
+const RATE_LIMIT_FAILURE_THRESHOLD = 15
 const RATE_LIMIT_STRIKE_RESET_DAYS = 7
-const RATE_LIMIT_TIER_MINUTES = [10, 60, 24 * 60] // 1. blokada, 2. blokada, 3.+ blokada
+const RATE_LIMIT_BASE_MINUTES = 10
+const RATE_LIMIT_MULTIPLIER = 3
+const RATE_LIMIT_MAX_MINUTES = 30 * 24 * 60 // sufit: 30 dni, żeby kara nie rosła bez końca
 
 const FALLBACK_SIFT_SCHEMA = {
   type: 'object',
@@ -543,9 +550,13 @@ Deno.serve(async (req: Request) => {
       if (lastBlock) {
         const remainingMs = new Date(lastBlock.blocked_until).getTime() - Date.now()
         if (remainingMs > 0) {
+          // "blocked_until" (dokładny znacznik czasu) pozwala frontendowi
+          // pokazać żywo odliczający licznik do końca blokady, zamiast
+          // statycznego, zaokrąglonego komunikatu.
           return new Response(
             JSON.stringify({
               error: 'too_many_failed_attempts',
+              blocked_until: lastBlock.blocked_until,
               retry_after_minutes: Math.ceil(remainingMs / 60000),
             }),
             { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -577,8 +588,11 @@ Deno.serve(async (req: Request) => {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user_id)
         .gte('created_at', resetStart)
-      const tierIndex = Math.min(recentStrikes ?? 0, RATE_LIMIT_TIER_MINUTES.length - 1)
-      const blockedUntil = new Date(Date.now() + RATE_LIMIT_TIER_MINUTES[tierIndex] * 60 * 1000).toISOString()
+      const blockMinutes = Math.min(
+        RATE_LIMIT_BASE_MINUTES * Math.pow(RATE_LIMIT_MULTIPLIER, recentStrikes ?? 0),
+        RATE_LIMIT_MAX_MINUTES
+      )
+      const blockedUntil = new Date(Date.now() + blockMinutes * 60 * 1000).toISOString()
 
       await supabase.from('rate_limit_blocks').insert({ user_id, blocked_until: blockedUntil })
     }

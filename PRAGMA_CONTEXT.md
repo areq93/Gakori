@@ -940,17 +940,22 @@ bez żadnego przychodu.
 **Rozwiązanie** (`analyze/index.ts`, stałe `RATE_LIMIT_*`, funkcja
 `logFailedAttempt()` wywoływana przy każdym `url_fetch_failed`/
 `gemini_error`/`save_failed` dla zalogowanego użytkownika):
-- Próg wyzwalający blokadę jest zawsze ten sam: **5 nieudanych prób w ciągu
-  10 minut** na jedno konto (log w `failed_scan_attempts`).
+- Próg wyzwalający blokadę jest zawsze ten sam: **15 nieudanych prób w
+  ciągu 10 minut** na jedno konto (log w `failed_scan_attempts`) — próg
+  celowo wysoki, bo przy tak tanim modelu (patrz niżej) nawet 15 prób to
+  wciąż znikomy koszt, a wysoki próg mocno zmniejsza ryzyko złapania
+  prawdziwego użytkownika przez zwykłego pecha.
 - Po przekroczeniu progu konto dostaje CHWILOWĄ blokadę — nowe analizy są
-  odrzucane komunikatem `too_many_failed_attempts` (z liczbą minut do
-  odblokowania), zanim cokolwiek policzymy czy wywołamy Gemini.
-- **Kara rośnie z każdą kolejną blokadą tego samego konta**: 1. blokada w
-  ciągu ostatnich 7 dni = 10 minut, 2. = 1 godzina, 3. i każda kolejna = 24
-  godziny. Licznik blokad (w `rate_limit_blocks`) liczy się z ruchomego,
-  7-dniowego okna wstecz — jeśli konto 7 dni nie zbiera nowych blokad, kara
-  **sama wraca** do najniższego poziomu (10 minut), bez żadnej ręcznej
-  interwencji.
+  odrzucane komunikatem `too_many_failed_attempts` (z dokładnym znacznikiem
+  czasu `blocked_until`, po którym frontend pokazuje żywo odliczający
+  licznik do końca blokady — patrz `formatCountdown()`/`renderResult()` w
+  `index.html`), zanim cokolwiek policzymy czy wywołamy Gemini.
+- **Kara rośnie TRZYKROTNIE z każdą kolejną blokadą tego samego konta**:
+  10 min → 30 min → 1,5h → 4,5h → ... aż do sufitu 30 dni
+  (`RATE_LIMIT_MAX_MINUTES`). Licznik blokad (w `rate_limit_blocks`) liczy
+  się z ruchomego, 7-dniowego okna wstecz (`RATE_LIMIT_STRIKE_RESET_DAYS`)
+  — jeśli konto 7 dni nie zbiera nowych blokad, kara **sama wraca** do
+  najniższego poziomu (10 minut), bez żadnej ręcznej interwencji.
 - **Świadomie NIE ma automatycznego, trwałego banowania konta** — przy
   tanim modelu (Gemini Flash-Lite, ułamek grosza za zapytanie) nawet
   ciągłe, całodobowe uderzanie w limit jednego konta to koszt rzędu
@@ -958,6 +963,9 @@ bez żadnego przychodu.
   konta jest znikome. Trwałe banowanie byłoby nieproporcjonalną karą
   (trudną do odwrócenia — może przez pomyłkę trwale zablokować prawdziwego
   użytkownika, który po prostu trafił na kilka zepsutych linków pod rząd).
+  Rosnąca (×3), ale zawsze cofalna kara ma być "stabilnie i zniechęcająco"
+  uciążliwa dla kogoś, kto naprawdę próbuje nadużywać systemu, bez
+  ryzyka trwałej, nieodwracalnej blokady prawdziwego konta.
 - **Świadomie POZA zakresem tej zmiany**: ochrona przed atakiem przez wiele
   fałszywych kont naraz (rejestracja jest dziś darmowa i bez weryfikacji) —
   to inny problem (ochrona samej rejestracji: e-mail, captcha, limit kont z
