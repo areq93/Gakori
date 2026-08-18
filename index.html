@@ -715,7 +715,14 @@
             if (imageFile) {
                 setSelectedImageFile(imageFile);
             } else {
-                alert(t('alert_paste_not_image'));
+                // TYMCZASOWA diagnostyka (do usunięcia po znalezieniu przyczyny
+                // problemu z wklejaniem na niektórych telefonach) — pokazuje, co
+                // przeglądarka faktycznie dostała ze schowka, żeby odróżnić "nasz
+                // kod czegoś nie łapie" od "telefon w ogóle nie przekazał obrazu".
+                const types = (clipboardData && clipboardData.types && clipboardData.types.length)
+                    ? Array.from(clipboardData.types).join(', ')
+                    : '(pusto)';
+                alert(t('alert_paste_not_image') + '\n\n[diagnostyka] typy w schowku: ' + types);
             }
         });
         // Ta strefa istnieje WYŁĄCZNIE do wklejania obrazu — blokujemy zwykłe
