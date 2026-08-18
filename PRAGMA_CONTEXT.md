@@ -761,6 +761,29 @@ zanim założysz, że działa.
       (odwołanie do modelu GIGO w bibliotece) i (b) wskazuje kategorie —
       połączone w jedno zapytanie celowo, żeby ta ścieżka też miała tylko 2
       zapytania do Gemini, nie 3.
+- **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
+  użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
+  prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
+  - **"WIERNOŚĆ CYTATU"**: model nie ma prawa w żaden sposób zmieniać treści
+    źródła, gdy się do niej odwołuje w polu `quote` — żadnej zmiany
+    wielkości liter, ucinania/dodawania słów, "wygładzania". Powód
+    techniczny: `scan.html` podświetla w pełnym tekście źródłowym dokładnie
+    te fragmenty, które `quote` cytuje (patrz `buildHighlightedText()`) —
+    jeśli model zmieni choć jedną literę (typowo: ucina wiodące "i"/"a" i
+    zamienia kolejne słowo na wielką literę, żeby "ładniej" zaczynało
+    zdanie), dopasowanie 1:1 zawodzi i fragment w ogóle się nie podświetla.
+    Frontend ma na to dodatkowy, niezależny fallback (`findQuoteRange()` w
+    `scan.html`: dopasowanie bez wielkości liter, a potem bez pierwszych
+    1-3 słów cytatu) — ale to tylko siatka bezpieczeństwa, NIE zwalnia
+    promptu z wymogu dosłowności; to jedno z pól, gdzie nawet drobne,
+    pozornie kosmetyczne odstępstwo modela ma realny, widoczny skutek dla
+    użytkownika.
+  - **"KTO NAPRAWDĘ TWIERDZI, ŻE COŚ SIĘ WYDARZYŁO"**: zapobiega myleniu
+    autora RELACJONUJĄCEGO cudze (fałszywe) twierdzenie na swój temat
+    (np. "z reklamy dowiedziałem się, że rzekomo...") z autorem opisującym
+    własne, prawdziwe przeżycie — zdiagnozowane na żywym przykładzie, gdzie
+    Gemini błędnie rozpoznał Efekt Halo w relacji ofiary fałszywej reklamy,
+    zamiast rozpoznać samo oszustwo jako wzorzec manipulacji.
 - **Zmieniające się komunikaty podczas oczekiwania na analizę**: skoro
   pełna analiza to teraz kilka kolejnych zapytań do AI (kategoryzacja →
   właściwa analiza → czasem jeszcze awaryjne pobranie strony), potrafi to
