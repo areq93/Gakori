@@ -217,6 +217,19 @@ zanim założysz, że działa.
     oraz w Service Workerze), świadomie odłożona, bo wklejanie ze schowka w
     pełni pokrywa zgłoszoną potrzebę ("wkleić ostatni zrzut ekranu z
     pamięci").
+    - **Znane ograniczenie na części telefonów: nie ma tu nic do naprawienia
+      po naszej stronie.** Zdiagnozowane na żywo z użytkownikiem (Android,
+      Brave): to, co telefon nazywa "skopiowaniem zrzutu ekranu", w zależności
+      od aplikacji źródłowej czasem w ogóle NIE umieszcza w systemowym
+      schowku żadnych danych obrazu — tylko sam tekst (`clipboardData.types`
+      pokazywało wyłącznie `text/plain`). Strona internetowa nie ma jak
+      pokazać obrazu, którego naprawdę nie ma w schowku — to ograniczenie
+      aplikacji/systemu kopiującego, nie błąd w kodzie Pragmy. Kod sprawdza
+      zarówno `clipboardData.files`, jak i `.items` (różne przeglądarki
+      wypełniają różne z tych pól), więc jeśli w schowku FAKTYCZNIE jest
+      obraz, zostanie złapany. Komunikat błędu (`alert_paste_not_image` w
+      `i18n.js`) podpowiada wtedy pewniejszą alternatywę: zwykły przycisk
+      "Wybierz zdjęcie", który na telefonach działa bez zarzutu.
   - PDF: jeszcze nie zaimplementowany (`input_type: "pdf"` zwróciłby
     `501 not_implemented`, gdyby frontend w ogóle wysyłał taki typ — na
     razie nie ma dla PDF żadnego pola w interfejsie). Moderacja opisana
