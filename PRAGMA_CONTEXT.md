@@ -953,9 +953,14 @@ bez żadnego przychodu.
 - **Kara rośnie TRZYKROTNIE z każdą kolejną blokadą tego samego konta**:
   10 min → 30 min → 1,5h → 4,5h → ... aż do sufitu 30 dni
   (`RATE_LIMIT_MAX_MINUTES`). Licznik blokad (w `rate_limit_blocks`) liczy
-  się z ruchomego, 7-dniowego okna wstecz (`RATE_LIMIT_STRIKE_RESET_DAYS`)
-  — jeśli konto 7 dni nie zbiera nowych blokad, kara **sama wraca** do
-  najniższego poziomu (10 minut), bez żadnej ręcznej interwencji.
+  się z ruchomego, 30-dniowego okna wstecz (`RATE_LIMIT_STRIKE_RESET_DAYS`)
+  — jeśli konto 30 dni nie zbiera nowych blokad, kara **sama wraca** do
+  najniższego poziomu (10 minut), bez żadnej ręcznej interwencji. Okno
+  resetu musi być >= sufitowi kary — inaczej "pamięć" o karze wygasałaby,
+  zanim najdłuższa możliwa blokada w ogóle by się skończyła, i konto, które
+  właśnie odsiedziało maksymalną karę, zaraz dostałoby najniższą (pierwotnie
+  było to 7 dni, poprawione po tym, jak Arek zauważył tę niespójność
+  2026-08-18).
 - **Świadomie NIE ma automatycznego, trwałego banowania konta** — przy
   tanim modelu (Gemini Flash-Lite, ułamek grosza za zapytanie) nawet
   ciągłe, całodobowe uderzanie w limit jednego konta to koszt rzędu
