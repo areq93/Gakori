@@ -745,14 +745,14 @@
             if (imageFile) {
                 setSelectedImageFile(imageFile);
             } else {
-                // TYMCZASOWA diagnostyka (do usunięcia po znalezieniu przyczyny
-                // problemu z wklejaniem na niektórych telefonach) — pokazuje, co
-                // przeglądarka faktycznie dostała ze schowka, żeby odróżnić "nasz
-                // kod czegoś nie łapie" od "telefon w ogóle nie przekazał obrazu".
-                const types = (clipboardData && clipboardData.types && clipboardData.types.length)
-                    ? Array.from(clipboardData.types).join(', ')
-                    : '(pusto)';
-                alert(t('alert_paste_not_image') + '\n\n[diagnostyka] typy w schowku: ' + types);
+                // Zdiagnozowane na żywo z użytkownikiem: na części telefonów to,
+                // co system nazywa "skopiowaniem zrzutu ekranu", w ogóle nie
+                // umieszcza w schowku danych obrazu — tylko sam tekst (np. nazwę
+                // pliku). To ograniczenie źródła kopiowania (aplikacji/systemu),
+                // nie coś, co da się naprawić po naszej stronie — nie ma tu więc
+                // nic do "łapania" innym kodem. Podpowiadamy wtedy pewniejszą,
+                // zawsze działającą alternatywę: zwykły wybór pliku.
+                alert(t('alert_paste_not_image'));
             }
         });
         // Ta strefa istnieje WYŁĄCZNIE do wklejania obrazu — blokujemy zwykłe
