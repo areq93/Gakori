@@ -782,6 +782,7 @@ Deno.serve(async (req: Request) => {
         language: outputLanguage,
         is_translation: usedTranslation,
         source_url: input_type === 'url' ? source_url : null,
+        text_content: input_type === 'text' ? text_content : null,
         char_count: input_type === 'text' ? char_count : 0,
         credits_charged: finalCost,
         result,

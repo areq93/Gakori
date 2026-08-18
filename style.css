@@ -172,6 +172,27 @@ a { color: var(--accent); }
 }
 .scan-source-box a { font-weight: 600; }
 
+/* Zwijany pełny tekst źródłowy (tylko dla trybu "tekst") — <details> daje
+   natywne, dostępne zwijanie/rozwijanie bez dodatkowego JS do samego
+   pokazywania/chowania. Podświetlenie fragmentów odpowiadających cytatom
+   patrz buildHighlightedText() w scan.html. */
+.scan-text-source { margin: 0 0 18px 0; }
+.scan-text-source summary {
+    cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-soft);
+    background: var(--card); border: var(--border-w) solid var(--card-border);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.scan-text-source-content {
+    border: var(--border-w) solid var(--card-border); border-top: none;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm); padding: 12px;
+    font-size: 13.5px; line-height: 1.6; color: var(--ink-soft);
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 320px; overflow-y: auto;
+}
+.scan-text-source-content mark.source-highlight {
+    background: var(--accent-soft); color: var(--ink); border-radius: 2px; padding: 0 2px;
+}
+
 /* Poszczególne wykryte wzorce (manipulacja albo trafny sposób rozumowania) —
    każdy w osobnej, wyraźnie odgraniczonej ramce, żeby łatwo było je przewijać
    wzrokiem jako osobne "karty" wewnątrz wyniku. */
