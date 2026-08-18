@@ -194,9 +194,13 @@ a { color: var(--accent); }
     white-space: pre-wrap; word-break: break-word;
     max-height: 320px; overflow-y: auto;
 }
-.scan-text-source-content mark.source-highlight {
-    background: var(--accent-soft); color: var(--ink); border-radius: 2px; padding: 0 2px;
-}
+/* Kolor podświetlenia zależy od typu wzorca — ta sama konwencja co odznaka
+   i lewa krawędź karty wzorca niżej (.pattern-item), żeby nie było
+   rozjazdu, jak w wersji, gdzie "obserwacja" gdzie indziej była zielona,
+   a tu i tak zawsze czerwona. */
+.scan-text-source-content mark.source-highlight { color: var(--ink); border-radius: 2px; padding: 0 2px; }
+.scan-text-source-content mark.source-highlight-manipulation { background: var(--accent-soft); }
+.scan-text-source-content mark.source-highlight-reasoning { background: #dcfce7; }
 
 /* Poszczególne wykryte wzorce (manipulacja albo trafny sposób rozumowania) —
    każdy w osobnej, wyraźnie odgraniczonej ramce, żeby łatwo było je przewijać
