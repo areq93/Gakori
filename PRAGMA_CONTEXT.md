@@ -437,6 +437,24 @@ zanim założysz, że działa.
     startowej) — żeby "świat" aplikacji był spójny na każdej podstronie,
     nie tylko na pierwszym ekranie.
     `sw.js` `CACHE_NAME` podbite do `pragma-v13`.
+  - **POPRAWKA 2026-08-18(e) — runda 3**: użytkownik po zobaczeniu rundy 2
+    na żywo ocenił, że apka "wygląda jakby nie miała energii", a gry
+    świateł dalej za mało. Przyczyna: same reguły (gradient, `inset`
+    highlight) już były, ale różnica jasności między `--card` i `--card-2`
+    (dwa końce gradientu karty) była zbyt mała, żeby oko faktycznie
+    zarejestrowało światło — a cień był za płytki, żeby karta wyglądała na
+    uniesioną. Podbite (bez powrotu do jaskrawych kolorów, tylko mocniej
+    rozstawiona jasność/nasycenie tej samej, stonowanej palety): większy
+    rozstaw jasności `--card`/`--card-2` w obu motywach, głębszy i bardziej
+    rozmyty `--sculpt-shadow`/`--sculpt-shadow-sm`, mocniejszy
+    `--highlight-edge`, bardziej nasycone `--accent`/`--primary`, wyraźniej
+    widoczne (ale wciąż cienkie) `--card-border`, szerszy rozstaw gradientu
+    na przyciskach/odznakach (`color-mix` z 82% do 90% bieli na jasnym
+    końcu), mocniejsza opacity `.pragma-backdrop` (0.16→0.22 jasny,
+    0.22→0.3 ciemny). Kontrast sprawdzony ponownie po zmianie — wyszedł
+    RÓWNIEŻ lepszy niż w rundzie 2 (np. `--ink-soft` na `--paper`: było ok.
+    5:1, jest ok. 4,9-8,4:1 zależnie od motywu), więc silniejszy wygląd nie
+    kosztował czytelności, wręcz ją poprawił.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
