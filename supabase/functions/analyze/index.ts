@@ -857,15 +857,31 @@ Deno.serve(async (req: Request) => {
         // się), które niekoniecznie trafiają w kategorie blokowane
         // automatycznie przez samego dostawcę.
         const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy KTÓRYKOLWIEK z przesłanych obrazów przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK (choćby na jednym z obrazów) — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "q_score", "patterns" i "summary" zostaw odpowiednio: 0, pusta lista, pusty tekst. NIE opisuj ani nie analizuj dalej żadnego z obrazów. Jeśli ŻADEN obraz nie przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.`
-        // Przy więcej niż jednym obrazie naraz Gemini ma je czytać jako JEDEN
-        // wspólny kontekst (np. seria zrzutów tej samej rozmowy) i zwrócić
-        // JEDNĄ wspólną listę wzorców dla wszystkich obrazów razem — bez
-        // dzielenia jej według obrazu (świadoma decyzja: prostszy wynik,
-        // patrz PRAGMA_CONTEXT.md).
+        // Przy więcej niż jednym obrazie naraz Gemini ma zwrócić JEDNĄ wspólną
+        // listę wzorców dla wszystkich obrazów razem, bez dzielenia jej według
+        // obrazu (świadoma decyzja: prostszy wynik, patrz PRAGMA_CONTEXT.md).
+        // ALE — zaobserwowane na żywo z użytkownikiem: bez wyraźnego
+        // rozgraniczenia i jednoznacznego nakazu model skupiał się tylko na
+        // NAJBARDZIEJ RZUCAJĄCYM SIĘ W OCZY obrazie (zwykle pierwszym) i
+        // całkowicie ignorował resztę — mimo poprawnego wywołania ze
+        // wszystkimi obrazami w zapytaniu. Naprawa dwuczęściowa: (1) każdy
+        // obraz dostaje jawną etykietę tekstową "OBRAZ N" bezpośrednio przed
+        // nim (patrz budowanie "parts" niżej), żeby model w ogóle "widział"
+        // osobne, policzalne elementy, a nie jeden nieopisany zbiór; (2)
+        // instrukcja wprost zabrania pomijania któregokolwiek i wymusza, żeby
+        // pole "summary" jawnie potwierdzało sprawdzenie WSZYSTKICH obrazów —
+        // które miały wzorce, a które nie.
         const multiImageInstruction =
           imageMimeTypes.length > 1
-            ? ` Przesłano ${imageMimeTypes.length} obrazów naraz — potraktuj je jako jeden, wspólny kontekst do analizy i zwróć JEDNĄ wspólną listę wzorców dla wszystkich obrazów razem, bez dzielenia jej według konkretnego obrazu.`
+            ? ` Przesłano ${imageMimeTypes.length} obrazów naraz, oznaczonych poniżej etykietami "OBRAZ 1", "OBRAZ 2" itd. MUSISZ przeanalizować KAŻDY z nich osobno i uważnie, po kolei, bez pomijania żadnego — to, że jeden obraz zawiera wyraźny, rzucający się w oczy wzorzec, NIE zwalnia Cię z równie dokładnego sprawdzenia pozostałych. Zwróć JEDNĄ wspólną listę "patterns" dla wszystkich wykrytych wzorców łącznie (bez dzielenia jej według obrazu) — ale w polu "summary" WPROST napisz, w których obrazach (po numerze) wykryto wzorce, a w których nie wykryto żadnych (np. "W obrazie 1 wykryto X. Obrazy 2-6 nie zawierają wyraźnych wzorców manipulacji."). Czytelnik musi mieć pewność, że każdy obraz został realnie sprawdzony, a nie tylko ten najbardziej widoczny.`
             : ''
+        const imageParts =
+          imageMimeTypes.length > 1
+            ? imageMimeTypes.flatMap((mimeType, i) => [
+                { text: `OBRAZ ${i + 1}:` },
+                { inlineData: { mimeType, data: images_base64[i] } },
+              ])
+            : imageMimeTypes.map((mimeType, i) => ({ inlineData: { mimeType, data: images_base64[i] } }))
         geminiData = await callGemini(
           {
             contents: [
@@ -874,9 +890,7 @@ Deno.serve(async (req: Request) => {
                   {
                     text: `${systemPrompt}\n\n${moderationInstruction}\n\nPrzeanalizuj treść widoczną na przesłanym obrazie lub obrazach (to może być zrzut ekranu, zdjęcie tekstu, wykres, post z mediów społecznościowych itp.) — potraktuj ją dokładnie tak samo jak tekst do analizy.${multiImageInstruction}`,
                   },
-                  ...imageMimeTypes.map((mimeType, i) => ({
-                    inlineData: { mimeType, data: images_base64[i] },
-                  })),
+                  ...imageParts,
                 ],
               },
             ],

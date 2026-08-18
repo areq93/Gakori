@@ -1069,6 +1069,28 @@ bez żadnego przychodu.
 
 ## Pułapki, w które już raz wpadliśmy (żeby się nie powtórzyły)
 
+- **Gemini "widzi" tylko najbardziej wyrazisty obraz z kilku naraz** (złapane
+  na żywo 2026-08-18, zaraz po wdrożeniu analizy wielu obrazów): mimo że
+  wszystkie obrazy trafiały w jednym zapytaniu do Gemini jako kolejne
+  `inlineData`, a instrukcja mówiła "przeanalizuj wszystkie razem", model w
+  praktyce analizował TYLKO pierwszy/najbardziej rzucający się w oczy obraz
+  (np. reklamę z tekstem) i całkowicie pomijał resztę (np. zrzuty ekranu
+  telefonu bez wyraźnej treści) — bez żadnego komunikatu o pominięciu. Model
+  bez jawnego rozgraniczenia nie "widzi" osobnych, policzalnych elementów,
+  tylko jeden rozmyty zbiór danych. Naprawione dwuczęściowo w
+  `analyze/index.ts` (gałąź `input_type === 'image'`, >1 obraz): (1) każdy
+  obraz dostaje jawną etykietę tekstową `"OBRAZ N:"` jako osobną część
+  (`part`) TUŻ PRZED nim w zapytaniu — nie samo `inlineData` bez opisu; (2)
+  instrukcja wprost zabrania pomijania któregokolwiek obrazu i wymusza, żeby
+  pole `summary` jawnie wymieniało, w których obrazach (po numerze) wykryto
+  wzorce, a w których nie wykryto żadnych — więc nawet gdyby model coś
+  pominął, będzie to widoczne w treści wyniku, a nie ukryte. **Ogólna
+  lekcja, nie tylko dla obrazów**: przy każdym zadaniu, gdzie model ma
+  jednakowo potraktować kilka odrębnych elementów naraz (kilka obrazów,
+  kilka fragmentów tekstu, kilka linków), nie wystarczy o to poprosić w
+  jednym zdaniu — elementy muszą być jawnie ponumerowane/oznaczone w samym
+  zapytaniu, a wynik musi dawać sposób na sprawdzenie, że żaden nie został
+  po cichu pominięty.
 - **Service Worker cache**: przy każdej zmianie pliku, który jest w
   `ASSETS` (precache) w `sw.js`, trzeba pamiętać o podbiciu `CACHE_NAME`.
   Kilka PR-ów z rzędu o tym zapomniało, co skutkowało tym, że użytkownicy
