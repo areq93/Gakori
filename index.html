@@ -65,8 +65,8 @@
             <div style="text-align:center; margin-top:8px;">
                 <a href="#" id="forgotPasswordLink" style="font-size:13px; color:var(--accent);" data-i18n="link_forgot_password">Zapomniałeś hasła?</a>
             </div>
-            <div style="text-align:center; color:#999; font-size:12px; margin:12px 0;" data-i18n="divider_or">— lub —</div>
-            <button id="googleLoginBtn" type="button" style="background:#fff; color:#333; border:1px solid #ccc;" data-i18n="btn_google_login">Zaloguj przez Google</button>
+            <div style="text-align:center; color:var(--ink-soft); font-size:12px; margin:12px 0;" data-i18n="divider_or">— lub —</div>
+            <button id="googleLoginBtn" type="button" class="btn-secondary" data-i18n="btn_google_login">Zaloguj przez Google</button>
             <div id="authStatus" style="margin-top:10px; font-size:13px;"></div>
         </div>
 
@@ -98,8 +98,8 @@
         <div class="mode-panel" id="panel-image">
             <p data-i18n="label_choose_image">Wybierz zdjęcie do analizy:</p>
             <input type="file" id="imageInput" accept="image/*" multiple style="display:none;">
-            <button type="button" id="imageInputTrigger" data-i18n="btn_choose_image" style="background:#fff; color:#333; border:1px solid #ccc;">Wybierz zdjęcie</button>
-            <div id="imagePasteDivider" style="text-align:center; color:#999; font-size:12px; margin:10px 0;" data-i18n="divider_or">— lub —</div>
+            <button type="button" id="imageInputTrigger" data-i18n="btn_choose_image" class="btn-secondary">Wybierz zdjęcie</button>
+            <div id="imagePasteDivider" style="text-align:center; color:var(--ink-soft); font-size:12px; margin:10px 0;" data-i18n="divider_or">— lub —</div>
             <div id="imagePasteZone" class="paste-zone" contenteditable="true" tabindex="0" data-i18n-content-placeholder="label_paste_image_zone" data-i18n-aria-label="label_paste_image_zone"></div>
             <div id="imageSelectionInfo"></div>
             <div id="imagePreviewList" class="image-preview-list"></div>
@@ -235,7 +235,7 @@
 
         if (!sb) {
             document.getElementById('authLoggedOut').innerHTML =
-                '<p style="color:#991b1b; margin:0;">⚠️ Logowanie chwilowo niedostępne. Sprawdź połączenie z internetem i odśwież stronę.</p>';
+                '<p style="color:var(--danger-text); margin:0;">⚠️ Logowanie chwilowo niedostępne. Sprawdź połączenie z internetem i odśwież stronę.</p>';
             document.getElementById('appLoading').style.display = 'none';
             document.getElementById('authCard').style.display = 'block';
         } else {
