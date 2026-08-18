@@ -407,10 +407,13 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
 // RATE_LIMIT_STRIKE_RESET_DAYS dni (10 min → 30 min → 1,5h → 4,5h → ...,
 // z sufitem RATE_LIMIT_MAX_MINUTES) — jeśli konto przez ten czas nie
 // zbiera nowych blokad, kara wraca do najniższego poziomu (patrz
-// logFailedAttempt() w Deno.serve niżej).
+// logFailedAttempt() w Deno.serve niżej). RATE_LIMIT_STRIKE_RESET_DAYS musi
+// być >= (RATE_LIMIT_MAX_MINUTES w dniach) — inaczej "pamięć" o karze
+// wygasłaby, zanim najdłuższa możliwa blokada w ogóle się skończy, i ktoś
+// kto właśnie odsiedział maksymalną karę zaraz dostałby najniższą.
 const RATE_LIMIT_WINDOW_MINUTES = 10
 const RATE_LIMIT_FAILURE_THRESHOLD = 15
-const RATE_LIMIT_STRIKE_RESET_DAYS = 7
+const RATE_LIMIT_STRIKE_RESET_DAYS = 30
 const RATE_LIMIT_BASE_MINUTES = 10
 const RATE_LIMIT_MULTIPLIER = 3
 const RATE_LIMIT_MAX_MINUTES = 30 * 24 * 60 // sufit: 30 dni, żeby kara nie rosła bez końca
