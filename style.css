@@ -162,7 +162,12 @@ a { color: var(--accent); }
 .badge-green { background: #dcfce7; color: #166534; border-color: #166534; }
 .badge-yellow { background: #fef9c3; color: #854d0e; border-color: #854d0e; }
 .badge-red { background: #fee2e2; color: #991b1b; border-color: #991b1b; }
-.result-quote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: var(--ink-soft); line-height: 1.5; }
+/* Neutralna linia przy cytacie — celowo NIE kolor wzorca (manipulacja/
+   obserwacja), żeby nie dublować/mylić się z kolorem odznaki i lewej
+   krawędzi całej karty wzorca (patrz .pattern-item niżej), które już same
+   niosą to rozróżnienie. Ta sama reguła obowiązuje wszędzie (index.html,
+   scan.html), dla każdego trybu analizy. */
+.result-quote { border-left: 3px solid var(--card-border); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: var(--ink-soft); line-height: 1.5; }
 
 /* Ramka wokół informacji o źródle (link analizowanej strony) na scan.html */
 .scan-source-box {
@@ -202,7 +207,11 @@ a { color: var(--accent); }
 }
 .pattern-item:last-child { margin-bottom: 0; }
 .pattern-item.pattern-manipulation { border-left-color: var(--accent); }
-.pattern-item.pattern-reasoning { border-left-color: var(--primary); }
+/* Ten sam zielony co .badge-green niżej (celowo NIE var(--primary) — to
+   kolor przycisków/marki w całej appce, za mało odróżnialny od reszty UI
+   tutaj) — "obserwacja/trafne rozumowanie" ma być jednoznacznie kojarzona
+   z tym samym zielonym, którego użytkownik już zna z odznaki wyniku. */
+.pattern-item.pattern-reasoning { border-left-color: #166534; }
 
 .pattern-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .pattern-tag {
@@ -210,7 +219,7 @@ a { color: var(--accent); }
     padding: 2px 8px; border-radius: 3px; white-space: nowrap;
 }
 .pattern-manipulation .pattern-tag { background: var(--accent-soft); color: var(--accent-dark); }
-.pattern-reasoning .pattern-tag { background: var(--primary-soft); color: var(--primary-dark); }
+.pattern-reasoning .pattern-tag { background: #dcfce7; color: #166534; }
 .pattern-name { font-weight: 700; font-size: 13.5px; color: var(--ink); }
 
 .pattern-item .result-quote { margin: 0 0 8px 0; }
