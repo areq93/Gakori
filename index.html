@@ -78,6 +78,8 @@
             <p data-i18n="label_choose_image">Wybierz zdjęcie do analizy:</p>
             <input type="file" id="imageInput" accept="image/*" style="display:none;">
             <button type="button" id="imageInputTrigger" data-i18n="btn_choose_image" style="background:#fff; color:#333; border:1px solid #ccc;">Wybierz zdjęcie</button>
+            <div style="text-align:center; color:#999; font-size:12px; margin:10px 0;" data-i18n="divider_or">— lub —</div>
+            <div id="imagePasteZone" class="paste-zone" contenteditable="true" tabindex="0" data-i18n-content-placeholder="label_paste_image_zone" data-i18n-aria-label="label_paste_image_zone"></div>
             <div id="fileName"></div>
             <img id="imagePreview" alt="podgląd">
         </div>
@@ -637,7 +639,35 @@
             btn.addEventListener('click', () => setMode(btn.dataset.mode));
         });
 
-        // 4. Podgląd wybranego obrazu
+        // 4. Wybór obrazu — ręcznie z pliku (przycisk) ALBO wklejony ze schowka
+        // (np. świeży zrzut ekranu skopiowany w innej aplikacji) — oba trafiają
+        // do tej samej zmiennej i tego samego podglądu, żeby reszta kodu
+        // (przycisk "Analizuj") nie musiała wiedzieć, skąd plik pochodzi.
+        let selectedImageFile = null;
+        function setSelectedImageFile(file) {
+            selectedImageFile = file;
+            const preview = document.getElementById('imagePreview');
+            const fileNameEl = document.getElementById('fileName');
+            if (!file) {
+                preview.style.display = 'none';
+                fileNameEl.innerText = '';
+                return;
+            }
+            const sizeKb = Math.round(file.size / 1024);
+            // Wklejony ze schowka plik często nie ma nazwy (albo ma taką samą,
+            // ogólną dla każdego zrzutu ekranu) — wtedy pokazujemy neutralny opis
+            // zamiast pustego/mylącego tekstu.
+            fileNameEl.innerText = file.name
+                ? file.name + ' (' + sizeKb + ' KB)'
+                : t('label_pasted_image', { size: sizeKb });
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                preview.src = ev.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
         // Prawdziwe pole <input type="file"> jest ukryte — przeglądarka i tak
         // pokazuje jego przycisk/placeholder ("Wybierz plik") we WŁASNYM języku
         // systemu, ignorując język ustawiony w naszej aplikacji. Zamiast tego
@@ -647,21 +677,41 @@
             document.getElementById('imageInput').click();
         });
         document.getElementById('imageInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            const preview = document.getElementById('imagePreview');
-            const fileNameEl = document.getElementById('fileName');
-            if (!file) {
-                preview.style.display = 'none';
-                fileNameEl.innerText = '';
-                return;
+            setSelectedImageFile(e.target.files[0] || null);
+        });
+
+        // 4b. Wklejanie obrazu ze schowka (Ctrl+V na komputerze, "Wklej" z menu
+        // dotykowego na telefonie) — działa TYLKO wtedy, gdy ta strefa jest
+        // aktywna/skupiona, dlatego jest to widoczny, klikalny obszar
+        // (contenteditable), a nie niewidoczny nasłuch na całej stronie —
+        // telefony w ogóle nie pokazują opcji "Wklej" bez skupionego,
+        // edytowalnego pola. Sam obraz nigdy nie jest tu "wpisywany" jako
+        // tekst — zawsze przechwytujemy go z danych schowka i czyścimy pole.
+        const pasteZone = document.getElementById('imagePasteZone');
+        pasteZone.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const items = (e.clipboardData && e.clipboardData.items) || [];
+            let imageFile = null;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].kind === 'file' && items[i].type.indexOf('image/') === 0) {
+                    imageFile = items[i].getAsFile();
+                    break;
+                }
             }
-            fileNameEl.innerText = file.name + ' (' + Math.round(file.size / 1024) + ' KB)';
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                preview.src = ev.target.result;
-                preview.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
+            if (imageFile) {
+                setSelectedImageFile(imageFile);
+            } else {
+                alert(t('alert_paste_not_image'));
+            }
+        });
+        // Ta strefa istnieje WYŁĄCZNIE do wklejania obrazu — blokujemy zwykłe
+        // wpisywanie tekstu (poza skrótami typu Ctrl+V), a gdyby mimo to coś
+        // się w niej pojawiło (np. przez dotykowe menu edycji), czyścimy ją.
+        pasteZone.addEventListener('keydown', (e) => {
+            if (!(e.ctrlKey || e.metaKey)) e.preventDefault();
+        });
+        pasteZone.addEventListener('input', () => {
+            pasteZone.textContent = '';
         });
 
         // 5. Hashowanie SHA-256 (klucz do cache'u społecznościowego w Supabase)
@@ -683,6 +733,32 @@
                 binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
             }
             return btoa(binary);
+        }
+
+        // 5c. Pomniejszona miniatura wybranego obrazu (do pokazania na stronie
+        // wyniku, patrz sekcja 7 niżej) — zmniejszona do maks. 1000 pikseli na
+        // dłuższym boku i skompresowana jako JPEG, żeby zmieściła się w
+        // rozsądnym limicie sessionStorage niezależnie od rozmiaru oryginału.
+        function makeImagePreview(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const objectUrl = URL.createObjectURL(file);
+                img.onload = () => {
+                    const maxDim = 1000;
+                    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+                    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(objectUrl);
+                    resolve(canvas.toDataURL('image/jpeg', 0.72));
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    reject(new Error('preview_failed'));
+                };
+                img.src = objectUrl;
+            });
         }
 
         // 6. Wyświetlenie wyniku (albo przyjaznego komunikatu, jeśli backend odmówił)
@@ -775,6 +851,7 @@
 
             let payload = null;
             let statusInterval = null;
+            let imagePreviewDataUrl = null;
 
             try {
                 if (currentMode === 'url') {
@@ -790,7 +867,7 @@
                     payload = { input_type: 'text', content_hash: hash, char_count: text.length, text_content: text, language: getCurrentLanguage() };
 
                 } else if (currentMode === 'image') {
-                    const file = document.getElementById('imageInput').files[0];
+                    const file = selectedImageFile;
                     if (!file) return alert(t('alert_choose_image'));
                     // Ten sam limit co po stronie backendu (8 MB) — tu tylko
                     // szybka informacja zwrotna, backend i tak sprawdza to
@@ -800,6 +877,17 @@
                     const hash = await sha256Hex(buffer);
                     const imageBase64 = arrayBufferToBase64(buffer);
                     payload = { input_type: 'image', content_hash: hash, image_base64: imageBase64, language: getCurrentLanguage() };
+                    // Osobna, pomniejszona miniatura (nie pełna rozdzielczość
+                    // wysyłana wyżej do analizy) — tylko po to, żeby pokazać
+                    // obraz na stronie z wynikiem (scan.html), do której zaraz
+                    // przejdziemy. Musi być mała, bo trafi na chwilę do
+                    // sessionStorage (limit paru MB w niektórych przeglądarkach),
+                    // a oryginalne zdjęcia z telefonu bywają blisko limitu 8 MB.
+                    try {
+                        imagePreviewDataUrl = await makeImagePreview(file);
+                    } catch {
+                        imagePreviewDataUrl = null; // brak podglądu nie blokuje samej analizy
+                    }
                 }
 
                 btn.disabled = true;
@@ -847,6 +935,19 @@
                     // Błąd pokazujemy na tej samej stronie.
                     renderResult(data);
                 } else {
+                    // Miniaturę obrazu przekazujemy do scan.html przez sessionStorage
+                    // (dane w pamięci JS nie przetrwałyby pełnego przejścia na inną
+                    // stronę) — TYLKO na chwilę, do jednorazowego odczytania tam;
+                    // scan.html sam ją usuwa zaraz po wyświetleniu (patrz tamtejszy
+                    // kod). Gdyby się nie zmieściła (bardzo rzadki limit przeglądarki),
+                    // po prostu nie pokaże się obraz — reszta wyniku działa normalnie.
+                    if (currentMode === 'image' && imagePreviewDataUrl) {
+                        try {
+                            sessionStorage.setItem('pragma_scan_image_' + data.id, imagePreviewDataUrl);
+                        } catch {
+                            // limit miejsca w sessionStorage — pomijamy podgląd, nie blokujemy przejścia
+                        }
+                    }
                     // Przechodzimy w TEJ SAMEJ karcie na stronę z wynikiem
                     // (nie otwieramy nowej karty przeglądarki).
                     window.location.href = 'scan.html?id=' + encodeURIComponent(data.id);

@@ -178,6 +178,45 @@ zanim założysz, że działa.
       w `i18n.js`, wszystkie 10 języków) i od razu odświeża widoczny stan
       kredytów (patrz "Stan kredytów" wyżej), żeby liczba na ekranie
       zgadzała się z tym, co faktycznie pobrano.
+  - **Obraz pokazywany na górze wyniku na `scan.html`, ale TYLKO temu, kto
+    go właśnie przesłał**: tak jak link/tekst, po udanej analizie obrazu
+    frontend też przekierowuje na `scan.html?id=...` (użytkownik prosił, żeby
+    to zachować). Sam plik obrazu nigdy nie trafia na serwer (patrz decyzja o
+    kosztach Storage niżej) — więc żeby mimo to pokazać go na `scan.html`,
+    `index.html` tuż przed przekierowaniem robi z niego pomniejszoną miniaturę
+    (`makeImagePreview()` — canvas, maks. 1000px, JPEG ~0,72 jakości, żeby
+    zmieściła się w limicie `sessionStorage`) i zapisuje ją na chwilę pod
+    kluczem `pragma_scan_image_<id>` w `sessionStorage` (dane w pamięci JS nie
+    przetrwałyby pełnej nawigacji na inną stronę). `scan.html` odczytuje ją
+    pod tym samym kluczem, pokazuje na górze (`#scanImage` +
+    `image_not_saved_notice` w `i18n.js`) i OD RAZU usuwa z `sessionStorage` —
+    jednorazowy podgląd, zniknie np. po odświeżeniu strony albo dla kogoś
+    innego, kto dostanie ten sam link. Wpis w cache'u (`scans.id`) i sam
+    tekstowy wynik istnieją normalnie jak zawsze — tylko obraz nigdy nie jest
+    trwale nigdzie zapisany.
+    - **Świadomie NIE trzymamy plików obrazów na serwerze** — rozważaliśmy
+      to (żeby analiza była "odkrywalna" publicznie tak jak tekst/link), ale
+      koszt przechowywania (Supabase Storage) rósłby bez górnego limitu wraz
+      z liczbą analiz, a nasza własna moderacja i tak nie łapie wszystkiego,
+      co mogłoby być problematyczne do publicznego pokazania (np. czyjeś
+      prywatne zdjęcie bez zgody) — zbyt duże ryzyko kosztowe i prawne
+      względem korzyści, więc świadomie zrezygnowaliśmy.
+  - **Wybór obrazu: przycisk (plik) ALBO wklejenie ze schowka** — obok
+    przycisku "Wybierz zdjęcie" jest druga strefa (`#imagePasteZone`,
+    `contenteditable`, celowo widoczny/klikalny element, nie niewidoczny
+    nasłuch na całej stronie — telefony bez skupionego, edytowalnego pola w
+    ogóle nie pokazują opcji "Wklej"), do której można wkleić obraz ze
+    schowka (Ctrl+V na komputerze, "Wklej" z menu dotykowego na telefonie) —
+    np. świeży zrzut ekranu skopiowany w innej aplikacji, bez zapisywania go
+    najpierw jako plik. Oba źródła trafiają do tej samej zmiennej
+    (`selectedImageFile` w `index.html`), więc reszta kodu (przycisk
+    "Analizuj") nie musi wiedzieć, skąd plik pochodzi. **To NIE jest
+    integracja z systemowym "Udostępnij" telefonu** (Android/iOS share sheet
+    z galerii wprost do Pragmy) — to osobna, większa funkcja (wymagałaby
+    zmian w `manifest.json` — `share_target` z plikami i metodą `POST` —
+    oraz w Service Workerze), świadomie odłożona, bo wklejanie ze schowka w
+    pełni pokrywa zgłoszoną potrzebę ("wkleić ostatni zrzut ekranu z
+    pamięci").
   - PDF: jeszcze nie zaimplementowany (`input_type: "pdf"` zwróciłby
     `501 not_implemented`, gdyby frontend w ogóle wysyłał taki typ — na
     razie nie ma dla PDF żadnego pola w interfejsie). Moderacja opisana
