@@ -117,7 +117,7 @@ async function pickRelevantCategories(
   useUrlContext: boolean,
   geminiKey: string
 ): Promise<string[]> {
-  const prompt = `Poniżej jest treść do wstępnego rozpoznania. Twoje JEDYNE zadanie: zgrubnie wskaż, do których z poniższych kategorii modeli mentalnych najprawdopodobniej będą pasować wzorce widoczne w tej treści (manipulacja, błędy poznawcze, albo trafne, wartościowe rozumowanie) — NIE analizuj jeszcze żadnych szczegółów, nie szukaj cytatów. Wybierz 1-4 najtrafniejsze kategorie z listy (dokładnie w tym brzmieniu):
+  const prompt = `Poniżej jest treść do wstępnego rozpoznania. Twoje zadanie: oceń dopasowanie KAŻDEJ z poniższych 15 kategorii modeli mentalnych do tej treści Z OSOBNA, a potem wybierz WSZYSTKIE kategorie, które faktycznie pasują do wzorców widocznych w tej treści (manipulacja, błędy poznawcze, albo trafne, wartościowe rozumowanie) — NIE analizuj jeszcze żadnych szczegółów, nie szukaj cytatów, na tym etapie oceniasz tylko dopasowanie kategorii. NIE ma sztywnego limitu liczby kategorii do wybrania — czasem pasuje tylko jedna, czasem kilka naraz (np. artykuł finansowy może jednocześnie pasować do EKONOMIA, MATEMATYKA I STATYSTYKA, PSYCHOLOGIA i STRATEGIA). Nie ograniczaj się z góry do jednej, najbardziej oczywistej kategorii (np. samej psychologii/perswazji), jeśli treść realnie porusza wątki z kilku dziedzin naraz. Lista kategorii (dokładnie w tym brzmieniu):
 ${MENTAL_MODEL_CATEGORIES.join(', ')}
 
 ${contentPrompt}`
@@ -186,6 +186,8 @@ BIBLIOTEKA MODELI MENTALNYCH: Masz do dyspozycji poniższą bibliotekę nazwanyc
 
 BIBLIOTEKA:
 ${mentalModelsLibrary}
+
+DOKŁADNOŚĆ I RÓŻNORODNOŚĆ (WAŻNE, jakość analizy to rdzeń tego produktu): Nie ograniczaj się do 2-3 najbardziej oczywistych wzorców. Przejrzyj tekst akapit po akapicie, twierdzenie po twierdzeniu — dłuższe, złożone teksty (artykuły finansowe, giełdowe, naukowe, newsowe) prawie zawsze zawierają WIĘCEJ niż kilka wartych nazwania mechanizmów, jeśli się ich uważnie poszuka. Dla KAŻDEGO znaczącego fragmentu/twierdzenia sprawdź, czy pasuje do jakiegoś modelu z biblioteki — manipulacji ALBO trafnego rozumowania. W tekstach ekonomicznych/finansowych/giełdowych aktywnie szukaj też wzorców z kategorii EKONOMIA i MATEMATYKA I STATYSTYKA (obok ewentualnych psychologicznych) — np. czy tekst rzetelnie waży szanse i ryzyka, czy pomija koszt alternatywny, czy miesza korelację z przyczynowością, czy konsensus analityków/rynku jest przedstawiony jako pewnik zamiast opinii, czy prognoza finansowa ma realne uzasadnienie w liczbach. Różnorodność ma znaczenie — nie sięgaj za każdym razem po te same, najpopularniejsze modele, jeśli inne, mniej oczywiste lepiej opisują to, co faktycznie dzieje się w danym fragmencie.
 
 JĘZYK: Niezależnie od tego, w jakim języku jest analizowany tekst — pola "name", "explanation" i "summary" MUSZĄ być zawsze napisane WYŁĄCZNIE w języku ${langName}, prostym, codziennym słownictwem zrozumiałym dla każdego. Jedynym wyjątkiem jest pole "quote" — to dosłowny cytat, więc zostaje w oryginalnym języku analizowanego tekstu, bez tłumaczenia. Nigdy nie mieszaj języków w jednym polu (poza polem "quote").
 
@@ -448,7 +450,7 @@ async function siftFallbackText(
 ): Promise<{ cleanText: string; categories: string[] } | null> {
   const prompt = `Poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Masz dwa zadania:
 1. clean_text: wyciągnij WYŁĄCZNIE właściwą treść artykułu/strony (bez menu, stopki, reklam, list linków) — nie streszczaj, nie skracaj treści, po prostu usuń szum wokół niej.
-2. categories: zgrubnie wskaż 1-4 najtrafniejsze kategorie z listy (dokładnie w tym brzmieniu), do których będą pasować wzorce w tej treści: ${MENTAL_MODEL_CATEGORIES.join(', ')}
+2. categories: oceń dopasowanie KAŻDEJ z 15 kategorii z listy do tej treści z osobna i wybierz WSZYSTKIE, które faktycznie pasują — bez sztywnego limitu liczby (czasem jedna, czasem kilka naraz, np. tekst finansowy może pasować jednocześnie do EKONOMIA, MATEMATYKA I STATYSTYKA i PSYCHOLOGIA), nie ograniczaj się z góry do jednej, najbardziej oczywistej kategorii. Lista (dokładnie w tym brzmieniu): ${MENTAL_MODEL_CATEGORIES.join(', ')}
 
 SUROWY TEKST:
 ${rawText}`
