@@ -39,9 +39,17 @@
     --accent: #b56953;
     --accent-dark: #874735;
     --accent-soft: #ecd4c6;
-    --primary: #48453a;
-    --primary-dark: #2e2b24;
+    --primary: #211f1c;
+    --primary-dark: #100f0d;
     --primary-soft: #ddd3bd;
+    /* Tekst na jednolitych, "perłowych" powierzchniach (przyciski, aktywna
+       zakładka, ikona konta) — MUSI się odwracać razem z motywem: w jasnym
+       przycisk jest matowo czarny, więc tekst jasny; w ciemnym przycisk
+       jest matowo biały/"brudnobiały", więc tekst musi być ciemny, inaczej
+       ginie (dokładnie ten błąd zgłoszony 2026-08-18 — dawniej tekst na
+       przyciskach był na sztywno #fdfcfa, więc w trybie ciemnym robił się
+       prawie niewidoczny na jasnym tle przycisku). */
+    --btn-text: #f7f4ee;
     --input-bg: #fffefc;
     --debug-bg: #e4e0d6;
     --debug-border: #c9c3b4;
@@ -90,9 +98,10 @@
     --accent: #e0a690;
     --accent-dark: #eec1ae;
     --accent-soft: #4a3128;
-    --primary: #beb190;
-    --primary-dark: #ddd0ac;
+    --primary: #e7dfce;
+    --primary-dark: #cabe9c;
     --primary-soft: #3c3627;
+    --btn-text: #17140f;
     --input-bg: #191612;
     --debug-bg: #2e2b26;
     --debug-border: #4a4438;
@@ -159,32 +168,44 @@ input, textarea {
 }
 input:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 textarea { resize: vertical; min-height: 100px; }
+/* Główny przycisk akcji — jednolita, matowa "perła": w jasnym motywie
+   matowa czerń, w ciemnym odwrotnie matowa biel/"brudna biel" (`--primary`
+   w każdym motywie już niesie tę wartość, patrz zmienne w :root wyżej) —
+   NIE kolorowy gradient jak wcześniej w "rundzie 2/3", tylko czysta gra
+   światła w obrębie jednego, bardzo ciemnego/bardzo jasnego odcienia.
+   Tekst MUSI iść przez var(--btn-text), nie na sztywno — inaczej w
+   ciemnym motywie (jasny przycisk) ginie na własnym tle. */
 button {
     width: 100%; padding: 13px;
     background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 50%, var(--primary-dark) 100%);
-    color: #fdfcfa; border: none;
+    color: var(--btn-text); border: none;
     border-radius: var(--radius-sm); font-weight: 700; letter-spacing: 0.01em; cursor: pointer; font-size: 16px;
     font-family: 'Inter', inherit;
     box-shadow: var(--sculpt-shadow-sm);
-    transition: transform .12s ease, box-shadow .12s ease, filter .15s ease;
+    transition: transform .12s ease, box-shadow .12s ease, filter .15s ease, background .15s ease, color .15s ease;
 }
-button:hover { filter: brightness(1.06); box-shadow: var(--sculpt-shadow); }
-button:active { transform: translateY(1px) scale(0.99); filter: brightness(0.97); box-shadow: var(--sculpt-shadow-sm); }
-button:disabled { background: #a8a296; filter: none; box-shadow: none; cursor: default; transform: none; }
+button:hover { filter: brightness(1.35); box-shadow: var(--sculpt-shadow); }
+button:active { transform: translateY(1px) scale(0.99); filter: brightness(0.8); box-shadow: var(--sculpt-shadow-sm); }
+button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow: none; cursor: default; transform: none; }
 
 /* Przycisk drugoplanowy (np. "Wyloguj", "Zaloguj przez Google", "Wybierz
-   zdjęcie") — świadomie mniej wyrazisty niż główny przycisk akcji, ale
-   MUSI trzymać się tej samej palety zmiennych, inaczej w trybie ciemnym
-   wygląda jak zapomniana, jasna "dziura" wklejona z innego UI (dokładnie
-   ten błąd poprawiony 2026-08-18: kilka przycisków miało dawniej twardo
-   wpisane #fff/#eee/#333 inline w HTML, ignorując motyw). */
+   zdjęcie") — świadomie mniej wyrazisty niż główny przycisk akcji (obrys
+   zamiast pełnego wypełnienia), ale ŚWIADOMIE z tej samej "czarna
+   perła / biała perła" rodziny co przycisk główny (border+tekst =
+   var(--ink), czyli dokładnie ten sam odcień, który motyw już odwraca) —
+   inaczej w trybie ciemnym wygląda jak zapomniana, jasna "dziura" wklejona
+   z innego UI (dokładnie ten błąd zgłoszony 2026-08-18: najpierw twardo
+   wpisane #fff/#eee/#333 inline w HTML ignorujące motyw, potem płaskie
+   jasne tło niespójne z czarnym przyciskiem głównym). Po najechaniu
+   WYPEŁNIA się tym samym kolorem co przycisk główny — spójność, nie tylko
+   podobieństwo. */
 button.btn-secondary {
-    background: var(--card-2); color: var(--ink);
-    border: var(--border-w) solid var(--card-border);
+    background: var(--card); color: var(--ink);
+    border: 1.5px solid var(--ink);
     box-shadow: none;
 }
-button.btn-secondary:hover { filter: none; background: var(--primary-soft); box-shadow: var(--sculpt-shadow-sm); }
-button.btn-secondary:active { filter: none; background: var(--primary-soft); }
+button.btn-secondary:hover { filter: none; background: var(--ink); color: var(--paper); box-shadow: var(--sculpt-shadow-sm); }
+button.btn-secondary:active { filter: none; background: var(--ink); color: var(--paper); }
 
 .tabs { display: flex; gap: 6px; margin: 10px 0; }
 .tab-btn {
@@ -194,7 +215,7 @@ button.btn-secondary:active { filter: none; background: var(--primary-soft); }
 }
 .tab-btn.active {
     background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 90%, white) 0%, var(--accent) 50%, var(--accent-dark) 100%);
-    color: #fdfcfa; border-color: transparent; box-shadow: var(--sculpt-shadow-sm);
+    color: var(--btn-text); border-color: transparent; box-shadow: var(--sculpt-shadow-sm);
 }
 
 .mode-panel { display: none; }
@@ -374,7 +395,7 @@ a { color: var(--accent); }
     display: none; position: fixed; top: 16px; right: 16px; z-index: 50;
     width: 44px; height: 44px; padding: 0; border-radius: 50%;
     background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 50%, var(--primary-dark) 100%);
-    color: #fdfcfa; font-size: 20px; border: none;
+    color: var(--btn-text); font-size: 20px; border: none;
     align-items: center; justify-content: center; text-decoration: none;
     box-shadow: var(--sculpt-shadow-sm);
 }
