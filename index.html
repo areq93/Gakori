@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="shortcut icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <meta name="theme-color" content="#241f18">
+    <meta name="theme-color" content="#2b2a27">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,7 +28,18 @@
     </div>
 
     <div class="card" id="authCard" style="display:none;">
-        <h1 style="margin-top:0">Pragma</h1>
+        <h1 style="margin-top:0">
+            <svg class="pragma-mark" width="34" height="34" viewBox="0 0 100 100" aria-hidden="true">
+                <defs>
+                    <linearGradient id="pragmaMarkGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+                        <stop offset="0%" stop-color="#9a9184"/>
+                        <stop offset="100%" stop-color="#3f3c35"/>
+                    </linearGradient>
+                </defs>
+                <path transform="rotate(-18 50 50)" fill="url(#pragmaMarkGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
+            </svg>
+            Pragma
+        </h1>
         <p class="tagline" data-i18n="tagline">Wklej tekst, a my pokażemy Ci, czy ktoś próbuje Tobą manipulować.</p>
 
         <div id="authLoggedOut">

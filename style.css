@@ -1,64 +1,65 @@
-/* Styl "Retro plakat" — grube czarne obramowania, mocny kontrast, płaskie
-   przesunięte cienie jak u naklejki/plakatu. Wybrany przez użytkownika
-   spośród 3 wariantów retro, żeby zastąpić poprzedni, bardziej stonowany
-   wygląd. Jeśli zmieniasz paletę — zmień tylko zmienne tutaj, reszta pliku
-   się do nich odwołuje. */
+/* Styl "Rzeźba" — miękka, matowa, organiczna estetyka inspirowana
+   abstrakcyjną rzeźbą współczesną (patrz logo Pragmy): płynne, biomorficzne
+   formy bez twardych krawędzi, delikatne rozproszone cienie (gra światła i
+   cienia po zaokrąglonej powierzchni, nie płaski cień naklejki), stonowana,
+   niemal monochromatyczna paleta. ŚWIADOMIE zastąpiony poprzedni styl
+   "retro plakat" (grube czarne obramowania, płaskie przesunięte cienie) —
+   te dwie estetyki się wykluczają, użytkownik wybrał pełne zastąpienie
+   (2026-08-18). Kolory FUNKCYJNE wyniku (badge-green/yellow/red,
+   pattern-manipulation/reasoning) ŚWIADOMIE zostały prawie bez zmian — niosą
+   krytyczne znaczenie bezpieczeństwa (jednoznaczna czytelność wyniku), więc
+   nie zostały spłaszczone do monochromu. Jeśli zmieniasz paletę — zmień
+   tylko zmienne tutaj, reszta pliku się do nich odwołuje. */
 :root {
-    --ink: #241f18;
-    --ink-soft: #5c5344;
-    --paper: #ede1c8;
-    --card: #fff8ec;
-    --quote-bg: #f6ecda;
-    --card-border: #241f18;
-    --accent: #d1495b;
-    --accent-dark: #a83347;
-    --accent-soft: #f6c9cf;
-    --primary: #1f6f6b;
-    --primary-dark: #15514d;
-    --primary-soft: #d3e6e4;
-    --input-bg: #fffdf7;
-    --debug-bg: #ded2b4;
-    --debug-border: #c3b48c;
-    --shadow-color: var(--card-border);
-    --radius: 14px;
-    --radius-sm: 9px;
-    --border-w: 2px;
-    --sticker-shadow: 4px 4px 0 var(--shadow-color);
-    --sticker-shadow-sm: 3px 3px 0 var(--shadow-color);
-    --paper-dot-color: 60,45,20;
+    --ink: #2b2a27;
+    --ink-soft: #726f68;
+    --paper: #efece6;
+    --card: #f9f7f3;
+    --quote-bg: #eae6dd;
+    --card-border: rgba(43, 42, 39, 0.10);
+    --accent: #b3766f;
+    --accent-dark: #97564f;
+    --accent-soft: #ecdcd9;
+    --primary: #57534a;
+    --primary-dark: #3f3c35;
+    --primary-soft: #e4ded2;
+    --input-bg: #fdfcfa;
+    --debug-bg: #e4e0d6;
+    --debug-border: #c9c3b4;
+    --shadow-color: rgba(43, 42, 39, 0.16);
+    --shadow-color-soft: rgba(43, 42, 39, 0.07);
+    --radius: 22px;
+    --radius-sm: 14px;
+    --border-w: 1px;
+    /* Miękki, rozproszony cień "rzeźby" — dwie warstwy (bliska ostrzejsza +
+       daleka rozmyta), zamiast płaskiego, przesuniętego cienia naklejki.
+       Efekt: forma jakby lekko unosi się nad tłem. */
+    --sculpt-shadow: 0 14px 34px -12px var(--shadow-color), 0 3px 10px -2px var(--shadow-color-soft);
+    --sculpt-shadow-sm: 0 6px 16px -6px var(--shadow-color), 0 2px 6px -1px var(--shadow-color-soft);
 }
 
-/* Tryb ciemny — ta sama "retro plakat" estetyka (grube obramowania, płaskie
-   przesunięte cienie), tylko z odwróconą jasnością. Obramowania stają się
-   jasne (żeby było je widać na ciemnym tle), a cień zostaje osobno ciemny
-   (--shadow-color), żeby nadal wyglądał jak cień, nie poświata. Przełączane
-   atrybutem data-theme na <html> — patrz applyTheme() w i18n.js. Ustawiany
-   SYNCHRONICZNIE małym inline-skryptem w <head> każdej strony (przed
-   wczytaniem tego pliku CSS), żeby uniknąć "błysku" złego motywu przy
-   ładowaniu strony. */
+/* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
+   jasność. Cienie w ciemnym motywie są subtelniejsze (na ciemnym tle mocny
+   czarny cień i tak "znika"), za to karty dostają odrobinę jaśniejszej
+   poświaty u góry, żeby nadal czytać się jako uniesione nad tłem. */
 :root[data-theme="dark"] {
-    /* "Nocny plakat" — NIE zwykłe odwrócenie jasnego motywu (to wyglądało
-       jak negatyw zdjęcia i użytkownikowi się nie podobało). Obramowanie
-       jest przygaszonym, matowym brązem zamiast jaskrawej bieli — dalej
-       widoczne, ale bez efektu "negatywu". Cień zostaje osobno dobrany,
-       prawie czarny, żeby nadal czytał się jako cień, nie poświata. */
-    --ink: #f0e6d4;
-    --ink-soft: #a99b7e;
-    --paper: #1d1a16;
-    --card: #2a241c;
-    --quote-bg: #231f19;
-    --card-border: #6b5c42;
-    --accent: #d9748a;
-    --accent-dark: #e79aab;
-    --accent-soft: #3d2a2e;
-    --primary: #3fa39a;
-    --primary-dark: #8fd6cd;
-    --primary-soft: #1f3a37;
-    --input-bg: #201b14;
-    --debug-bg: #332b20;
-    --debug-border: #55492f;
-    --shadow-color: #0e0c09;
-    --paper-dot-color: 255,240,214;
+    --ink: #ece9e2;
+    --ink-soft: #a39d90;
+    --paper: #1c1b19;
+    --card: #262420;
+    --quote-bg: #2e2b26;
+    --card-border: rgba(255, 255, 255, 0.09);
+    --accent: #d19a92;
+    --accent-dark: #e3b3ac;
+    --accent-soft: #3a2b28;
+    --primary: #a39a86;
+    --primary-dark: #c2b9a3;
+    --primary-soft: #33302a;
+    --input-bg: #201e1a;
+    --debug-bg: #2e2b26;
+    --debug-border: #4a4438;
+    --shadow-color: rgba(0, 0, 0, 0.45);
+    --shadow-color-soft: rgba(0, 0, 0, 0.22);
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -66,16 +67,6 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     display: flex; flex-direction: column; align-items: center; padding: 20px;
     background-color: var(--paper);
-    background-image:
-        radial-gradient(circle at 12% 18%, rgba(var(--paper-dot-color),0.13) 0px, rgba(var(--paper-dot-color),0.13) 1px, transparent 1.6px),
-        radial-gradient(circle at 78% 8%, rgba(var(--paper-dot-color),0.10) 0px, rgba(var(--paper-dot-color),0.10) 1px, transparent 1.4px),
-        radial-gradient(circle at 34% 62%, rgba(var(--paper-dot-color),0.12) 0px, rgba(var(--paper-dot-color),0.12) 1.2px, transparent 1.8px),
-        radial-gradient(circle at 90% 55%, rgba(var(--paper-dot-color),0.09) 0px, rgba(var(--paper-dot-color),0.09) 1px, transparent 1.4px),
-        radial-gradient(circle at 55% 85%, rgba(var(--paper-dot-color),0.10) 0px, rgba(var(--paper-dot-color),0.10) 1.1px, transparent 1.6px),
-        radial-gradient(circle at 20% 92%, rgba(var(--paper-dot-color),0.08) 0px, rgba(var(--paper-dot-color),0.08) 1px, transparent 1.4px),
-        radial-gradient(circle at 65% 32%, rgba(var(--paper-dot-color),0.08) 0px, rgba(var(--paper-dot-color),0.08) 1px, transparent 1.4px),
-        radial-gradient(circle at 8% 70%, rgba(var(--paper-dot-color),0.09) 0px, rgba(var(--paper-dot-color),0.09) 1px, transparent 1.4px),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
     color: var(--ink);
     line-height: 1.5;
 }
@@ -83,44 +74,51 @@ h1 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 2.2rem; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
     text-align: center; margin: 0 0 4px 0;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
 }
 h2 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 1.4rem; font-weight: 700; color: var(--ink); margin: 0 0 16px 0;
 }
 .tagline { margin: 0 0 20px 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.45; text-align: center; }
+
+/* Mały, powtarzalny znak marki — ta sama, opływowa "kropla" co w logo
+   aplikacji, obok nagłówka "Pragma" (patrz <h1> w index.html). Gradient
+   naśladuje miękkie przejście światła po zaokrąglonej powierzchni rzeźby. */
+.pragma-mark { flex-shrink: 0; filter: drop-shadow(0 3px 6px var(--shadow-color-soft)); }
+
 .card {
-    background: var(--card); padding: 22px; border-radius: var(--radius);
+    background: var(--card); padding: 26px; border-radius: var(--radius);
     border: var(--border-w) solid var(--card-border);
-    box-shadow: var(--sticker-shadow);
+    box-shadow: var(--sculpt-shadow);
     width: 100%; max-width: 400px; box-sizing: border-box;
 }
 input, textarea {
     width: 100%; padding: 13px 14px; margin: 10px 0;
     border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm); box-sizing: border-box;
     font-size: 16px; font-family: inherit; color: var(--ink); background: var(--input-bg);
-    transition: border-color .15s ease;
+    transition: border-color .15s ease, box-shadow .15s ease;
 }
-input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+input:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 textarea { resize: vertical; min-height: 100px; }
 button {
-    width: 100%; padding: 13px; background: var(--primary); color: #fdf6ee; border: var(--border-w) solid var(--card-border);
+    width: 100%; padding: 13px; background: var(--primary); color: #fdfcfa; border: none;
     border-radius: var(--radius-sm); font-weight: 700; letter-spacing: 0.01em; cursor: pointer; font-size: 16px;
     font-family: 'Inter', inherit;
-    box-shadow: var(--sticker-shadow-sm);
-    transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
+    box-shadow: var(--sculpt-shadow-sm);
+    transition: transform .12s ease, box-shadow .12s ease, background-color .15s ease;
 }
-button:hover { background: var(--primary-dark); }
-button:active { transform: translate(3px, 3px); box-shadow: none; }
-button:disabled { background: #a89e88; border-color: #a89e88; box-shadow: none; cursor: default; transform: none; }
+button:hover { background: var(--primary-dark); box-shadow: var(--sculpt-shadow); }
+button:active { transform: translateY(1px) scale(0.99); box-shadow: var(--sculpt-shadow-sm); }
+button:disabled { background: #a8a296; box-shadow: none; cursor: default; transform: none; }
 
 .tabs { display: flex; gap: 6px; margin: 10px 0; }
 .tab-btn {
     flex: 1; padding: 11px 4px; font-size: 13.5px; font-weight: 700;
-    background: var(--card); color: var(--ink-soft); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
+    background: var(--paper); color: var(--ink-soft); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
     cursor: pointer; width: auto; margin: 0; box-shadow: none;
 }
-.tab-btn.active { background: var(--accent); color: #fff8ec; border-color: var(--card-border); box-shadow: var(--sticker-shadow-sm); }
+.tab-btn.active { background: var(--accent); color: #fdfcfa; border-color: transparent; box-shadow: var(--sculpt-shadow-sm); }
 
 .mode-panel { display: none; }
 .mode-panel.active { display: block; }
@@ -132,11 +130,11 @@ button:disabled { background: #a89e88; border-color: #a89e88; box-shadow: none; 
    usuwania w rogu. */
 .image-preview-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .image-preview-item { position: relative; width: 84px; height: 84px; }
-.image-preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block; }
+.image-preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; display: block; }
 .image-preview-remove {
     position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; border-radius: 50%;
-    border: 2px solid var(--card); background: var(--ink); color: #fff; font-size: 14px; line-height: 1;
-    cursor: pointer; padding: 0; box-shadow: var(--sticker-shadow-sm);
+    border: 2px solid var(--card); background: var(--ink); color: var(--card); font-size: 14px; line-height: 1;
+    cursor: pointer; padding: 0; box-shadow: var(--sculpt-shadow-sm);
 }
 
 /* Strefa wklejania obrazu ze schowka (Ctrl+V / "Wklej" na telefonie) —
@@ -167,15 +165,15 @@ a { color: var(--accent); }
 
 /* Karta wyniku */
 .result-card {
-    background: var(--card); padding: 22px; border-radius: var(--radius);
+    background: var(--card); padding: 26px; border-radius: var(--radius);
     border: var(--border-w) solid var(--card-border);
-    box-shadow: var(--sticker-shadow);
+    box-shadow: var(--sculpt-shadow);
     width: 100%; max-width: 400px; margin-top: 16px; box-sizing: border-box; display: none;
 }
-.result-badge { display: inline-block; padding: 6px 14px; border-radius: var(--radius-sm); font-weight: bold; font-size: 14px; margin-bottom: 14px; border: 1.5px solid; }
-.badge-green { background: #dcfce7; color: #166534; border-color: #166534; }
-.badge-yellow { background: #fef9c3; color: #854d0e; border-color: #854d0e; }
-.badge-red { background: #fee2e2; color: #991b1b; border-color: #991b1b; }
+.result-badge { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: bold; font-size: 14px; margin-bottom: 14px; border: 1.5px solid; }
+.badge-green { background: #dcfce7; color: #166534; border-color: #a7d9b8; }
+.badge-yellow { background: #fef9c3; color: #854d0e; border-color: #e9d99a; }
+.badge-red { background: #fee2e2; color: #991b1b; border-color: #eeb3b1; }
 /* Delikatne pudełko z tłem zamiast kolorowej/kontrastowej linii z boku —
    PODOBNY pomysł co .pattern-tip niżej (subtelnie ciemniejsze tło niż karta),
    ale świadomie WŁASNY odcień (var(--quote-bg), nie var(--paper)), żeby te
@@ -191,7 +189,7 @@ a { color: var(--accent); }
 /* Ramka wokół informacji o źródle (link analizowanej strony) na scan.html */
 .scan-source-box {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    background: var(--card); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
+    background: var(--paper); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
     padding: 10px 12px; margin: 0 0 18px 0; font-size: 13px; line-height: 1.4; word-break: break-all;
 }
 .scan-source-box a { font-weight: 600; }
@@ -203,7 +201,7 @@ a { color: var(--accent); }
 .scan-text-source { margin: 0 0 18px 0; }
 .scan-text-source summary {
     cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-soft);
-    background: var(--card); border: var(--border-w) solid var(--card-border);
+    background: var(--paper); border: var(--border-w) solid var(--card-border);
     border-radius: var(--radius-sm); padding: 10px 12px;
 }
 .scan-text-source-content {
@@ -217,16 +215,21 @@ a { color: var(--accent); }
    i lewa krawędź karty wzorca niżej (.pattern-item), żeby nie było
    rozjazdu, jak w wersji, gdzie "obserwacja" gdzie indziej była zielona,
    a tu i tak zawsze czerwona. */
-.scan-text-source-content mark.source-highlight { color: var(--ink); border-radius: 2px; padding: 0 2px; }
+.scan-text-source-content mark.source-highlight { color: var(--ink); border-radius: 3px; padding: 0 2px; }
 .scan-text-source-content mark.source-highlight-manipulation { background: var(--accent-soft); }
 .scan-text-source-content mark.source-highlight-reasoning { background: #dcfce7; }
 
 /* Poszczególne wykryte wzorce (manipulacja albo trafny sposób rozumowania) —
-   każdy w osobnej, wyraźnie odgraniczonej ramce, żeby łatwo było je przewijać
-   wzrokiem jako osobne "karty" wewnątrz wyniku. */
+   każdy w osobnej, miękko odgraniczonej karcie (cień zamiast twardej ramki),
+   żeby łatwo było je przewijać wzrokiem jako osobne "kartki" wewnątrz wyniku.
+   Lewa krawędź zostaje jako kolorowy pasek — to jedyny funkcjonalny
+   sygnał typu wzorca oprócz odznaki tekstowej powyżej, więc świadomie NIE
+   spłaszczony do monochromu — ale zaokrąglony razem z resztą karty, nie
+   ostro ucięty jak w poprzednim, "plakatowym" stylu. */
 .pattern-item {
     background: var(--card); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
-    padding: 14px 16px; margin-bottom: 14px; border-left-width: 5px; border-left-style: solid;
+    box-shadow: var(--sculpt-shadow-sm);
+    padding: 14px 16px; margin-bottom: 14px; border-left-width: 4px; border-left-style: solid;
 }
 .pattern-item:last-child { margin-bottom: 0; }
 .pattern-item.pattern-manipulation { border-left-color: var(--accent); }
@@ -239,7 +242,7 @@ a { color: var(--accent); }
 .pattern-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .pattern-tag {
     font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
-    padding: 2px 8px; border-radius: 3px; white-space: nowrap;
+    padding: 3px 9px; border-radius: 999px; white-space: nowrap;
 }
 .pattern-manipulation .pattern-tag { background: var(--accent-soft); color: var(--accent-dark); }
 .pattern-reasoning .pattern-tag { background: #dcfce7; color: #166534; }
@@ -270,11 +273,11 @@ a { color: var(--accent); }
 }
 .scan-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 12px 4px; border-bottom: 1.5px solid var(--card-border);
+    padding: 12px 4px; border-bottom: var(--border-w) solid var(--card-border);
     text-decoration: none; color: var(--ink);
 }
 .scan-row:last-child { border-bottom: none; }
-.scan-row:hover { background: var(--accent-soft); }
+.scan-row:hover { background: var(--paper); border-radius: var(--radius-sm); }
 .scan-row-icon { flex-shrink: 0; font-size: 15px; }
 .scan-row .result-badge { flex-shrink: 0; margin-bottom: 0; padding: 4px 10px; font-size: 12.5px; }
 .scan-row-snippet { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -282,7 +285,7 @@ a { color: var(--accent); }
 #publicScansList p.status-err, #publicScansList p.status-ok { text-align: center; }
 
 /* Panel debugowania — tylko dla developera, patrz sekcja 1 w skrypcie (?debug=1) */
-#debug { display: none; margin-top: 20px; padding: 10px; background: var(--debug-bg); border-radius: 4px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed var(--debug-border); box-sizing: border-box; color: var(--ink-soft); }
+#debug { display: none; margin-top: 20px; padding: 10px; background: var(--debug-bg); border-radius: 10px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed var(--debug-border); box-sizing: border-box; color: var(--ink-soft); }
 .status-ok { color: #166534; font-weight: bold; }
 .status-err { color: #991b1b; font-weight: bold; }
 
@@ -290,9 +293,9 @@ a { color: var(--accent); }
 #userMenuBtn {
     display: none; position: fixed; top: 16px; right: 16px; z-index: 50;
     width: 44px; height: 44px; padding: 0; border-radius: 50%;
-    background: var(--primary); color: #fdf6ee; font-size: 20px; border: var(--border-w) solid var(--card-border);
+    background: var(--primary); color: #fdfcfa; font-size: 20px; border: none;
     align-items: center; justify-content: center; text-decoration: none;
-    box-shadow: var(--sticker-shadow-sm);
+    box-shadow: var(--sculpt-shadow-sm);
 }
 
 /* Stan kredytów — pigułka tuż obok ikony profilu, ten sam rytm wizualny co
@@ -301,7 +304,7 @@ a { color: var(--accent); }
     position: fixed; top: 16px; right: 68px; z-index: 50; height: 44px;
     padding: 0 14px; border-radius: 999px; box-sizing: border-box;
     background: var(--card); color: var(--ink); border: var(--border-w) solid var(--card-border);
-    box-shadow: var(--sticker-shadow-sm);
+    box-shadow: var(--sculpt-shadow-sm);
     align-items: center; justify-content: center; gap: 6px;
     font-weight: 700; font-size: 15px; white-space: nowrap;
 }
