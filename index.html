@@ -78,7 +78,7 @@
             <p data-i18n="label_choose_image">Wybierz zdjęcie do analizy:</p>
             <input type="file" id="imageInput" accept="image/*" style="display:none;">
             <button type="button" id="imageInputTrigger" data-i18n="btn_choose_image" style="background:#fff; color:#333; border:1px solid #ccc;">Wybierz zdjęcie</button>
-            <div style="text-align:center; color:#999; font-size:12px; margin:10px 0;" data-i18n="divider_or">— lub —</div>
+            <div id="imagePasteDivider" style="text-align:center; color:#999; font-size:12px; margin:10px 0;" data-i18n="divider_or">— lub —</div>
             <div id="imagePasteZone" class="paste-zone" contenteditable="true" tabindex="0" data-i18n-content-placeholder="label_paste_image_zone" data-i18n-aria-label="label_paste_image_zone"></div>
             <div id="fileName"></div>
             <img id="imagePreview" alt="podgląd">
@@ -707,11 +707,21 @@
             selectedImageFile = file;
             const preview = document.getElementById('imagePreview');
             const fileNameEl = document.getElementById('fileName');
+            const pasteDivider = document.getElementById('imagePasteDivider');
+            const pasteZone = document.getElementById('imagePasteZone');
             if (!file) {
                 preview.style.display = 'none';
                 fileNameEl.innerText = '';
+                pasteDivider.style.display = '';
+                pasteZone.style.display = '';
                 return;
             }
+            // Skoro obraz jest już wybrany (niezależnie skąd — plik, wklejenie
+            // czy systemowe "Udostępnij"), zaproszenie do wklejenia innego jest
+            // tylko mylącym, pustym polem obok — chowamy je, dopóki ktoś nie
+            // usunie/zmieni wyboru (wtedy wracamy do stanu wyjściowego).
+            pasteDivider.style.display = 'none';
+            pasteZone.style.display = 'none';
             const sizeKb = Math.round(file.size / 1024);
             // Wklejony ze schowka plik często nie ma nazwy (albo ma taką samą,
             // ogólną dla każdego zrzutu ekranu) — wtedy pokazujemy neutralny opis
