@@ -1,41 +1,65 @@
 /* Styl "Rzeźba" — miękka, matowa, organiczna estetyka inspirowana
    abstrakcyjną rzeźbą współczesną (patrz logo Pragmy): płynne, biomorficzne
-   formy bez twardych krawędzi, delikatne rozproszone cienie (gra światła i
-   cienia po zaokrąglonej powierzchni, nie płaski cień naklejki), stonowana,
-   niemal monochromatyczna paleta. ŚWIADOMIE zastąpiony poprzedni styl
-   "retro plakat" (grube czarne obramowania, płaskie przesunięte cienie) —
-   te dwie estetyki się wykluczają, użytkownik wybrał pełne zastąpienie
-   (2026-08-18). Kolory FUNKCYJNE wyniku (badge-green/yellow/red,
-   pattern-manipulation/reasoning) ŚWIADOMIE zostały prawie bez zmian — niosą
-   krytyczne znaczenie bezpieczeństwa (jednoznaczna czytelność wyniku), więc
-   nie zostały spłaszczone do monochromu. Jeśli zmieniasz paletę — zmień
-   tylko zmienne tutaj, reszta pliku się do nich odwołuje. */
+   formy bez twardych krawędzi, delikatne gradienty naśladujące światło
+   rozlewające się po zaokrąglonej powierzchni, stonowana, ziemista paleta.
+   Zastąpiła poprzedni styl "Retro plakat" (2026-08-18). POPRAWKA
+   2026-08-18(b) — pierwsza wersja nadal "wyglądała jak stary UI z kilkoma
+   zaokrąglonymi rogami": za mało gry światła, a JASKRAWE kolory sygnałowe
+   (czysta zieleń/żółć/czerwień prosto z web-safe palety) kompletnie gryzły
+   się z resztą stonowanej, ziemistej estetyki logo. Naprawione: (1) kolory
+   sygnałowe (zielony/żółty/czerwony) też są teraz PRZYGASZONE, ziemiste —
+   dalej rozróżnialne, ale należą do tej samej "rodziny materiału" co reszta
+   UI, nie wyglądają jak wklejone z innej aplikacji; (2) karty/przyciski/
+   odznaki dostały subtelne gradienty (nie płaski jednolity kolor) — to one
+   "sprzedają" wrażenie światła padającego na zaokrągloną powierzchnię;
+   (3) cień ma teraz też delikatne, jasne obwiedzenie u góry (`inset`),
+   które razem z gradientem daje wrażenie uniesionej, oświetlonej bryły;
+   (4) duży, rozmyty kształt rzeźby w tle karty startowej (`.pragma-backdrop`
+   w index.html) — nie tylko mały znaczek przy nagłówku — żeby "świat" loga
+   i świat aplikacji wewnątrz faktycznie się zgadzały. Jeśli zmieniasz
+   paletę — zmień tylko zmienne tutaj, reszta pliku się do nich odwołuje. */
 :root {
     --ink: #2b2a27;
     --ink-soft: #726f68;
     --paper: #efece6;
     --card: #f9f7f3;
+    --card-2: #f1ede4;
     --quote-bg: #eae6dd;
-    --card-border: rgba(43, 42, 39, 0.10);
-    --accent: #b3766f;
-    --accent-dark: #97564f;
-    --accent-soft: #ecdcd9;
+    --card-border: rgba(43, 42, 39, 0.09);
+    --accent: #a97c6d;
+    --accent-dark: #8c6053;
+    --accent-soft: #e6d9d2;
     --primary: #57534a;
-    --primary-dark: #3f3c35;
+    --primary-dark: #403d35;
     --primary-soft: #e4ded2;
     --input-bg: #fdfcfa;
     --debug-bg: #e4e0d6;
     --debug-border: #c9c3b4;
-    --shadow-color: rgba(43, 42, 39, 0.16);
-    --shadow-color-soft: rgba(43, 42, 39, 0.07);
+    --shadow-color: rgba(43, 42, 39, 0.18);
+    --shadow-color-soft: rgba(43, 42, 39, 0.08);
+    --highlight-edge: rgba(255, 255, 255, 0.55);
     --radius: 22px;
     --radius-sm: 14px;
     --border-w: 1px;
-    /* Miękki, rozproszony cień "rzeźby" — dwie warstwy (bliska ostrzejsza +
-       daleka rozmyta), zamiast płaskiego, przesuniętego cienia naklejki.
-       Efekt: forma jakby lekko unosi się nad tłem. */
-    --sculpt-shadow: 0 14px 34px -12px var(--shadow-color), 0 3px 10px -2px var(--shadow-color-soft);
-    --sculpt-shadow-sm: 0 6px 16px -6px var(--shadow-color), 0 2px 6px -1px var(--shadow-color-soft);
+    /* Miękki, rozproszony cień "rzeźby" (dwie warstwy) + jasna obwódka u
+       góry (inset) naśladująca światło ślizgające się po zaokrąglonej
+       krawędzi — razem dają wrażenie uniesionej, oświetlonej bryły, nie
+       płaskiej naklejki i nie płaskiej kartki. */
+    --sculpt-shadow: 0 16px 36px -14px var(--shadow-color), 0 4px 12px -2px var(--shadow-color-soft), inset 0 1px 0 var(--highlight-edge);
+    --sculpt-shadow-sm: 0 7px 18px -8px var(--shadow-color), 0 2px 6px -1px var(--shadow-color-soft), inset 0 1px 0 var(--highlight-edge);
+    /* Kolory sygnałowe (wynik analizy) — ŚWIADOMIE przygaszone/ziemiste, nie
+       jaskrawe web-safe zielenie/żółcie/czerwienie. Nadal jednoznacznie
+       rozróżnialne (inny odcień = inne znaczenie), ale należą do tej samej,
+       stonowanej "rodziny materiału" co reszta interfejsu. */
+    --ok-bg: #dfe3d2;
+    --ok-text: #4c5a3f;
+    --ok-border: #b7c2a2;
+    --warn-bg: #ecdfc2;
+    --warn-text: #7a5a2e;
+    --warn-border: #d1bb8a;
+    --danger-bg: #e6d3ce;
+    --danger-text: #7c4038;
+    --danger-border: #cca298;
 }
 
 /* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
@@ -47,19 +71,24 @@
     --ink-soft: #a39d90;
     --paper: #1c1b19;
     --card: #262420;
+    --card-2: #2d2a25;
     --quote-bg: #2e2b26;
-    --card-border: rgba(255, 255, 255, 0.09);
-    --accent: #d19a92;
-    --accent-dark: #e3b3ac;
-    --accent-soft: #3a2b28;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --accent: #cb9587;
+    --accent-dark: #dcaea2;
+    --accent-soft: #3c2d29;
     --primary: #a39a86;
-    --primary-dark: #c2b9a3;
+    --primary-dark: #beb49f;
     --primary-soft: #33302a;
     --input-bg: #201e1a;
     --debug-bg: #2e2b26;
     --debug-border: #4a4438;
-    --shadow-color: rgba(0, 0, 0, 0.45);
-    --shadow-color-soft: rgba(0, 0, 0, 0.22);
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --shadow-color-soft: rgba(0, 0, 0, 0.25);
+    --highlight-edge: rgba(255, 255, 255, 0.06);
+    --ok-bg: #333d2b; --ok-text: #b9c6a6; --ok-border: #4c5a3f;
+    --warn-bg: #3c3120; --warn-text: #d6bd8b; --warn-border: #5c4a2e;
+    --danger-bg: #3c2b27; --danger-text: #d6ada5; --danger-border: #5c3f38;
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -67,8 +96,10 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     display: flex; flex-direction: column; align-items: center; padding: 20px;
     background-color: var(--paper);
+    background-image: radial-gradient(ellipse 900px 500px at 50% -12%, var(--card-2) 0%, var(--paper) 60%);
     color: var(--ink);
     line-height: 1.5;
+    position: relative;
 }
 h1 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -87,11 +118,25 @@ h2 {
    naśladuje miękkie przejście światła po zaokrąglonej powierzchni rzeźby. */
 .pragma-mark { flex-shrink: 0; filter: drop-shadow(0 3px 6px var(--shadow-color-soft)); }
 
+/* Duży, mocno rozmyty odpowiednik znaku marki, ustawiony ZA kartą startową
+   (patrz index.html) — bez tego cała reszta ekranu wyglądała jak zupełnie
+   inny, niepowiązany świat niż samo logo. Position:fixed + niska
+   nieprzezroczystość + blur = ambientowa poświata w tle, nie kolejna
+   ikonka do czytania. */
+.pragma-backdrop {
+    position: fixed; top: -8%; left: 50%; transform: translateX(-50%);
+    width: 640px; height: 640px; max-width: 160vw;
+    opacity: 0.16; filter: blur(38px); pointer-events: none; z-index: 0;
+}
+:root[data-theme="dark"] .pragma-backdrop { opacity: 0.22; }
+
 .card {
-    background: var(--card); padding: 26px; border-radius: var(--radius);
+    background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 45%, var(--card) 100%);
+    padding: 26px; border-radius: var(--radius);
     border: var(--border-w) solid var(--card-border);
     box-shadow: var(--sculpt-shadow);
     width: 100%; max-width: 400px; box-sizing: border-box;
+    position: relative; z-index: 1;
 }
 input, textarea {
     width: 100%; padding: 13px 14px; margin: 10px 0;
@@ -102,15 +147,17 @@ input, textarea {
 input:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 textarea { resize: vertical; min-height: 100px; }
 button {
-    width: 100%; padding: 13px; background: var(--primary); color: #fdfcfa; border: none;
+    width: 100%; padding: 13px;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 82%, white) 0%, var(--primary) 55%, var(--primary-dark) 100%);
+    color: #fdfcfa; border: none;
     border-radius: var(--radius-sm); font-weight: 700; letter-spacing: 0.01em; cursor: pointer; font-size: 16px;
     font-family: 'Inter', inherit;
     box-shadow: var(--sculpt-shadow-sm);
-    transition: transform .12s ease, box-shadow .12s ease, background-color .15s ease;
+    transition: transform .12s ease, box-shadow .12s ease, filter .15s ease;
 }
-button:hover { background: var(--primary-dark); box-shadow: var(--sculpt-shadow); }
-button:active { transform: translateY(1px) scale(0.99); box-shadow: var(--sculpt-shadow-sm); }
-button:disabled { background: #a8a296; box-shadow: none; cursor: default; transform: none; }
+button:hover { filter: brightness(1.06); box-shadow: var(--sculpt-shadow); }
+button:active { transform: translateY(1px) scale(0.99); filter: brightness(0.97); box-shadow: var(--sculpt-shadow-sm); }
+button:disabled { background: #a8a296; filter: none; box-shadow: none; cursor: default; transform: none; }
 
 .tabs { display: flex; gap: 6px; margin: 10px 0; }
 .tab-btn {
@@ -118,7 +165,10 @@ button:disabled { background: #a8a296; box-shadow: none; cursor: default; transf
     background: var(--paper); color: var(--ink-soft); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
     cursor: pointer; width: auto; margin: 0; box-shadow: none;
 }
-.tab-btn.active { background: var(--accent); color: #fdfcfa; border-color: transparent; box-shadow: var(--sculpt-shadow-sm); }
+.tab-btn.active {
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 82%, white) 0%, var(--accent) 55%, var(--accent-dark) 100%);
+    color: #fdfcfa; border-color: transparent; box-shadow: var(--sculpt-shadow-sm);
+}
 
 .mode-panel { display: none; }
 .mode-panel.active { display: block; }
@@ -165,15 +215,17 @@ a { color: var(--accent); }
 
 /* Karta wyniku */
 .result-card {
-    background: var(--card); padding: 26px; border-radius: var(--radius);
+    background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 45%, var(--card) 100%);
+    padding: 26px; border-radius: var(--radius);
     border: var(--border-w) solid var(--card-border);
     box-shadow: var(--sculpt-shadow);
     width: 100%; max-width: 400px; margin-top: 16px; box-sizing: border-box; display: none;
+    position: relative; z-index: 1;
 }
 .result-badge { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: bold; font-size: 14px; margin-bottom: 14px; border: 1.5px solid; }
-.badge-green { background: #dcfce7; color: #166534; border-color: #a7d9b8; }
-.badge-yellow { background: #fef9c3; color: #854d0e; border-color: #e9d99a; }
-.badge-red { background: #fee2e2; color: #991b1b; border-color: #eeb3b1; }
+.badge-green { background: var(--ok-bg); color: var(--ok-text); border-color: var(--ok-border); }
+.badge-yellow { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-border); }
+.badge-red { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
 /* Delikatne pudełko z tłem zamiast kolorowej/kontrastowej linii z boku —
    PODOBNY pomysł co .pattern-tip niżej (subtelnie ciemniejsze tło niż karta),
    ale świadomie WŁASNY odcień (var(--quote-bg), nie var(--paper)), żeby te
@@ -217,7 +269,7 @@ a { color: var(--accent); }
    a tu i tak zawsze czerwona. */
 .scan-text-source-content mark.source-highlight { color: var(--ink); border-radius: 3px; padding: 0 2px; }
 .scan-text-source-content mark.source-highlight-manipulation { background: var(--accent-soft); }
-.scan-text-source-content mark.source-highlight-reasoning { background: #dcfce7; }
+.scan-text-source-content mark.source-highlight-reasoning { background: var(--ok-bg); }
 
 /* Poszczególne wykryte wzorce (manipulacja albo trafny sposób rozumowania) —
    każdy w osobnej, miękko odgraniczonej karcie (cień zamiast twardej ramki),
@@ -233,11 +285,12 @@ a { color: var(--accent); }
 }
 .pattern-item:last-child { margin-bottom: 0; }
 .pattern-item.pattern-manipulation { border-left-color: var(--accent); }
-/* Ten sam zielony co .badge-green niżej (celowo NIE var(--primary) — to
-   kolor przycisków/marki w całej appce, za mało odróżnialny od reszty UI
-   tutaj) — "obserwacja/trafne rozumowanie" ma być jednoznacznie kojarzona
-   z tym samym zielonym, którego użytkownik już zna z odznaki wyniku. */
-.pattern-item.pattern-reasoning { border-left-color: #166534; }
+/* Ten sam stonowany zielony co .badge-green wyżej (var(--ok-*), celowo NIE
+   var(--primary) — to kolor przycisków/marki w całej appce, za mało
+   odróżnialny od reszty UI tutaj) — "obserwacja/trafne rozumowanie" ma być
+   jednoznacznie kojarzona z tym samym zielonym, którego użytkownik już zna
+   z odznaki wyniku. */
+.pattern-item.pattern-reasoning { border-left-color: var(--ok-text); }
 
 .pattern-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .pattern-tag {
@@ -245,7 +298,7 @@ a { color: var(--accent); }
     padding: 3px 9px; border-radius: 999px; white-space: nowrap;
 }
 .pattern-manipulation .pattern-tag { background: var(--accent-soft); color: var(--accent-dark); }
-.pattern-reasoning .pattern-tag { background: #dcfce7; color: #166534; }
+.pattern-reasoning .pattern-tag { background: var(--ok-bg); color: var(--ok-text); }
 .pattern-name { font-weight: 700; font-size: 13.5px; color: var(--ink); }
 
 .pattern-item .result-quote { margin: 0 0 8px 0; }
@@ -286,14 +339,15 @@ a { color: var(--accent); }
 
 /* Panel debugowania — tylko dla developera, patrz sekcja 1 w skrypcie (?debug=1) */
 #debug { display: none; margin-top: 20px; padding: 10px; background: var(--debug-bg); border-radius: 10px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed var(--debug-border); box-sizing: border-box; color: var(--ink-soft); }
-.status-ok { color: #166534; font-weight: bold; }
-.status-err { color: #991b1b; font-weight: bold; }
+.status-ok { color: var(--ok-text); font-weight: bold; }
+.status-err { color: var(--danger-text); font-weight: bold; }
 
 /* Ikona profilu (link do account.html) */
 #userMenuBtn {
     display: none; position: fixed; top: 16px; right: 16px; z-index: 50;
     width: 44px; height: 44px; padding: 0; border-radius: 50%;
-    background: var(--primary); color: #fdfcfa; font-size: 20px; border: none;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 82%, white) 0%, var(--primary) 55%, var(--primary-dark) 100%);
+    color: #fdfcfa; font-size: 20px; border: none;
     align-items: center; justify-content: center; text-decoration: none;
     box-shadow: var(--sculpt-shadow-sm);
 }
