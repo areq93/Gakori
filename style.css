@@ -162,12 +162,15 @@ a { color: var(--accent); }
 .badge-green { background: #dcfce7; color: #166534; border-color: #166534; }
 .badge-yellow { background: #fef9c3; color: #854d0e; border-color: #854d0e; }
 .badge-red { background: #fee2e2; color: #991b1b; border-color: #991b1b; }
-/* Neutralna linia przy cytacie — celowo NIE kolor wzorca (manipulacja/
-   obserwacja), żeby nie dublować/mylić się z kolorem odznaki i lewej
-   krawędzi całej karty wzorca (patrz .pattern-item niżej), które już same
-   niosą to rozróżnienie. Ta sama reguła obowiązuje wszędzie (index.html,
-   scan.html), dla każdego trybu analizy. */
-.result-quote { border-left: 3px solid var(--card-border); padding-left: 12px; margin: 0 0 14px 0; font-style: italic; color: var(--ink-soft); line-height: 1.5; }
+/* Delikatne pudełko z tłem zamiast kolorowej/kontrastowej linii z boku —
+   ten sam pomysł co .pattern-tip niżej (subtelnie ciemniejsze tło niż karta,
+   var(--paper)), ale świadomie BEZ obramowania, żeby cytat wyglądał
+   lżej/spokojniej niż wyraźnie odgraniczona podpowiedź "Co teraz zrobić".
+   Kolor wzorca (manipulacja/obserwacja) i tak niesie już odznaka i lewa
+   krawędź całej karty (patrz .pattern-item niżej) — tu nie dublujemy.
+   Ta sama reguła obowiązuje wszędzie (index.html, scan.html), dla każdego
+   trybu analizy. */
+.result-quote { background: var(--paper); border-radius: var(--radius-sm); padding: 10px 12px; margin: 0 0 14px 0; font-style: italic; color: var(--ink-soft); line-height: 1.5; }
 
 /* Ramka wokół informacji o źródle (link analizowanej strony) na scan.html */
 .scan-source-box {
