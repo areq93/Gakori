@@ -394,6 +394,27 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
   }
 }
 
+// --- Ochrona cashflow przed nadużyciem (patrz PRAGMA_CONTEXT.md) ---
+// Nieudana analiza (np. link, którego nie da się pobrać) kosztuje nas
+// zapytania do Gemini, ale nic nie zarabiamy — kredyty ściągamy dopiero po
+// sukcesie (sekcja 7 niżej). Bez ograniczenia ktoś mógłby (przez pomyłkę
+// albo celowo) zasypywać nas nieudanymi próbami bez końca. Próg wyzwalający
+// blokadę jest zawsze ten sam (15 nieudanych prób w 10 minut — przy tak
+// tanim modelu jak Flash-Lite realny koszt finansowy nawet tej liczby prób
+// jest znikomy, więc próg może być wysoki, żeby nie łapać prawdziwych
+// użytkowników przez przypadek), ale CZAS TRWANIA blokady rośnie
+// TRZYKROTNIE z każdą kolejną blokadą tego samego konta w ciągu ostatnich
+// RATE_LIMIT_STRIKE_RESET_DAYS dni (10 min → 30 min → 1,5h → 4,5h → ...,
+// z sufitem RATE_LIMIT_MAX_MINUTES) — jeśli konto przez ten czas nie
+// zbiera nowych blokad, kara wraca do najniższego poziomu (patrz
+// logFailedAttempt() w Deno.serve niżej).
+const RATE_LIMIT_WINDOW_MINUTES = 10
+const RATE_LIMIT_FAILURE_THRESHOLD = 15
+const RATE_LIMIT_STRIKE_RESET_DAYS = 7
+const RATE_LIMIT_BASE_MINUTES = 10
+const RATE_LIMIT_MULTIPLIER = 3
+const RATE_LIMIT_MAX_MINUTES = 30 * 24 * 60 // sufit: 30 dni, żeby kara nie rosła bez końca
+
 const FALLBACK_SIFT_SCHEMA = {
   type: 'object',
   properties: {
@@ -511,6 +532,69 @@ Deno.serve(async (req: Request) => {
     if (user_id) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user_id).single()
       profile = data
+    }
+
+    // 2b. OCHRONA PRZED NADUŻYCIEM — czy to konto ma teraz aktywną blokadę
+    // z powodu zbyt wielu nieudanych prób pod rząd? (patrz stałe
+    // RATE_LIMIT_* i logFailedAttempt() niżej). Sprawdzane od razu, zanim
+    // policzymy koszt czy wywołamy Gemini — nie ma sensu robić żadnej
+    // dalszej pracy dla zablokowanego konta.
+    if (user_id) {
+      const { data: lastBlock } = await supabase
+        .from('rate_limit_blocks')
+        .select('blocked_until')
+        .eq('user_id', user_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (lastBlock) {
+        const remainingMs = new Date(lastBlock.blocked_until).getTime() - Date.now()
+        if (remainingMs > 0) {
+          // "blocked_until" (dokładny znacznik czasu) pozwala frontendowi
+          // pokazać żywo odliczający licznik do końca blokady, zamiast
+          // statycznego, zaokrąglonego komunikatu.
+          return new Response(
+            JSON.stringify({
+              error: 'too_many_failed_attempts',
+              blocked_until: lastBlock.blocked_until,
+              retry_after_minutes: Math.ceil(remainingMs / 60000),
+            }),
+            { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+    }
+
+    // Loguje nieudaną próbę (patrz stałe RATE_LIMIT_* wyżej) i, jeśli w ciągu
+    // ostatnich RATE_LIMIT_WINDOW_MINUTES uzbierało się ich za dużo, nakłada
+    // nową, coraz dłuższą blokadę. Wywoływana tylko dla zalogowanych — dla
+    // anonimowych analiza tekstu i tak jest darmowa niezależnie od wyniku,
+    // więc nie ma tu dodatkowego ryzyka do ograniczenia.
+    async function logFailedAttempt(): Promise<void> {
+      if (!user_id) return
+      await supabase.from('failed_scan_attempts').insert({ user_id })
+
+      const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000).toISOString()
+      const { count: recentFailures } = await supabase
+        .from('failed_scan_attempts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user_id)
+        .gte('created_at', windowStart)
+      if ((recentFailures ?? 0) < RATE_LIMIT_FAILURE_THRESHOLD) return
+
+      const resetStart = new Date(Date.now() - RATE_LIMIT_STRIKE_RESET_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      const { count: recentStrikes } = await supabase
+        .from('rate_limit_blocks')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user_id)
+        .gte('created_at', resetStart)
+      const blockMinutes = Math.min(
+        RATE_LIMIT_BASE_MINUTES * Math.pow(RATE_LIMIT_MULTIPLIER, recentStrikes ?? 0),
+        RATE_LIMIT_MAX_MINUTES
+      )
+      const blockedUntil = new Date(Date.now() + blockMinutes * 60 * 1000).toISOString()
+
+      await supabase.from('rate_limit_blocks').insert({ user_id, blocked_until: blockedUntil })
     }
 
     let cost: number
@@ -721,6 +805,7 @@ Deno.serve(async (req: Request) => {
               geminiKey!
             )
           } else {
+            await logFailedAttempt()
             return new Response(
               JSON.stringify({
                 error: 'url_fetch_failed',
@@ -791,6 +876,7 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!geminiData?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        await logFailedAttempt()
         return new Response(
           JSON.stringify({ error: 'gemini_error', details: geminiData }),
           { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -835,6 +921,7 @@ Deno.serve(async (req: Request) => {
     // niezrozumiałym błędem "Cannot read properties of null") — zwracamy
     // czytelny błąd z prawdziwym powodem z bazy.
     if (insertError || !newScan) {
+      await logFailedAttempt()
       return new Response(
         JSON.stringify({
           error: 'save_failed',
