@@ -8,6 +8,7 @@
     --ink-soft: #5c5344;
     --paper: #ede1c8;
     --card: #fff8ec;
+    --quote-bg: #f6ecda;
     --card-border: #241f18;
     --accent: #d1495b;
     --accent-dark: #a83347;
@@ -45,6 +46,7 @@
     --ink-soft: #a99b7e;
     --paper: #1d1a16;
     --card: #2a241c;
+    --quote-bg: #231f19;
     --card-border: #6b5c42;
     --accent: #d9748a;
     --accent-dark: #e79aab;
@@ -163,14 +165,16 @@ a { color: var(--accent); }
 .badge-yellow { background: #fef9c3; color: #854d0e; border-color: #854d0e; }
 .badge-red { background: #fee2e2; color: #991b1b; border-color: #991b1b; }
 /* Delikatne pudełko z tłem zamiast kolorowej/kontrastowej linii z boku —
-   ten sam pomysł co .pattern-tip niżej (subtelnie ciemniejsze tło niż karta,
-   var(--paper)), ale świadomie BEZ obramowania, żeby cytat wyglądał
-   lżej/spokojniej niż wyraźnie odgraniczona podpowiedź "Co teraz zrobić".
-   Kolor wzorca (manipulacja/obserwacja) i tak niesie już odznaka i lewa
-   krawędź całej karty (patrz .pattern-item niżej) — tu nie dublujemy.
-   Ta sama reguła obowiązuje wszędzie (index.html, scan.html), dla każdego
-   trybu analizy. */
-.result-quote { background: var(--paper); border-radius: var(--radius-sm); padding: 10px 12px; margin: 0 0 14px 0; font-style: italic; color: var(--ink-soft); line-height: 1.5; }
+   PODOBNY pomysł co .pattern-tip niżej (subtelnie ciemniejsze tło niż karta),
+   ale świadomie WŁASNY odcień (var(--quote-bg), nie var(--paper)), żeby te
+   dwa różne bloki (cytat vs podpowiedź "Co teraz zrobić") dało się od siebie
+   odróżnić na pierwszy rzut oka, a nie żeby wyglądały identycznie — i
+   świadomie BEZ obramowania, żeby cytat wyglądał lżej/spokojniej niż
+   wyraźnie odgraniczona podpowiedź. Kolor wzorca (manipulacja/obserwacja) i
+   tak niesie już odznaka i lewa krawędź całej karty (patrz .pattern-item
+   niżej) — tu nie dublujemy. Ta sama reguła obowiązuje wszędzie (index.html,
+   scan.html), dla każdego trybu analizy. */
+.result-quote { background: var(--quote-bg); border-radius: var(--radius-sm); padding: 10px 12px; margin: 0 0 14px 0; font-style: italic; color: var(--ink-soft); line-height: 1.5; }
 
 /* Ramka wokół informacji o źródle (link analizowanej strony) na scan.html */
 .scan-source-box {
