@@ -140,6 +140,24 @@ zanim założysz, że działa.
   rozpoznaje prawdziwy typ pliku po zawartości i woła Gemini
   multimodalnie (`inlineData` z base64 + wykrytym `mimeType`), patrz
   sekcja "Cennik" wyżej.
+  - **Źródło pokazywane na `scan.html`, dla każdego trybu inaczej**: link →
+    klikalny adres (`source_url`, patrz "Bezpieczne linki" niżej); obraz →
+    jednorazowy, ulotny podgląd tylko u przesyłającego (patrz sekcja o
+    obrazie niżej — świadomie NIE zapisywany); **tekst → pełna wklejona
+    treść, zapisana na stałe i publiczna, tak jak `source_url` dla linku**
+    (kolumna `text_content` w `scans`, patrz struktura tabeli wyżej).
+    Pokazywana na `scan.html` jako zwijany blok (`<details>`,
+    `#scanTextSource`) na górze analizy, z fragmentami odpowiadającymi
+    `pattern.quote` delikatnie podświetlonymi DOKŁADNIE w miejscu ich
+    wystąpienia w oryginale (`buildHighlightedText()` w `scan.html` —
+    zbudowane wyłącznie przez `createTextNode`/`createElement`, nigdy
+    `innerHTML`, bo to treść od użytkownika). Świadoma decyzja (patrz
+    rozmowa z użytkownikiem): w odróżnieniu od obrazu, tekst JUŻ dziś jest
+    publicznie cache'owany/wyszukiwalny (nie ma filtra `.neq('input_type',
+    'text')` jak dla obrazu), więc trwały zapis pełnej treści to
+    kontynuacja istniejącego zachowania (cytaty i tak już są publiczne), a
+    nie nowa kategoria ekspozycji — w przeciwieństwie do obrazu koszt
+    przechowywania samego tekstu jest znikomy.
   - **Moderacja treści na obrazach** (użytkownik poprosił wprost, żeby
     zablokować próby wrzucania niedozwolonej treści): DWIE niezależne
     warstwy sprawdzania w tym samym, jedynym wywołaniu Gemini (bez
@@ -834,7 +852,11 @@ sprawdź, czy ten wyzwalacz nadal istnieje**
   (boolean, `NOT NULL DEFAULT false` — `true`, gdy wynik powstał przez
   przetłumaczenie istniejącej analizy z innego języka, a nie przez pełną
   analizę AI; używane, żeby zawsze tłumaczyć z prawdziwego oryginału,
-  nigdy z tłumaczenia), `source_url`, `char_count`, `credits_charged`,
+  nigdy z tłumaczenia), `source_url`, `text_content` (text, nullable —
+  pełna treść wklejonego tekstu, TYLKO dla `input_type = 'text'`; świadoma
+  decyzja, że to jest trwałe i publiczne jak `source_url` dla linku, NIE
+  ulotne jak obraz — patrz "Analiza tekstu, linków i obrazów" niżej),
+  `char_count`, `credits_charged`,
   `result` (jsonb — patrz struktura wyniku wyżej), `discovered_by` (uuid,
   nullable — kto pierwszy wygenerował ten wynik; część starych wierszy ma
   tu `null` z okresu, gdy istniało jeszcze darmowe dotłumaczanie z samej

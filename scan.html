@@ -33,6 +33,10 @@
             <img id="scanImage" alt="">
             <p id="scanImageNotice" class="image-not-saved-notice"></p>
             <p id="scanSource" class="scan-source-box" style="display:none;"></p>
+            <details id="scanTextSource" class="scan-text-source" style="display:none;">
+                <summary id="scanTextSourceSummary"></summary>
+                <div id="scanTextSourceContent" class="scan-text-source-content"></div>
+            </details>
             <div id="scanBadge" class="result-badge"></div>
             <div id="scanPatterns"></div>
             <div class="summary-block">
@@ -69,11 +73,57 @@
                 document.getElementById('scanNotFound').style.display = 'block';
             }
 
+            // Buduje pełny tekst źródłowy z delikatnie podświetlonymi fragmentami
+            // dokładnie tam, gdzie w oryginale występuje cytat z listy wykrytych
+            // wzorców (patrz pattern.quote) — żeby było widać, w którym miejscu
+            // tekstu analiza się do czegoś odnosi. Zbudowane WYŁĄCZNIE przez
+            // createTextNode/createElement (nigdy innerHTML) — treść pochodzi od
+            // użytkownika (własnego albo cudzego, gdy ktoś ogląda cudzą publiczną
+            // analizę), więc nie może trafić na stronę jako surowy HTML.
+            function buildHighlightedText(fullText, quotes) {
+                const fragment = document.createDocumentFragment();
+                const ranges = [];
+                quotes.forEach((q) => {
+                    if (!q) return;
+                    let from = 0;
+                    let found;
+                    while ((found = fullText.indexOf(q, from)) !== -1) {
+                        ranges.push([found, found + q.length]);
+                        from = found + q.length;
+                    }
+                });
+                if (!ranges.length) {
+                    fragment.appendChild(document.createTextNode(fullText));
+                    return fragment;
+                }
+                ranges.sort((a, b) => a[0] - b[0]);
+                const merged = [ranges[0]];
+                for (let i = 1; i < ranges.length; i++) {
+                    const last = merged[merged.length - 1];
+                    if (ranges[i][0] <= last[1]) {
+                        last[1] = Math.max(last[1], ranges[i][1]);
+                    } else {
+                        merged.push(ranges[i]);
+                    }
+                }
+                let cursor = 0;
+                merged.forEach(([start, end]) => {
+                    if (start > cursor) fragment.appendChild(document.createTextNode(fullText.slice(cursor, start)));
+                    const mark = document.createElement('mark');
+                    mark.className = 'source-highlight';
+                    mark.appendChild(document.createTextNode(fullText.slice(start, end)));
+                    fragment.appendChild(mark);
+                    cursor = end;
+                });
+                if (cursor < fullText.length) fragment.appendChild(document.createTextNode(fullText.slice(cursor)));
+                return fragment;
+            }
+
             if (!scanId) {
                 showNotFound();
             } else {
                 sb.from('scans')
-                    .select('input_type, source_url, result')
+                    .select('input_type, source_url, text_content, result')
                     .eq('id', scanId)
                     .maybeSingle()
                     .then(({ data, error }) => {
@@ -121,6 +171,22 @@
                             link.rel = 'noopener noreferrer nofollow';
                             link.innerText = data.source_url;
                             sourceEl.appendChild(link);
+                        }
+
+                        // Tekst wklejony ręcznie: pokazujemy go w całości, zwinięty,
+                        // z delikatnie podświetlonymi fragmentami odpowiadającymi
+                        // cytatom omówionym niżej — dokładnie w miejscu, gdzie
+                        // faktycznie występują w oryginale (patrz buildHighlightedText).
+                        if (data.input_type === 'text' && typeof data.text_content === 'string' && data.text_content) {
+                            const quotes = Array.isArray(r.patterns)
+                                ? r.patterns.map((p) => p.quote).filter(Boolean)
+                                : (r.source_quote ? [r.source_quote] : []);
+                            const textSourceEl = document.getElementById('scanTextSource');
+                            document.getElementById('scanTextSourceSummary').innerText = icon + ' ' + t('scan_text_source_label');
+                            document.getElementById('scanTextSourceContent').appendChild(
+                                buildHighlightedText(data.text_content, quotes)
+                            );
+                            textSourceEl.style.display = 'block';
                         }
 
                         const badge = document.getElementById('scanBadge');
