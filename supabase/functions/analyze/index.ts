@@ -268,21 +268,51 @@ const IMAGE_RESPONSE_SCHEMA = {
   required: ['unsafe_content', 'unsafe_content_category', 'q_score', 'patterns', 'summary'],
 }
 
+const GEMINI_TIMEOUT_MS = 20000 // 20s na pojedyncze zapytanie do Gemini
+const FALLBACK_FETCH_TIMEOUT_MS = 10000 // 10s na awaryjne, bezpośrednie pobranie strony
+
+// Owija fetch() twardym limitem czasu — bez tego POJEDYNCZE wolne albo
+// zawieszone żądanie (np. do wolnej/nieodpowiadającej strony przy analizie
+// linku) potrafiło trzymać całą analizę w nieskończoność, bez żadnego
+// komunikatu dla użytkownika (zgłoszone na żywo: ponad 2 minuty czekania
+// zanim w ogóle pojawił się błąd). Analiza linku robi do 5 kolejnych
+// zapytań sieciowych w najgorszym razie (kategoryzacja → właściwa analiza →
+// awaryjne pobranie strony → sito → druga właściwa analiza) — z tymi
+// limitami czasu górna granica całości to ok. 90s zamiast "bez ograniczeń".
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // Wspólny punkt wywołania Gemini — używany zarówno przez tłumaczenie gotowego
 // wyniku, jak i pełną analizę (URL, tekst i awaryjne ponowienie po nieudanym
 // pobraniu linku). Trzymanie tego w jednym miejscu gwarantuje, że wszystkie
 // wywołania biją w ten sam model i ten sam adres.
 // deno-lint-ignore no-explicit-any
 async function callGemini(requestBody: Record<string, unknown>, geminiKey: string): Promise<any> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    }
-  )
-  return await res.json()
+  try {
+    const res = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      },
+      GEMINI_TIMEOUT_MS
+    )
+    return await res.json()
+  } catch {
+    // Timeout albo błąd sieci — zwracamy pusty obiekt, żeby dalszy kod
+    // (sprawdzający brak "candidates" w odpowiedzi) potraktował to tak samo
+    // jak zwykły błąd Gemini, zamiast wywalać się nieobsłużonym wyjątkiem
+    // aż do zewnętrznego catch (który zwróciłby mniej czytelny komunikat).
+    return {}
+  }
 }
 
 // Tłumaczy GOTOWY wynik analizy na inny język — nie analizuje treści od nowa.
@@ -335,13 +365,17 @@ ${JSON.stringify(result)}`
 // szumu jest lepsza niż brak analizy w ogóle.
 async function fetchUrlAsText(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-        'Accept-Language': 'pl,en;q=0.8',
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+          'Accept-Language': 'pl,en;q=0.8',
+        },
       },
-    })
+      FALLBACK_FETCH_TIMEOUT_MS
+    )
     if (!res.ok) return null
     const html = await res.text()
     const text = html
