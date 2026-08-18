@@ -16,28 +16,38 @@
    które razem z gradientem daje wrażenie uniesionej, oświetlonej bryły;
    (4) duży, rozmyty kształt rzeźby w tle karty startowej (`.pragma-backdrop`
    w index.html) — nie tylko mały znaczek przy nagłówku — żeby "świat" loga
-   i świat aplikacji wewnątrz faktycznie się zgadzały. Jeśli zmieniasz
-   paletę — zmień tylko zmienne tutaj, reszta pliku się do nich odwołuje. */
+   i świat aplikacji wewnątrz faktycznie się zgadzały.
+   POPRAWKA 2026-08-18(e) — runda 3: mimo powyższego, całość dalej
+   sprawiała wrażenie "bez energii" — różnica jasności między --card i
+   --card-2 (gradient kart) oraz między jasnym i ciemnym końcem gradientu
+   przycisków była zbyt mała, żeby oko faktycznie zarejestrowało światło
+   padające na powierzchnię, a cień był za płytki, żeby karty wyglądały na
+   realnie uniesione. Podbite: rozstaw jasności --card/--card-2 (i
+   odpowiednika w trybie ciemnym), głębokość i rozmycie --sculpt-shadow*,
+   moc --highlight-edge, nasycenie --accent/--primary, oraz kontrast
+   obramowania --card-border (dalej cienkie i bez twardych krawędzi, ale
+   już widoczne, nie prawie-niewidoczne). Jeśli zmieniasz paletę — zmień
+   tylko zmienne tutaj, reszta pliku się do nich odwołuje. */
 :root {
-    --ink: #2b2a27;
-    --ink-soft: #726f68;
-    --paper: #efece6;
-    --card: #f9f7f3;
-    --card-2: #f1ede4;
-    --quote-bg: #eae6dd;
-    --card-border: rgba(43, 42, 39, 0.09);
-    --accent: #a97c6d;
-    --accent-dark: #8c6053;
-    --accent-soft: #e6d9d2;
-    --primary: #57534a;
-    --primary-dark: #403d35;
-    --primary-soft: #e4ded2;
-    --input-bg: #fdfcfa;
+    --ink: #201e1a;
+    --ink-soft: #66625a;
+    --paper: #ece7dd;
+    --card: #fcfaf7;
+    --card-2: #e6ddc9;
+    --quote-bg: #e1d8c6;
+    --card-border: rgba(43, 42, 39, 0.16);
+    --accent: #b56953;
+    --accent-dark: #874735;
+    --accent-soft: #ecd4c6;
+    --primary: #48453a;
+    --primary-dark: #2e2b24;
+    --primary-soft: #ddd3bd;
+    --input-bg: #fffefc;
     --debug-bg: #e4e0d6;
     --debug-border: #c9c3b4;
-    --shadow-color: rgba(43, 42, 39, 0.18);
-    --shadow-color-soft: rgba(43, 42, 39, 0.08);
-    --highlight-edge: rgba(255, 255, 255, 0.55);
+    --shadow-color: rgba(32, 30, 26, 0.30);
+    --shadow-color-soft: rgba(32, 30, 26, 0.13);
+    --highlight-edge: rgba(255, 255, 255, 0.8);
     --radius: 22px;
     --radius-sm: 14px;
     --border-w: 1px;
@@ -45,8 +55,8 @@
        góry (inset) naśladująca światło ślizgające się po zaokrąglonej
        krawędzi — razem dają wrażenie uniesionej, oświetlonej bryły, nie
        płaskiej naklejki i nie płaskiej kartki. */
-    --sculpt-shadow: 0 16px 36px -14px var(--shadow-color), 0 4px 12px -2px var(--shadow-color-soft), inset 0 1px 0 var(--highlight-edge);
-    --sculpt-shadow-sm: 0 7px 18px -8px var(--shadow-color), 0 2px 6px -1px var(--shadow-color-soft), inset 0 1px 0 var(--highlight-edge);
+    --sculpt-shadow: 0 20px 42px -14px var(--shadow-color), 0 7px 18px -3px var(--shadow-color-soft), inset 0 1.5px 0 var(--highlight-edge);
+    --sculpt-shadow-sm: 0 10px 22px -8px var(--shadow-color), 0 3px 9px -1px var(--shadow-color-soft), inset 0 1.5px 0 var(--highlight-edge);
     /* Kolory sygnałowe (wynik analizy) — ŚWIADOMIE przygaszone/ziemiste, nie
        jaskrawe web-safe zielenie/żółcie/czerwienie. Nadal jednoznacznie
        rozróżnialne (inny odcień = inne znaczenie), ale należą do tej samej,
@@ -65,30 +75,33 @@
 /* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
    jasność. Cienie w ciemnym motywie są subtelniejsze (na ciemnym tle mocny
    czarny cień i tak "znika"), za to karty dostają odrobinę jaśniejszej
-   poświaty u góry, żeby nadal czytać się jako uniesione nad tłem. */
+   poświaty u góry, żeby nadal czytać się jako uniesione nad tłem.
+   POPRAWKA 2026-08-18(e) — runda 3: ten sam powód co w trybie jasnym wyżej
+   (za mały rozstaw jasności --card/--card-2, za płytki cień) — podbite
+   analogicznie. */
 :root[data-theme="dark"] {
-    --ink: #ece9e2;
-    --ink-soft: #a39d90;
-    --paper: #1c1b19;
-    --card: #262420;
-    --card-2: #2d2a25;
-    --quote-bg: #2e2b26;
-    --card-border: rgba(255, 255, 255, 0.08);
-    --accent: #cb9587;
-    --accent-dark: #dcaea2;
-    --accent-soft: #3c2d29;
-    --primary: #a39a86;
-    --primary-dark: #beb49f;
-    --primary-soft: #33302a;
-    --input-bg: #201e1a;
+    --ink: #f2efe7;
+    --ink-soft: #b6ae9c;
+    --paper: #17130f;
+    --card: #2a251d;
+    --card-2: #423a2b;
+    --quote-bg: #362f24;
+    --card-border: rgba(255, 255, 255, 0.15);
+    --accent: #e0a690;
+    --accent-dark: #eec1ae;
+    --accent-soft: #4a3128;
+    --primary: #beb190;
+    --primary-dark: #ddd0ac;
+    --primary-soft: #3c3627;
+    --input-bg: #191612;
     --debug-bg: #2e2b26;
     --debug-border: #4a4438;
-    --shadow-color: rgba(0, 0, 0, 0.5);
-    --shadow-color-soft: rgba(0, 0, 0, 0.25);
-    --highlight-edge: rgba(255, 255, 255, 0.06);
-    --ok-bg: #333d2b; --ok-text: #b9c6a6; --ok-border: #4c5a3f;
-    --warn-bg: #3c3120; --warn-text: #d6bd8b; --warn-border: #5c4a2e;
-    --danger-bg: #3c2b27; --danger-text: #d6ada5; --danger-border: #5c3f38;
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --shadow-color-soft: rgba(0, 0, 0, 0.4);
+    --highlight-edge: rgba(255, 255, 255, 0.14);
+    --ok-bg: #333d2b; --ok-text: #bccaa9; --ok-border: #4c5a3f;
+    --warn-bg: #3c3120; --warn-text: #dcc292; --warn-border: #5c4a2e;
+    --danger-bg: #3c2b27; --danger-text: #dcb1a8; --danger-border: #5c3f38;
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -126,9 +139,9 @@ h2 {
 .pragma-backdrop {
     position: fixed; top: -8%; left: 50%; transform: translateX(-50%);
     width: 640px; height: 640px; max-width: 160vw;
-    opacity: 0.16; filter: blur(38px); pointer-events: none; z-index: 0;
+    opacity: 0.22; filter: blur(34px); pointer-events: none; z-index: 0;
 }
-:root[data-theme="dark"] .pragma-backdrop { opacity: 0.22; }
+:root[data-theme="dark"] .pragma-backdrop { opacity: 0.3; }
 
 .card {
     background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 45%, var(--card) 100%);
@@ -148,7 +161,7 @@ input:focus, textarea:focus { outline: none; border-color: var(--primary); box-s
 textarea { resize: vertical; min-height: 100px; }
 button {
     width: 100%; padding: 13px;
-    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 82%, white) 0%, var(--primary) 55%, var(--primary-dark) 100%);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 50%, var(--primary-dark) 100%);
     color: #fdfcfa; border: none;
     border-radius: var(--radius-sm); font-weight: 700; letter-spacing: 0.01em; cursor: pointer; font-size: 16px;
     font-family: 'Inter', inherit;
@@ -180,7 +193,7 @@ button.btn-secondary:active { filter: none; background: var(--primary-soft); }
     cursor: pointer; width: auto; margin: 0; box-shadow: none;
 }
 .tab-btn.active {
-    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 82%, white) 0%, var(--accent) 55%, var(--accent-dark) 100%);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 90%, white) 0%, var(--accent) 50%, var(--accent-dark) 100%);
     color: #fdfcfa; border-color: transparent; box-shadow: var(--sculpt-shadow-sm);
 }
 
@@ -360,7 +373,7 @@ a { color: var(--accent); }
 #userMenuBtn {
     display: none; position: fixed; top: 16px; right: 16px; z-index: 50;
     width: 44px; height: 44px; padding: 0; border-radius: 50%;
-    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 82%, white) 0%, var(--primary) 55%, var(--primary-dark) 100%);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 50%, var(--primary-dark) 100%);
     color: #fdfcfa; font-size: 20px; border: none;
     align-items: center; justify-content: center; text-decoration: none;
     box-shadow: var(--sculpt-shadow-sm);

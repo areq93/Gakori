@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pragma-v13';
+const CACHE_NAME = 'pragma-v14';
 // Osobny, tymczasowy "schowek" na obraz udostępniony z innej aplikacji
 // (patrz handleShareTarget niżej) — celowo NIE ten sam co CACHE_NAME, żeby
 // czyszczenie starych wersji aplikacji (patrz "activate" niżej) nigdy
