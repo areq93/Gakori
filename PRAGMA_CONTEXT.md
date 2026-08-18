@@ -455,6 +455,34 @@ zanim założysz, że działa.
     RÓWNIEŻ lepszy niż w rundzie 2 (np. `--ink-soft` na `--paper`: było ok.
     5:1, jest ok. 4,9-8,4:1 zależnie od motywu), więc silniejszy wygląd nie
     kosztował czytelności, wręcz ją poprawił.
+  - **POPRAWKA 2026-08-18(f) — runda 4**: użytkownikowi spodobał się
+    ciemny, prawie czarny odcień `--primary` z rundy 3 na głównym
+    przycisku ("jak perły, ale matowe") — poprosił, żeby TĘ SAMĄ czerń
+    (i jej odwrotność w trybie ciemnym) konsekwentnie zastosować na
+    WSZYSTKICH przyciskach, nie tylko głównym, oraz żeby panel konta
+    (`account.html`) wizualnie dorównał stronie głównej. Przy okazji: tekst
+    na przyciskach był na sztywno `#fdfcfa` (jasny), co w trybie ciemnym —
+    gdzie `--primary` był już jaśniejszy (tan/khaki z rundy 3) — dawało
+    słaby kontrast/niemal ginący napis. Zmiany:
+    1. `--primary`/`--primary-dark` w jasnym motywie dobite do niemal
+       czystej, ciepłej czerni (`#211f1c`/`#100f0d`); w ciemnym motywie do
+       wyraźnej "brudnej bieli" (`#e7dfce`/`#cabe9c`) zamiast wcześniejszego
+       tanowego odcienia — to jest właśnie żądane "odwrócenie trybu".
+    2. Nowa zmienna `--btn-text` — jasna w jasnym motywie, ciemna w
+       ciemnym — użyta zamiast każdego dawniej twardo wpisanego
+       `color: #fdfcfa` (`button`, `.tab-btn.active`, `#userMenuBtn`).
+       Bez tego czarny/biały przycisk w złym motywie miałby niewidoczny
+       napis.
+    3. `button.btn-secondary` (Wyloguj / Zaloguj przez Google / Wybierz
+       zdjęcie — czyli DOKŁADNIE te przyciski, które użytkownik uznał za
+       niespójne z resztą, w tym te na stronie konta) przebudowany z
+       płaskiego jasnego tła na obrys tej samej "czarnej/białej perły" —
+       `border`+`color: var(--ink)` (ten sam odcień, który motyw już
+       odwraca), wypełniający się na hover tym samym kolorem co przycisk
+       główny. To jednym ruchem naprawiło zarówno "przyciski nie są
+       spójne", jak i "panel konta nie dorównuje głównej" — obie strony
+       współdzielą tę samą klasę.
+    `sw.js` `CACHE_NAME` podbite do `pragma-v15`.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
