@@ -27,6 +27,14 @@ const IMAGE_SCAN_COST = 8
 // Twardy limit rozmiaru pliku — zarówno żeby nie zapłacić za coś absurdalnie
 // dużego, jak i żeby zmieścić się w limicie rozmiaru zapytania Edge Function.
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // 8 MB
+// Analiza wielu obrazów naraz (np. seria zrzutów ekranu tej samej rozmowy) —
+// jedna wspólna analiza, ale każdy obraz liczony osobno w cenie (patrz sekcja
+// 3 w Deno.serve niżej). Limit liczby obrazów chroni przed absurdalnie
+// wielkim zapytaniem; limit łącznego rozmiaru to dodatkowa, ostrożna granica
+// (zapytanie do Edge Function ma własny, niezależny od nas limit rozmiaru) —
+// w praktyce zrzuty ekranu są dużo mniejsze niż 8 MB, więc rzadko się o nią otrze.
+const MAX_IMAGES_PER_SCAN = 6
+const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024 // 20 MB łącznie
 
 // Nazwy języków (po polsku, w formie "w języku X") używane do parametryzacji
 // instrukcji językowej promptu — patrz buildSystemPrompt(). Klucze muszą się
@@ -476,7 +484,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json()
-    const { content_hash, input_type, text_content, source_url, char_count, language, image_base64 } = body
+    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64 } = body
     const outputLanguage = typeof language === 'string' && LANGUAGE_NAMES[language] ? language : DEFAULT_LANGUAGE
 
     // PDF wraca w kolejnym kroku — na razie tekst, link i obraz.
@@ -601,8 +609,8 @@ Deno.serve(async (req: Request) => {
     }
 
     let cost: number
-    let imageBytes: Uint8Array | null = null
-    let imageMimeType: string | null = null
+    let imageBytesList: Uint8Array[] = []
+    let imageMimeTypes: string[] = []
     if (input_type === 'image') {
       // Tak jak link — obraz zawsze wymaga konta (płaska, wyższa stawka niż
       // darmowy limit anonimowy dla krótkiego tekstu).
@@ -612,39 +620,55 @@ Deno.serve(async (req: Request) => {
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      if (typeof image_base64 !== 'string' || !image_base64) {
+      if (!Array.isArray(images_base64) || images_base64.length === 0) {
         return new Response(
           JSON.stringify({ error: 'invalid_image', message: 'Brak danych obrazu w zapytaniu.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+      if (images_base64.length > MAX_IMAGES_PER_SCAN) {
+        return new Response(
+          JSON.stringify({
+            error: 'too_many_images',
+            message: `Można analizować maksymalnie ${MAX_IMAGES_PER_SCAN} obrazów naraz.`,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
       try {
-        imageBytes = Uint8Array.from(atob(image_base64), (c) => c.charCodeAt(0))
+        imageBytesList = images_base64.map((b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
       } catch {
         return new Response(
           JSON.stringify({ error: 'invalid_image', message: 'Nie udało się odczytać przesłanego pliku.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      if (imageBytes.length > MAX_IMAGE_BYTES) {
+      if (imageBytesList.some((bytes) => bytes.length > MAX_IMAGE_BYTES)) {
         return new Response(
-          JSON.stringify({ error: 'file_too_large', message: 'Plik jest za duży (limit 8 MB).' }),
+          JSON.stringify({ error: 'file_too_large', message: 'Jeden z plików jest za duży (limit 8 MB na obraz).' }),
+          { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      const totalImageBytes = imageBytesList.reduce((sum, bytes) => sum + bytes.length, 0)
+      if (totalImageBytes > MAX_TOTAL_IMAGE_BYTES) {
+        return new Response(
+          JSON.stringify({ error: 'file_too_large', message: 'Łączny rozmiar obrazów jest za duży (limit 20 MB).' }),
           { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
       // NIGDY nie ufamy mime_type/rozszerzeniu podanemu przez przeglądarkę —
-      // sami rozpoznajemy prawdziwy typ pliku po jego zawartości. Jeśli to w
-      // ogóle nie jest rozpoznawalny obraz (np. ktoś podał PDF albo dowolny
-      // inny plik jako "obraz"), odrzucamy zapytanie, zanim cokolwiek
-      // zapłacimy Gemini.
-      imageMimeType = detectImageMimeType(imageBytes)
-      if (!imageMimeType) {
+      // sami rozpoznajemy prawdziwy typ pliku po jego zawartości. Jeśli
+      // KTÓRYKOLWIEK z obrazów w ogóle nie jest rozpoznawalnym formatem (np.
+      // ktoś podał PDF albo dowolny inny plik jako "obraz"), odrzucamy całe
+      // zapytanie, zanim cokolwiek zapłacimy Gemini.
+      imageMimeTypes = imageBytesList.map((bytes) => detectImageMimeType(bytes)!)
+      if (imageMimeTypes.some((mime) => !mime)) {
         return new Response(
-          JSON.stringify({ error: 'invalid_image', message: 'To nie jest rozpoznawalny plik obrazu (JPEG/PNG/GIF/WEBP).' }),
+          JSON.stringify({ error: 'invalid_image', message: 'Jeden z plików to nie rozpoznawalny obraz (JPEG/PNG/GIF/WEBP).' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      cost = IMAGE_SCAN_COST
+      cost = IMAGE_SCAN_COST * images_base64.length
     } else if (input_type === 'url') {
       // Analiza linku wymaga konta zawsze — nie znamy długości strony z góry,
       // więc nie da się bezpiecznie zastosować limitu anonimowego (ktoś mógłby
@@ -832,16 +856,27 @@ Deno.serve(async (req: Request) => {
         // przypadki z listy użytkownika (katastrofy, zranienia, znęcanie
         // się), które niekoniecznie trafiają w kategorie blokowane
         // automatycznie przez samego dostawcę.
-        const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy obraz przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "q_score", "patterns" i "summary" zostaw odpowiednio: 0, pusta lista, pusty tekst. NIE opisuj ani nie analizuj dalej takiej treści. Jeśli obraz NIE przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.`
+        const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy KTÓRYKOLWIEK z przesłanych obrazów przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK (choćby na jednym z obrazów) — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "q_score", "patterns" i "summary" zostaw odpowiednio: 0, pusta lista, pusty tekst. NIE opisuj ani nie analizuj dalej żadnego z obrazów. Jeśli ŻADEN obraz nie przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.`
+        // Przy więcej niż jednym obrazie naraz Gemini ma je czytać jako JEDEN
+        // wspólny kontekst (np. seria zrzutów tej samej rozmowy) i zwrócić
+        // JEDNĄ wspólną listę wzorców dla wszystkich obrazów razem — bez
+        // dzielenia jej według obrazu (świadoma decyzja: prostszy wynik,
+        // patrz PRAGMA_CONTEXT.md).
+        const multiImageInstruction =
+          imageMimeTypes.length > 1
+            ? ` Przesłano ${imageMimeTypes.length} obrazów naraz — potraktuj je jako jeden, wspólny kontekst do analizy i zwróć JEDNĄ wspólną listę wzorców dla wszystkich obrazów razem, bez dzielenia jej według konkretnego obrazu.`
+            : ''
         geminiData = await callGemini(
           {
             contents: [
               {
                 parts: [
                   {
-                    text: `${systemPrompt}\n\n${moderationInstruction}\n\nPrzeanalizuj treść widoczną na przesłanym obrazie (to może być zrzut ekranu, zdjęcie tekstu, wykres, post z mediów społecznościowych itp.) — potraktuj ją dokładnie tak samo jak tekst do analizy.`,
+                    text: `${systemPrompt}\n\n${moderationInstruction}\n\nPrzeanalizuj treść widoczną na przesłanym obrazie lub obrazach (to może być zrzut ekranu, zdjęcie tekstu, wykres, post z mediów społecznościowych itp.) — potraktuj ją dokładnie tak samo jak tekst do analizy.${multiImageInstruction}`,
                   },
-                  { inlineData: { mimeType: imageMimeType, data: image_base64 } },
+                  ...imageMimeTypes.map((mimeType, i) => ({
+                    inlineData: { mimeType, data: images_base64[i] },
+                  })),
                 ],
               },
             ],

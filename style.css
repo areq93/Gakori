@@ -125,8 +125,19 @@ button:disabled { background: #a89e88; border-color: #a89e88; box-shadow: none; 
 .mode-panel { display: none; }
 .mode-panel.active { display: block; }
 
-#imagePreview { max-width: 100%; border-radius: 4px; margin-top: 8px; display: none; }
-#fileName { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+#imageSelectionInfo { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+
+/* Siatka miniaturek wybranych obrazów (index.html, tryb "Obraz" — teraz
+   można dodać więcej niż jeden naraz) — każda miniaturka ma własny przycisk
+   usuwania w rogu. */
+.image-preview-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.image-preview-item { position: relative; width: 84px; height: 84px; }
+.image-preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block; }
+.image-preview-remove {
+    position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid var(--card); background: var(--ink); color: #fff; font-size: 14px; line-height: 1;
+    cursor: pointer; padding: 0; box-shadow: var(--sticker-shadow-sm);
+}
 
 /* Strefa wklejania obrazu ze schowka (Ctrl+V / "Wklej" na telefonie) —
    contenteditable, żeby telefony w ogóle pokazały opcję wklejania, ale
@@ -144,7 +155,8 @@ button:disabled { background: #a89e88; border-color: #a89e88; box-shadow: none; 
    (jednorazowy podgląd z sessionStorage — plik obrazu nigdy nie trafia na
    serwer do przechowania, patrz index.html/scan.html) oraz informacja o
    tym pod spodem. */
-#scanImage { max-width: 100%; border-radius: var(--radius-sm); margin-bottom: 12px; display: none; }
+.scan-image-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; display: none; }
+.scan-image-list img { max-width: 140px; max-height: 140px; border-radius: var(--radius-sm); object-fit: cover; }
 .image-not-saved-notice {
     font-size: 12.5px; color: var(--ink-soft); background: var(--paper);
     border: 1.5px dashed var(--card-border); border-radius: var(--radius-sm);
