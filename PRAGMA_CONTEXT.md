@@ -416,6 +416,27 @@ zanim założysz, że działa.
        nie tylko jako mały znaczek przy nagłówku.
     `sw.js` `CACHE_NAME` podbite dalej do `pragma-v11` (kolejna zmiana
     `style.css`).
+  - **POPRAWKA 2026-08-18(d)**: strona konta (`account.html`) sprawiała
+    wrażenie "niedokończonej" względem reszty aplikacji — przyczyna:
+    kilka przycisków (`#logoutBtn` na koncie, `#googleLoginBtn` i
+    `#imageInputTrigger` na stronie głównej) miało twardo wpisane inline
+    `style="background:#fff/#eee; color:#333; ..."`, całkowicie z pominięciem
+    zmiennych motywu — w trybie ciemnym wyglądały jak jasne "dziury"
+    wklejone z innej aplikacji, w jasnym po prostu nie pasowały do nowych
+    gradientów. Dodana klasa `button.btn-secondary` (w `style.css`,
+    korzysta wyłącznie ze zmiennych `--card-2`/`--ink`/`--card-border`) do
+    wszystkich przycisków drugoplanowych. Przy okazji też: teksty-dzielniki
+    "— lub —" i komunikat błędu logowania miały twardo wpisany kolor
+    (`#999`, `#991b1b`) — zamienione na `var(--ink-soft)`/
+    `var(--danger-text)`. **Ogólna zasada, żeby się nie powtarzało**: żaden
+    inline `style="color:...`/`background:...` w HTML nie może używać
+    gołego kodu hex — zawsze `var(--coś)` z palety w `style.css`, inaczej
+    element po cichu wypada z motywu przy następnej zmianie kolorów.
+  - Ten sam duży, rozmyty kształt tła (`.pragma-backdrop`) dodany też na
+    `account.html` i `scan.html` (wcześniej był tylko na stronie
+    startowej) — żeby "świat" aplikacji był spójny na każdej podstronie,
+    nie tylko na pierwszym ekranie.
+    `sw.js` `CACHE_NAME` podbite do `pragma-v13`.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
