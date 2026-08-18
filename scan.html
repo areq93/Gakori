@@ -83,17 +83,45 @@
             // createTextNode/createElement (nigdy innerHTML) — treść pochodzi od
             // użytkownika (własnego albo cudzego, gdy ktoś ogląda cudzą publiczną
             // analizę), więc nie może trafić na stronę jako surowy HTML.
+            // Mimo instrukcji w prompcie ("dokładny cytat, nie parafraza") model
+            // czasem i tak nieznacznie zmienia sam POCZĄTEK cytatu — najczęściej
+            // ucina wiodący spójnik/zaimek i wielką literą zaczyna od kolejnego
+            // słowa (np. oryginał "...I gdy patrzę..." → cytat "Gdy patrzę...").
+            // Zanim uznamy, że cytatu w ogóle nie ma w tekście, próbujemy: (1) bez
+            // rozróżniania wielkości liter, (2) to samo bez pierwszych 1-3 słów
+            // cytatu. Zwraca [start, end] albo null.
+            function findQuoteRange(fullText, quote) {
+                const lowerFull = fullText.toLowerCase();
+                let idx = lowerFull.indexOf(quote.toLowerCase());
+                if (idx !== -1) return [idx, idx + quote.length];
+
+                const words = quote.split(/\s+/);
+                for (let skip = 1; skip <= 3 && skip < words.length; skip++) {
+                    const shortened = words.slice(skip).join(' ');
+                    if (shortened.length < 15) break; // zbyt krótki fragment nie ma sensu podświetlać
+                    idx = lowerFull.indexOf(shortened.toLowerCase());
+                    if (idx !== -1) return [idx, idx + shortened.length];
+                }
+                return null;
+            }
+
             // quoteEntries: [{ quote: string, isReasoning: boolean }]
             function buildHighlightedText(fullText, quoteEntries) {
                 const fragment = document.createDocumentFragment();
                 let ranges = [];
                 quoteEntries.forEach(({ quote, isReasoning }) => {
                     if (!quote) return;
+                    let matchedAny = false;
                     let from = 0;
                     let found;
                     while ((found = fullText.indexOf(quote, from)) !== -1) {
                         ranges.push({ start: found, end: found + quote.length, isReasoning });
                         from = found + quote.length;
+                        matchedAny = true;
+                    }
+                    if (!matchedAny) {
+                        const fuzzy = findQuoteRange(fullText, quote);
+                        if (fuzzy) ranges.push({ start: fuzzy[0], end: fuzzy[1], isReasoning });
                     }
                 });
                 if (!ranges.length) {
