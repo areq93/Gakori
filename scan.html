@@ -83,21 +83,55 @@
             // createTextNode/createElement (nigdy innerHTML) — treść pochodzi od
             // użytkownika (własnego albo cudzego, gdy ktoś ogląda cudzą publiczną
             // analizę), więc nie może trafić na stronę jako surowy HTML.
-            // Mimo instrukcji w prompcie o dosłowności model (albo różnice w
-            // oryginalnym tekście — np. podwójna spacja, którą model naturalnie
-            // "wygładza" do pojedynczej) czasem sprawia, że dokładne dopasowanie
-            // 1:1 nie zadziała. Ta funkcja buduje wersję tekstu, w której KAŻDY
-            // ciąg białych znaków (spacje, podwójne spacje, tabulatory,
-            // złamania linii) jest zamieniony na pojedynczą spację — razem z
-            // mapą "indeks w znormalizowanym tekście → indeks w oryginale", żeby
-            // po znalezieniu dopasowania dało się podświetlić właściwy fragment
-            // PRAWDZIWEGO tekstu (z jego oryginalnymi spacjami), nie kopii.
+            // Niektóre teksty wklejone z zewnątrz (czaty AI, Notion, edytory
+            // markdown) zawierają "udawane pogrubienie" — zamiast prawdziwego
+            // formatowania to specjalne znaki Unicode wyglądające jak pogrubione
+            // litery (np. „𝗧𝗿𝗲𝗮𝘁” zamiast zwykłego „Treat”), z bloku Mathematical
+            // Alphanumeric Symbols. Model przy cytowaniu zwykle "prostuje" je z
+            // powrotem do zwykłych liter — nawet mimo instrukcji o dosłowności,
+            // bo to leży poza jego naturalnym sposobem generowania tekstu — więc
+            // dopasowanie cytatu do takiego fragmentu inaczej by zawsze zawodziło.
+            // Zwraca zwykłą literę/cyfrę dla znanych "stylizowanych" zakresów
+            // (pogrubienie, kursywa, pogrubiona kursywa, bezszeryfowe, maszynowe)
+            // albo null, jeśli znak nie należy do żadnego z nich.
+            function foldStyledChar(codePoint) {
+                if (codePoint === 0x210e) return 'h'; // wyjątek: kursywne "h" nie ma własnego miejsca w bloku
+                const letterRanges = [
+                    0x1d400, 0x1d41a, 0x1d434, 0x1d44e, 0x1d468, 0x1d482,
+                    0x1d5a0, 0x1d5ba, 0x1d5d4, 0x1d5ee, 0x1d608, 0x1d622,
+                    0x1d63c, 0x1d656, 0x1d670, 0x1d68a,
+                ];
+                const lowerBases = new Set([0x1d41a, 0x1d44e, 0x1d482, 0x1d5ba, 0x1d5ee, 0x1d622, 0x1d656, 0x1d68a]);
+                for (const base of letterRanges) {
+                    if (codePoint >= base && codePoint < base + 26) {
+                        return String.fromCharCode((lowerBases.has(base) ? 97 : 65) + (codePoint - base));
+                    }
+                }
+                const digitRanges = [0x1d7ce, 0x1d7d8, 0x1d7e2, 0x1d7ec, 0x1d7f6];
+                for (const base of digitRanges) {
+                    if (codePoint >= base && codePoint < base + 10) return String.fromCharCode(48 + (codePoint - base));
+                }
+                return null;
+            }
+
+            // Buduje wersję tekstu, w której KAŻDY ciąg białych znaków (spacje,
+            // podwójne spacje, tabulatory, złamania linii) jest zamieniony na
+            // pojedynczą spację, a "stylizowane" litery/cyfry (patrz
+            // foldStyledChar wyżej) na zwykłe — razem z mapą "indeks w
+            // znormalizowanym tekście → indeks w oryginale", żeby po znalezieniu
+            // dopasowania dało się podświetlić właściwy fragment PRAWDZIWEGO
+            // tekstu, nie kopii. Iteruje po punktach kodowych (nie jednostkach
+            // UTF-16), bo stylizowane znaki Unicode zajmują dwie jednostki —
+            // inaczej rozcięlibyśmy je w połowie.
             function normalizeWithMap(text) {
                 let normalized = '';
                 const map = [];
                 let lastWasSpace = false;
-                for (let i = 0; i < text.length; i++) {
-                    const ch = text[i];
+                let i = 0;
+                while (i < text.length) {
+                    const codePoint = text.codePointAt(i);
+                    const unitLength = codePoint > 0xffff ? 2 : 1;
+                    const ch = String.fromCodePoint(codePoint);
                     if (/\s/.test(ch)) {
                         if (!lastWasSpace) {
                             normalized += ' ';
@@ -105,10 +139,11 @@
                             lastWasSpace = true;
                         }
                     } else {
-                        normalized += ch;
+                        normalized += foldStyledChar(codePoint) || ch;
                         map.push(i);
                         lastWasSpace = false;
                     }
+                    i += unitLength;
                 }
                 return { normalized, map };
             }
@@ -121,9 +156,12 @@
             function findQuoteRange(quote, normFullLower, fullMap, fullLength) {
                 const { normalized: normQuote } = normalizeWithMap(quote);
                 const lowerNormQuote = normQuote.toLowerCase();
+                // "end" to początek NASTĘPNEGO znaku po dopasowaniu (albo koniec
+                // tekstu) — nie "ostatni znak + 1", żeby nie rozciąć w połowie
+                // dwuznakowego (surogatowego) znaku na granicy dopasowania.
                 const toOriginal = (normStart, normEndExclusive) => ({
                     start: fullMap[normStart],
-                    end: normEndExclusive - 1 < fullMap.length ? fullMap[normEndExclusive - 1] + 1 : fullLength,
+                    end: normEndExclusive < fullMap.length ? fullMap[normEndExclusive] : fullLength,
                 });
 
                 let idx = normFullLower.indexOf(lowerNormQuote);
