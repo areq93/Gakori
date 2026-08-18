@@ -513,6 +513,31 @@ zanim założysz, że działa.
     — platformowe emoji (różne na różnych telefonach, kolorowe wbrew
     reszcie stonowanej palety) nie pasowały do konceptu prestiżu z logo.
     `sw.js` `CACHE_NAME` podbite do `pragma-v16`.
+  - **POPRAWKA 2026-08-18(h) — runda 6**: użytkownik ocenił, że tryb ciemny
+    ma już właściwą "grę świateł"/prestiż, ale jasnemu jej brakuje.
+    Znaleziona PRAWDZIWA przyczyna (nie kwestia mocy efektu, tylko
+    KIERUNKU): `--card-2` MUSI być JAŚNIEJSZE niż `--card` (card-2 siedzi
+    na początku gradientu, u góry karty — to on symuluje błysk światła
+    padającego z góry). W trybie ciemnym tak faktycznie było
+    (`--card-2: #423a2b` jaśniejsze niż `--card: #2a251d`) — efekt działał,
+    bo przypadkiem trafiono właściwy kierunek. W trybie jasnym było
+    ODWROTNIE (`--card-2: #e6ddc9` było CIEMNIEJSZE niż `--card: #fcfaf7`)
+    — dokładnie ten sam wzór gradientu w CSS (`.card`, `.result-card`,
+    `button.btn-secondary`, tło strony) w jasnym motywie robił więc coś
+    przeciwnego do zamierzonego: górna krawędź karty była PRZYCIEMNIANA,
+    nie rozświetlana, więc złudzenie "światła padającego z góry" nigdy nie
+    powstawało, niezależnie jak mocne były cień i `--highlight-edge`.
+    Naprawione: `--card` obniżone do cieplejszego kremu (`#f5f0e5`),
+    `--card-2` podniesione do niemal czystej bieli (`#fffdf9`) — teraz
+    zachowana poprawna kolejność jasności w obu motywach: `--card-2` >
+    `--card` > `--paper`. Przy okazji lekko pogłębiony `--shadow-color`/
+    `--shadow-color-soft`/`--highlight-edge` w jasnym motywie dla
+    dodatkowego "uniesienia". **Ogólna zasada na przyszłość**: przy każdej
+    zmianie tych dwóch zmiennych w którymkolwiek motywie, zawsze sprawdzić
+    kolejność jasności `--card-2` > `--card` > `--paper` — sam ten sam
+    wzór CSS w obu motywach nie gwarantuje tego samego efektu wizualnego,
+    jeśli kolejność wartości zmiennych się nie zgadza.
+    `sw.js` `CACHE_NAME` podbite do `pragma-v17`.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze

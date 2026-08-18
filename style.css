@@ -32,8 +32,18 @@
     --ink: #201e1a;
     --ink-soft: #66625a;
     --paper: #ece7dd;
-    --card: #fcfaf7;
-    --card-2: #e6ddc9;
+    /* --card-2 MUSI być jaśniejsze niż --card, które z kolei MUSI być
+       jaśniejsze niż --paper (card-2 > card > paper) — to jest cała
+       "gra świateł": karta = jaśniejsza powierzchnia niż strona, a jej
+       góra (--card-2, początek gradientu w .card/.result-card niżej) =
+       jeszcze jaśniejszy "błysk światła". POPRAWKA 2026-08-18(h): w
+       jasnym motywie ta kolejność była odwrócona (--card-2 było CIEMNIEJSZE
+       niż --card) — w ciemnym motywie przypadkiem wyszła poprawnie, więc
+       tylko tam było widać zamierzony efekt, a jasny wyglądał płasko/bez
+       prestiżu mimo identycznego wzoru gradientu w CSS. Jeśli kiedyś
+       zmieniasz te dwie wartości — zawsze zachowaj tę kolejność jasności. */
+    --card: #f5f0e5;
+    --card-2: #fffdf9;
     --quote-bg: #e1d8c6;
     --card-border: rgba(43, 42, 39, 0.16);
     --accent: #b56953;
@@ -53,9 +63,9 @@
     --input-bg: #fffefc;
     --debug-bg: #e4e0d6;
     --debug-border: #c9c3b4;
-    --shadow-color: rgba(32, 30, 26, 0.30);
-    --shadow-color-soft: rgba(32, 30, 26, 0.13);
-    --highlight-edge: rgba(255, 255, 255, 0.8);
+    --shadow-color: rgba(32, 30, 26, 0.36);
+    --shadow-color-soft: rgba(32, 30, 26, 0.16);
+    --highlight-edge: rgba(255, 255, 255, 0.9);
     --radius: 22px;
     --radius-sm: 14px;
     --border-w: 1px;
