@@ -690,12 +690,26 @@
         const pasteZone = document.getElementById('imagePasteZone');
         pasteZone.addEventListener('paste', (e) => {
             e.preventDefault();
-            const items = (e.clipboardData && e.clipboardData.items) || [];
+            const clipboardData = e.clipboardData;
             let imageFile = null;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].kind === 'file' && items[i].type.indexOf('image/') === 0) {
-                    imageFile = items[i].getAsFile();
-                    break;
+            // Różne przeglądarki (zwłaszcza na Androidzie) potrafią wypełnić
+            // TYLKO "files" albo TYLKO "items" ze schowka — sprawdzamy oba
+            // miejsca, żeby złapać wklejony obraz niezależnie od tego, którędy
+            // akurat go dostarczyły.
+            if (clipboardData && clipboardData.files) {
+                for (let i = 0; i < clipboardData.files.length; i++) {
+                    if (clipboardData.files[i].type.indexOf('image/') === 0) {
+                        imageFile = clipboardData.files[i];
+                        break;
+                    }
+                }
+            }
+            if (!imageFile && clipboardData && clipboardData.items) {
+                for (let i = 0; i < clipboardData.items.length; i++) {
+                    if (clipboardData.items[i].kind === 'file' && clipboardData.items[i].type.indexOf('image/') === 0) {
+                        imageFile = clipboardData.items[i].getAsFile();
+                        break;
+                    }
                 }
             }
             if (imageFile) {
