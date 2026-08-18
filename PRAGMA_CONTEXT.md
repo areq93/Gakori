@@ -210,13 +210,7 @@ zanim założysz, że działa.
     np. świeży zrzut ekranu skopiowany w innej aplikacji, bez zapisywania go
     najpierw jako plik. Oba źródła trafiają do tej samej zmiennej
     (`selectedImageFile` w `index.html`), więc reszta kodu (przycisk
-    "Analizuj") nie musi wiedzieć, skąd plik pochodzi. **To NIE jest
-    integracja z systemowym "Udostępnij" telefonu** (Android/iOS share sheet
-    z galerii wprost do Pragmy) — to osobna, większa funkcja (wymagałaby
-    zmian w `manifest.json` — `share_target` z plikami i metodą `POST` —
-    oraz w Service Workerze), świadomie odłożona, bo wklejanie ze schowka w
-    pełni pokrywa zgłoszoną potrzebę ("wkleić ostatni zrzut ekranu z
-    pamięci").
+    "Analizuj") nie musi wiedzieć, skąd plik pochodzi.
     - **Znane ograniczenie na części telefonów: nie ma tu nic do naprawienia
       po naszej stronie.** Zdiagnozowane na żywo z użytkownikiem (Android,
       Brave): to, co telefon nazywa "skopiowaniem zrzutu ekranu", w zależności
@@ -230,6 +224,41 @@ zanim założysz, że działa.
       obraz, zostanie złapany. Komunikat błędu (`alert_paste_not_image` w
       `i18n.js`) podpowiada wtedy pewniejszą alternatywę: zwykły przycisk
       "Wybierz zdjęcie", który na telefonach działa bez zarzutu.
+  - **Trzeci, najpewniejszy sposób na telefonie: systemowe "Udostępnij"**
+    (Android — na iOS/Safari ta funkcja w ogóle nie istnieje dla zainstalowanych
+    PWA, ograniczenie samego Apple, nie nasze). W przeciwieństwie do
+    kopiowania do schowka (patrz ograniczenie wyżej), "Udostępnij" dla
+    zdjęcia/zrzutu ekranu ZAWSZE przekazuje prawdziwe dane obrazu — to
+    gwarantuje sam system Android (`Intent.ACTION_SEND`), nie żadna
+    pośrednicząca aplikacja. Zbudowane w trzech miejscach:
+    1. `manifest.json`: `share_target` przełączony z `GET` (tylko tekst/link)
+       na `POST` + `multipart/form-data`, z dodanym polem `files` (klucz
+       `shared_image`, `accept: ["image/*"]`) — dalej obsługuje też
+       tytuł/tekst/link jak dawniej, jednym mechanizmem.
+    2. `sw.js`: GitHub Pages jest stroną statyczną i nie ma jak przyjąć
+       prawdziwego żądania `POST` (nie ma tam żadnego serwera) — Service
+       Worker musi je przechwycić SAM, zanim pójdzie do sieci
+       (`handleShareTarget()`, nowa gałąź w `fetch`, rozpoznawana po
+       `method === 'POST'` i ścieżce kończącej się na `/index.html`).
+       Wyjmuje plik z `request.formData()`, trzyma go PRZEZ CHWILĘ w
+       osobnym `SHARE_TARGET_CACHE` (celowo NIE w głównym `CACHE_NAME` —
+       inaczej rutynowe czyszczenie starych wersji przy każdej aktualizacji
+       apki, patrz "activate", mogłoby skasować obraz, zanim strona zdąży
+       go odebrać), po czym przekierowuje zwykłym `GET` na `index.html` z
+       parametrem `shared_image=1` (plus `title`/`text`/`url`, jeśli to było
+       udostępnienie tekstu — dokładnie w tym samym formacie adresu, jakiego
+       `index.html` już oczekiwał dla tekstu/linku, więc TA część kodu w
+       ogóle nie wymagała zmian).
+    3. `index.html`: `receiveSharedImage()` (wywoływana z tego samego
+       `DOMContentLoaded`, co dotychczasowa obsługa udostępnionego
+       tekstu/linku) sprawdza `shared_image=1`, odbiera plik z
+       `SHARE_TARGET_CACHE`, OD RAZU go stamtąd kasuje (jednorazowy odbiór —
+       odświeżenie strony nie próbuje wczytać go drugi raz), przełącza na
+       zakładkę "Obraz" i wstawia jako `selectedImageFile` — DOKŁADNIE tą
+       samą ścieżką, co ręczny wybór pliku i wklejanie ze schowka (patrz
+       wyżej), więc reszta analizy (limit 8 MB, sprawdzenie prawdziwego typu
+       pliku po zawartości na backendzie, moderacja) działa identycznie,
+       bez żadnych wyjątków dla tego trzeciego źródła.
   - PDF: jeszcze nie zaimplementowany (`input_type: "pdf"` zwróciłby
     `501 not_implemented`, gdyby frontend w ogóle wysyłał taki typ — na
     razie nie ma dla PDF żadnego pola w interfejsie). Moderacja opisana
