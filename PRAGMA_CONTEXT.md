@@ -538,6 +538,19 @@ zanim założysz, że działa.
     wzór CSS w obu motywach nie gwarantuje tego samego efektu wizualnego,
     jeśli kolejność wartości zmiennych się nie zgadza.
     `sw.js` `CACHE_NAME` podbite do `pragma-v17`.
+  - **POPRAWKA 2026-08-18(i)**: blok "Co teraz zrobić" pod każdym wzorcem
+    (`.pattern-tip` w `scan.html`) wyglądał na telefonie na ściśnięty —
+    etykieta i tekst były obok siebie w jednym wierszu (`display:flex`),
+    ale sam tekst rady (bare `<span>`, bez `flex:1`/`min-width:0`) nie
+    rozciągał się na dostępną szerokość, więc łamał się w wąską kolumnę z
+    pustym miejscem obok, mimo że karta miała więcej miejsca do
+    wykorzystania. Naprawione przez zmianę układu na kolumnowy: etykieta
+    jako mały, stonowany nagłówek (uppercase, mały rozmiar) NAD tekstem,
+    a sam tekst rady na pełną szerokość karty — czytelniej niż samo
+    dodanie `flex:1` przy tak wąskiej etykiecie na mobile. `pattern-tip-text`
+    to nowa, dedykowana klasa na `<span>` z tekstem rady (wcześniej był bez
+    klasy, więc nie dało się go ostylować osobno).
+    `sw.js` `CACHE_NAME` podbite do `pragma-v18`.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
