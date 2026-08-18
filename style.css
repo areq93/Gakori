@@ -371,11 +371,22 @@ a { color: var(--accent); }
 .pattern-explanation { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 10px 0; line-height: 1.5; }
 .pattern-item .pattern-explanation:last-child { margin-bottom: 0; }
 
+/* POPRAWKA 2026-08-18: etykieta i tekst ułożone były obok siebie w jednym
+   wierszu (display:flex, bez flex-grow na tekście) — na wąskiej karcie
+   mobilnej etykieta "Co teraz zrobić:" zabierała spory kawałek szerokości,
+   a tekst (bez flex:1/min-width:0) nie rozciągał się na resztę dostępnego
+   miejsca, więc łamał się w wąską, "ściśniętą" kolumnę z pustą przestrzenią
+   obok — zgłoszone jako nieczytelne. Zamienione na układ kolumnowy: etykieta
+   jako mały, stonowany nagłówek NAD tekstem, tekst na pełną szerokość. */
 .pattern-tip {
-    display: flex; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--ink);
-    background: var(--paper); border: 1.5px dashed var(--card-border); border-radius: var(--radius-sm); padding: 8px 10px;
+    display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; line-height: 1.55; color: var(--ink);
+    background: var(--paper); border: 1.5px dashed var(--card-border); border-radius: var(--radius-sm); padding: 12px 14px;
 }
-.pattern-tip-label { font-weight: 700; color: var(--accent-dark); flex-shrink: 0; }
+.pattern-tip-label {
+    font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--accent-dark);
+}
+.pattern-tip-text { display: block; }
 
 /* Podsumowanie całości — osobny blok pod listą wzorców */
 .summary-block { margin-top: 18px; padding-top: 16px; border-top: var(--border-w) solid var(--card-border); }
