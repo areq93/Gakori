@@ -888,6 +888,15 @@
             }
         }
 
+        // Zamienia liczbę minut z backendu (patrz RATE_LIMIT_TIER_MINUTES w
+        // analyze/index.ts) na czytelny, prosty tekst — sama liczba minut
+        // wygląda niezręcznie przy dłuższych blokadach (np. "1440 minut").
+        function formatRetryDuration(minutes) {
+            if (!minutes || minutes < 60) return t('retry_minutes', { minutes: minutes || 1 });
+            if (minutes < 24 * 60) return t('retry_hours', { hours: Math.ceil(minutes / 60) });
+            return t('retry_days', { days: Math.ceil(minutes / (24 * 60)) });
+        }
+
         function renderResult(data) {
             const card = document.getElementById('resultCard');
             const badge = document.getElementById('resultBadge');
@@ -910,9 +919,12 @@
                     invalid_image: 'err_invalid_image',
                     file_too_large: 'err_file_too_large',
                     unsafe_content: 'err_unsafe_content',
+                    too_many_failed_attempts: 'err_too_many_failed_attempts',
                 };
                 const key = errorMessageKeys[data.error];
-                summary.innerText = key ? t(key) : t('result_generic_error');
+                summary.innerText = key
+                    ? t(key, { time: formatRetryDuration(data.retry_after_minutes) })
+                    : t('result_generic_error');
                 return;
             }
 

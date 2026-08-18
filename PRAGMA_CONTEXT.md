@@ -910,15 +910,62 @@ sprawdź, czy ten wyzwalacz nadal istnieje**
 **`wallet_transactions`**:
 - `user_id`, `amount`, `type` (np. `spend`), `related_scan_id`
 
+**`failed_scan_attempts`** (log surowych nieudanych analiz, patrz "Ochrona
+cashflow" niżej):
+- `id`, `user_id`, `created_at`
+
+**`rate_limit_blocks`** (log nałożonych blokad, patrz "Ochrona cashflow"
+niżej):
+- `id`, `user_id`, `blocked_until`, `created_at`
+
 RLS: `scans` ma publiczny odczyt (używane przez niezalogowanych w
 przeglądarce publicznych analiz i na `scan.html`). Zapis do `scans`/
-`profiles`/`wallet_transactions` idzie przez `service_role` w Edge
-Function (backend), nie bezpośrednio z przeglądarki — **z jednym
-wyjątkiem**: `profiles.language` jest aktualizowane bezpośrednio z
-przeglądarki (`setLanguage()` w `i18n.js`, wywoływane z sesją
-zalogowanego użytkownika), więc `profiles` ma regułę RLS pozwalającą
-zalogowanemu użytkownikowi na `UPDATE` własnego wiersza (`auth.uid() =
-id`), obok istniejącej reguły `SELECT`.
+`profiles`/`wallet_transactions`/`failed_scan_attempts`/`rate_limit_blocks`
+idzie przez `service_role` w Edge Function (backend), nie bezpośrednio z
+przeglądarki — **z jednym wyjątkiem**: `profiles.language` jest
+aktualizowane bezpośrednio z przeglądarki (`setLanguage()` w `i18n.js`,
+wywoływane z sesją zalogowanego użytkownika), więc `profiles` ma regułę RLS
+pozwalającą zalogowanemu użytkownikowi na `UPDATE` własnego wiersza
+(`auth.uid() = id`), obok istniejącej reguły `SELECT`.
+
+## Ochrona cashflow przed nadużyciem (rate limiting) — dodane 2026-08-18
+
+**Problem**: nieudana analiza (np. link, którego nie da się pobrać, albo
+błąd Gemini) kosztuje nas realne zapytania do Gemini API, ale NIE zarabiamy
+nic — kredyty ściągamy dopiero po sukcesie (patrz `analyze/index.ts`,
+sekcja 7). Bez ograniczenia jedno konto mogłoby (przez pomyłkę albo celowo)
+zasypywać backend nieudanymi próbami bez końca, generując nam koszty API
+bez żadnego przychodu.
+
+**Rozwiązanie** (`analyze/index.ts`, stałe `RATE_LIMIT_*`, funkcja
+`logFailedAttempt()` wywoływana przy każdym `url_fetch_failed`/
+`gemini_error`/`save_failed` dla zalogowanego użytkownika):
+- Próg wyzwalający blokadę jest zawsze ten sam: **5 nieudanych prób w ciągu
+  10 minut** na jedno konto (log w `failed_scan_attempts`).
+- Po przekroczeniu progu konto dostaje CHWILOWĄ blokadę — nowe analizy są
+  odrzucane komunikatem `too_many_failed_attempts` (z liczbą minut do
+  odblokowania), zanim cokolwiek policzymy czy wywołamy Gemini.
+- **Kara rośnie z każdą kolejną blokadą tego samego konta**: 1. blokada w
+  ciągu ostatnich 7 dni = 10 minut, 2. = 1 godzina, 3. i każda kolejna = 24
+  godziny. Licznik blokad (w `rate_limit_blocks`) liczy się z ruchomego,
+  7-dniowego okna wstecz — jeśli konto 7 dni nie zbiera nowych blokad, kara
+  **sama wraca** do najniższego poziomu (10 minut), bez żadnej ręcznej
+  interwencji.
+- **Świadomie NIE ma automatycznego, trwałego banowania konta** — przy
+  tanim modelu (Gemini Flash-Lite, ułamek grosza za zapytanie) nawet
+  ciągłe, całodobowe uderzanie w limit jednego konta to koszt rzędu
+  pojedynczych groszy dziennie, więc realne ryzyko finansowe z JEDNEGO
+  konta jest znikome. Trwałe banowanie byłoby nieproporcjonalną karą
+  (trudną do odwrócenia — może przez pomyłkę trwale zablokować prawdziwego
+  użytkownika, który po prostu trafił na kilka zepsutych linków pod rząd).
+- **Świadomie POZA zakresem tej zmiany**: ochrona przed atakiem przez wiele
+  fałszywych kont naraz (rejestracja jest dziś darmowa i bez weryfikacji) —
+  to inny problem (ochrona samej rejestracji: e-mail, captcha, limit kont z
+  jednego IP), nierozwiązany tym mechanizmem. Rate limiting opisany wyżej
+  chroni tylko przed nadużyciem PRZEZ JEDNO konto.
+- Mechanizm dotyczy WYŁĄCZNIE zalogowanych — dla anonimowych pierwszy skan
+  tekstu jest darmowy niezależnie od wyniku, więc nie ma tam dodatkowego
+  ryzyka finansowego do ograniczenia tym mechanizmem.
 
 ## Cennik (do skalibrowania na realnych danych — na razie przybliżenia)
 
