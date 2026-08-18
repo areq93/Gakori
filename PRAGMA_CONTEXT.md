@@ -106,9 +106,9 @@ zanim założysz, że działa.
   dostępna bez logowania, link docelowy z listy publicznych analiz.
 - `i18n.js` — słownik tłumaczeń interfejsu (10 języków) + mechanizm
   przełączania języka. Ładowany na wszystkich trzech stronach HTML.
-- `style.css` — wspólny styl (ciepła, "papierowa" estetyka, czytelna dla
-  każdego wieku — świadomie, po kilku iteracjach, odejście od
-  "surowego"/generycznego wyglądu). Jedna czcionka na całej stronie —
+- `style.css` — wspólny styl. Od 2026-08-18 styl **"Rzeźba"** (patrz
+  osobna sekcja niżej) — poprzednio "Retro plakat", wcześniej jeszcze
+  ciepła, "papierowa" estetyka. Jedna czcionka na całej stronie —
   'Inter' (sans-serif). Wcześniej nagłówki (`h1`/`h2`) używały ozdobnego
   szeryfu 'Lora' — usunięte na wyraźną prośbę użytkownika, który go nie
   lubił; import czcionki Lora usunięty też z linków Google Fonts w
@@ -335,16 +335,62 @@ zanim założysz, że działa.
     `style.css` — jeśli dodajesz nowe pole do wyniku, trzymaj się tego
     samego wzorca (osobna, podpisana sekcja, nie gołe zdanie wtopione w
     resztę tekstu).
-- **Styl wizualny "Retro plakat"**: grube (2px), zawsze ciemne/jasne w
-  zależności od motywu obramowania kart i przycisków, płaskie przesunięte
-  cienie "jak u naklejki" (`--sticker-shadow`, `--sticker-shadow-sm`),
-  zaokrąglone rogi (`--radius`, `--radius-sm`). Wybrany przez użytkownika
-  spośród 3 zaproponowanych wariantów retro (pokazanych jako zrzuty ekranu
-  do porównania — dobra metoda przy tego typu decyzjach: łatwiej wskazać
-  wariant niż opisać słowami). Jedna czcionka na całej stronie — 'Inter'
-  (wcześniej nagłówki miały ozdobny szeryf 'Lora', usunięty na wcześniejszą
-  prośbę użytkownika). Wszystkie kolory/rozmiary jako zmienne CSS w
-  `:root` na górze `style.css` — zmieniaj tam, nie w poszczególnych regułach.
+- **Styl wizualny "Rzeźba" (od 2026-08-18, zastąpił "Retro plakat")**:
+  miękka, matowa, organiczna estetyka inspirowana wprost logo Pragmy
+  (abstrakcyjna, biomorficzna rzeźba — użytkownik przesłał opis/inspirację
+  z Google, "gra światła i cienia po zaokrąglonej powierzchni", "wrażenie
+  lekkości mimo twardego materiału"). Świadomie **zastąpiła**, nie
+  uzupełniła, poprzedni styl "Retro plakat" (grube czarne obramowania,
+  płaskie przesunięte cienie naklejki) — te dwie estetyki się wykluczają;
+  potwierdzone wprost z użytkownikiem przed wdrożeniem (patrz "Pułapki"
+  niżej — nie zakładaj automatycznie kierunku zmiany przy podobnych
+  prośbach w przyszłości, zawsze potwierdź zakres).
+  - Brak grubych obramowań — `--border-w` zmniejszone z 2px do 1px, kolor
+    `--card-border` to teraz prawie niewidoczna, półprzezroczysta linia
+    (`rgba(...,0.10)` w jasnym, `rgba(255,255,255,0.09)` w ciemnym), nie
+    pełny, kontrastowy kolor jak wcześniej.
+  - Płaski, przesunięty `--sticker-shadow`/`--sticker-shadow-sm` (naklejka)
+    zastąpiony miękkim, rozproszonym, DWUWARSTWOWYM cieniem
+    `--sculpt-shadow`/`--sculpt-shadow-sm` (bliższa, ostrzejsza warstwa +
+    dalsza, mocno rozmyta) — efekt "unoszącej się" nad tłem formy, nie
+    cienia płaskiej naklejki. `button:active` NIE przesuwa się już o
+    twarde `translate(3px,3px)` z zerowanym cieniem (tak wyglądała
+    "wciśnięta naklejka") — teraz lekkie `translateY(1px) scale(0.99)`
+    z przyciemnionym, ale wciąż miękkim cieniem.
+  - Promienie zaokrąglenia zwiększone (`--radius` 14px→22px, `--radius-sm`
+    9px→14px) dla bardziej opływowego, mniej "kanciastego" wrażenia.
+  - Paleta przesunięta z ciepłego kremu/brązu + żywego czerwono-różowego
+    akcentu na stonowaną, niemal monochromatyczną: `--ink`/`--paper`/
+    `--card` to teraz neutralne, matowe szarości z ciepłym podtonem (nie
+    żółty kremowy jak wcześniej), `--accent` to przygaszony terakotowy róż
+    (`#b3766f`), `--primary` to matowy szaro-taupe (`#57534a`) — zamiast
+    dawnego jaskrawego `#d1495b`/`#1f6f6b`.
+  - Usunięta tekstura "papieru" z tła `<body>` (siatka kropek +
+    szum/ziarno SVG) — czysta, jednolita powierzchnia, zgodnie z
+    minimalistycznym duchem opisu rzeźby.
+  - **Świadomie NIE spłaszczone do monochromu**: kolory FUNKCYJNE wyniku
+    (`.badge-green/yellow/red`, lewa krawędź `.pattern-item` dla
+    manipulacja/reasoning) zostały prawie bez zmian — niosą krytyczne
+    znaczenie bezpieczeństwa (jednoznaczna, natychmiastowa czytelność
+    wyniku), więc nie mogły zniknąć w imię estetyki. To był mój (Claude)
+    świadomy wybór przy realizacji, zaproponowany użytkownikowi jako
+    "opcja 1" przed wdrożeniem — nie zostało to explicite potwierdzone dla
+    "opcji 2" (głębsza zmiana), więc jeśli użytkownik kiedyś zapyta, czemu
+    odznaki wyniku nadal są kolorowe, to jest odpowiedź.
+  - Mały, powtarzalny znak marki: `.pragma-mark` — inline SVG "kropla"
+    (`M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z`,
+    obrócona o -18°, gradient szaro-taupe) obok nagłówka `<h1>Pragma</h1>`
+    w `index.html` — jedyne miejsce z widocznym tekstowym nagłówkiem
+    "Pragma" w treści strony (na `account.html`/`scan.html` "Pragma"
+    występuje tylko w `<title>`, nie w treści, więc tam znaku nie dodano).
+  - `sw.js`: `CACHE_NAME` podbite do `pragma-v10` (zmiana `style.css` —
+    zasób cache'owany, patrz pułapka "Service Worker cache" niżej).
+    `theme-color` w `<meta>` na wszystkich 3 stronach HTML zaktualizowany
+    do nowego `--ink` (`#2b2a27`, wcześniej `#241f18`).
+  - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
+    ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
+    Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
+    `style.css` — zmieniaj tam, nie w poszczególnych regułach.
 - **Motyw jasny/ciemny**: przełącznik w ustawieniach konta
   (`account.html`, selektor obok języka), ten sam wzorzec zapisu co język —
   `localStorage` (`pragma_theme`, działa też dla niezalogowanych) + kolumna
