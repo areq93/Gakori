@@ -39,7 +39,7 @@
             </div>
             <input type="email" id="authEmail" data-i18n-placeholder="placeholder_email" placeholder="e-mail" autocomplete="email">
             <input type="password" id="authPassword" data-i18n-placeholder="placeholder_password" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
-            <div class="cf-turnstile" data-sitekey="0x4AAAAAAERY10ded3P_8tNf" data-size="flexible" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin:10px 0;"></div>
+            <div id="turnstileWidget" style="margin:10px 0;"></div>
             <button id="authSubmitBtn" type="button" data-i18n="btn_login">Zaloguj się</button>
             <div style="text-align:center; margin-top:8px;">
                 <a href="#" id="forgotPasswordLink" style="font-size:13px; color:var(--accent);" data-i18n="link_forgot_password">Zapomniałeś hasła?</a>
@@ -112,7 +112,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad" async defer></script>
     <script src="i18n.js"></script>
     <script>
         applyTranslations();
@@ -140,6 +140,10 @@
                 // języka trzeba ją odświeżyć, inaczej pokazywałaby wyniki sprzed zmiany.
                 const searchInput = document.getElementById('publicScansSearch');
                 if (sb && searchInput) fetchAndRenderScans(searchInput.value);
+                // Widżet Turnstile ma własny język, ustawiony przy renderowaniu —
+                // przy zmianie języka aplikacji przerenderowujemy go w nowym
+                // (patrz window.onTurnstileLoad niżej), żeby oba były spójne.
+                if (window.onTurnstileLoad) window.onTurnstileLoad();
             });
         })();
 
@@ -161,13 +165,39 @@
 
         // Weryfikacja "nie jestem robotem" (Cloudflare Turnstile) — chroni rejestrację,
         // logowanie i reset hasła przed masowym, automatycznym zakładaniem kont.
+        // Renderujemy widżet RĘCZNIE (nie przez automatyczne "data-sitekey" na
+        // <div>), żeby móc mu jawnie podać nasz aktualny język — inaczej widżet
+        // sam zgaduje język przeglądarki/systemu, co potrafi się rozjechać z
+        // językiem wybranym w samej aplikacji (np. komunikat "Powodzenie!" przy
+        // interfejsie ustawionym na angielski).
         let turnstileToken = null;
+        let turnstileWidgetId = null;
         window.onTurnstileSuccess = (token) => { turnstileToken = token; };
         window.onTurnstileError = () => { turnstileToken = null; };
         window.onTurnstileExpired = () => { turnstileToken = null; };
+        // Wywoływane automatycznie przez skrypt Turnstile, gdy się wczyta
+        // (patrz "?onload=onTurnstileLoad" w adresie skryptu wyżej) — a także
+        // ponownie przy każdej zmianie języka na ekranie logowania (patrz
+        // initAuthLanguageSelect wyżej), żeby przerenderować widżet w nowym
+        // języku zamiast zostawiać go w starym do odświeżenia strony.
+        window.onTurnstileLoad = function renderTurnstileWidget() {
+            if (!window.turnstile) return;
+            if (turnstileWidgetId !== null) {
+                window.turnstile.remove(turnstileWidgetId);
+            }
+            turnstileToken = null;
+            turnstileWidgetId = window.turnstile.render('#turnstileWidget', {
+                sitekey: '0x4AAAAAAERY10ded3P_8tNf',
+                size: 'flexible',
+                language: getCurrentLanguage(),
+                callback: window.onTurnstileSuccess,
+                'error-callback': window.onTurnstileError,
+                'expired-callback': window.onTurnstileExpired,
+            });
+        };
         function resetTurnstile() {
             turnstileToken = null;
-            if (window.turnstile) window.turnstile.reset();
+            if (window.turnstile && turnstileWidgetId !== null) window.turnstile.reset(turnstileWidgetId);
         }
 
         // 0. Tłumaczenie typowych błędów Supabase Auth na przyjazny komunikat w wybranym języku
