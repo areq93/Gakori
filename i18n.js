@@ -5,17 +5,21 @@
 // explanation, summary) jest generowana przez Gemini już w wybranym
 // tu języku (patrz payload.language wysyłany do analyze).
 
+// Posortowane alfabetycznie wg wyświetlanej nazwy (nie wg kodu ani "polski
+// pierwszy") — to jedna, wspólna lista używana wszędzie, gdzie w interfejsie
+// pojawia się wybór języka (ekran logowania, ustawienia konta), więc
+// wystarczy posortować ją raz tutaj.
 const SUPPORTED_LANGUAGES = [
-    { code: 'pl', name: 'Polski' },
+    { code: 'de', name: 'Deutsch' },
     { code: 'en', name: 'English' },
     { code: 'es', name: 'Español' },
-    { code: 'de', name: 'Deutsch' },
     { code: 'fr', name: 'Français' },
+    { code: 'pl', name: 'Polski' },
     { code: 'ru', name: 'Русский' },
+    { code: 'ar', name: 'العربية' },
+    { code: 'hi', name: 'हिन्दी' },
     { code: 'zh', name: '中文' },
     { code: 'ja', name: '日本語' },
-    { code: 'hi', name: 'हिन्दी' },
-    { code: 'ar', name: 'العربية' },
 ];
 
 const RTL_LANGUAGES = ['ar'];
