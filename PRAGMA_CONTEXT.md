@@ -1496,6 +1496,12 @@ bez żadnego przychodu.
   `daily-report` — tabele `packages`/`package_purchases` już są w
   bazie, ale brak jeszcze działającego przepływu zakupu w aplikacji;
   gdy powstanie, dopisać tę sekcję do raportu.
+- Analiza nagrań audio (np. podcastów) i wideo — potwierdzone 2026-08-19
+  jako kierunek na PÓŹNIEJ, po PDF, nie teraz. Inna skala trudności/kosztu
+  niż PDF: wymaga najpierw transkrypcji mowy na tekst (osobny, wyraźnie
+  droższy krok niż analiza tekstu/obrazu), więc to osobny, większy projekt
+  — nie rozszerzenie istniejącego flow "policz strony/obrazy, policz
+  koszt". Nie zaczynać bez wyraźnej, osobnej prośby użytkownika.
 
 ## Dokumenty z pomysłami biznesowymi (traktuj krytycznie)
 
