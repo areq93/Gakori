@@ -50,18 +50,31 @@ const PDF_PAGE_COST = IMAGE_SCAN_COST
 // PDF w Deno.serve niżej) — kredytów może być sporo, a wybranie pliku samo
 // w sobie nie jest jeszcze świadomą zgodą na konkretny koszt.
 const PDF_AUTO_ANALYZE_MAX_PAGES = 20
-// Bezwzględny sufit — NIE do ominięcia nawet po potwierdzeniu kosztu przez
-// użytkownika. Chroni przed absurdalnie dużym plikiem (czas przetwarzania,
-// limit tokenów pojedynczego zapytania do Gemini, ryzyko operacyjne).
-const PDF_HARD_MAX_PAGES = 150
-const MAX_PDF_BYTES = 20 * 1024 * 1024 // 20 MB — tyle samo co łączny limit obrazów
+// POPRAWKA 2026-08-19 — świadomie OSTROŻNIEJSZE limity niż pierwotnie
+// planowane (150 stron / 20 MB), na podstawie realnych limitów Supabase
+// Edge Functions (sprawdzone na żywo): limit czasu ODPOWIEDZI to hojne
+// 400s i limit PAMIĘCI to hojne 150 MB — to NIE jest wąskie gardło. Wąskie
+// gardło to limit CZASU PROCESORA (CPU) — tylko 2 SEKUNDY rzeczywistej
+// pracy procesora na całe zapytanie (czekanie na odpowiedź Gemini w to NIE
+// wlicza się — to "czekanie", nie "liczenie"). Odczytanie liczby stron
+// (`countPdfPages()`, biblioteka pdf-lib) to prawdziwa, synchroniczna praca
+// procesora, i to na SŁABSZYM/współdzielonym sprzęcie serwera, nie na
+// komputerze deweloperskim — dla dużego, złożonego pliku mogłoby to realnie
+// zbliżyć się do tego limitu. Zaczynamy więc od bezpieczniejszego pułapu i
+// PODNOSIMY go dopiero po zebraniu realnych danych z produkcji (patrz
+// PRAGMA_CONTEXT.md) — łatwiej podnieść limit później niż odkryć na żywo,
+// że coś się wywala.
+const PDF_HARD_MAX_PAGES = 80
+const MAX_PDF_BYTES = 10 * 1024 * 1024 // 10 MB (świadomie mniej niż 20 MB limit obrazów — patrz wyżej)
 // PDF-y (zwłaszcza bliżej PDF_HARD_MAX_PAGES) bywają zauważalnie dłuższe do
 // przetworzenia dla Gemini niż zwykły tekst/obraz — osobny, dłuższy limit
 // czasu TYLKO na to jedno zapytanie (reszta zapytań w tej funkcji nadal
 // używa GEMINI_TIMEOUT_MS). Musi być SKOŃCZONY — system nigdy nie może
 // czekać w nieskończoność — ale wystarczająco długi, żeby duży, ale wciąż
-// dozwolony plik (≤150 stron) miał realną szansę się doliczyć, zamiast
-// ucinać się w połowie.
+// dozwolony plik miał realną szansę się doliczyć, zamiast ucinać się w
+// połowie. To zapytanie samo w sobie to CZEKANIE (I/O), nie liczy się do
+// limitu CPU opisanego wyżej — bezpiecznie mieści się też w limicie 400s
+// na całą odpowiedź.
 const PDF_GEMINI_TIMEOUT_MS = 60000 // 60s
 
 // Nazwy języków (po polsku, w formie "w języku X") używane do parametryzacji
@@ -763,7 +776,7 @@ Deno.serve(async (req: Request) => {
       }
       if (pdfBytes.length > MAX_PDF_BYTES) {
         return new Response(
-          JSON.stringify({ error: 'file_too_large', message: 'Plik PDF jest za duży (limit 20 MB).' }),
+          JSON.stringify({ error: 'file_too_large', message: 'Plik PDF jest za duży (limit 10 MB).' }),
           { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -802,6 +815,17 @@ Deno.serve(async (req: Request) => {
       // page_count/estimated_cost i wysyła TO SAMO zapytanie ponownie z
       // confirmed:true, dopiero wtedy lecimy dalej do analizy.
       if (pageCount > PDF_AUTO_ANALYZE_MAX_PAGES && confirmed !== true) {
+        // POPRAWKA 2026-08-19 — "nieprzekraczalny mur" przeciw nadużyciu:
+        // samo sprawdzenie kosztu nie kosztuje nas pieniędzy (liczenie stron
+        // jest lokalne, za darmo), ALE zużywa realny czas procesora serwera
+        // (patrz komentarz przy PDF_HARD_MAX_PAGES wyżej) — bez tego wpisu
+        // ktoś mógłby bez końca "sondować" koszt dużych PDF-ów (nigdy nie
+        // potwierdzając analizy) zupełnie poza systemem blokad, bo żadna
+        // inna ścieżka PDF nie jest tu jeszcze liczona jako "nieudana
+        // próba". Liczymy to tym samym licznikiem co realne niepowodzenia —
+        // 15 takich "sondowań" w 10 minut i konto trafia w tę samą,
+        // rosnącą blokadę co przy nadużyciu innych trybów.
+        await logFailedAttempt()
         return new Response(
           JSON.stringify({ needs_confirmation: true, page_count: pageCount, estimated_cost: cost }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

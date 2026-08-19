@@ -354,6 +354,60 @@ zanim założysz, że działa.
       przestaje być pomocne — funkcja zwraca `null`, frontend wtedy
       pokazuje samą liczbę kredytów bez tej linijki. Rodzaj napoju (2
       opcje na język, np. kawa/herbata) losowany przy każdym wywołaniu.
+    - **POPRAWKA 2026-08-19 — przegląd ryzyka inżynierskiego przed
+      wdrożeniem, na wyraźną prośbę użytkownika ("jakie zagrożenia dla
+      cashflow, systemu i użytkownika? jakie pętle dodatnie/ujemne?").
+      Znaleziono i naprawiono PRZED pierwszym wdrożeniem:**
+      1. **Limit czasu procesora Supabase (sprawdzone na żywo w
+         dokumentacji, 19.08.2026) to tylko 2 SEKUNDY realnej pracy
+         procesora na całe zapytanie** — czekanie na Gemini w to NIE
+         wlicza się (to I/O, nie liczenie), ale `countPdfPages()`
+         (pdf-lib) to prawdziwa, synchroniczna praca procesora, na
+         słabszym/współdzielonym sprzęcie serwera niż komputer
+         deweloperski. Limit czasu ODPOWIEDZI (400s) i limit PAMIĘCI (150
+         MB) są na tyle hojne, że nie są tu wąskim gardłem — dlatego
+         wcześniej wybrany limit czasu na zapytanie do Gemini (60s, patrz
+         `PDF_GEMINI_TIMEOUT_MS` wyżej) zostaje bez zmian, ale limity
+         PLIKU zostały obniżone: `PDF_HARD_MAX_PAGES` ze 150 na **80**,
+         `MAX_PDF_BYTES` z 20 MB na **10 MB** — świadomie OSTROŻNIEJ niż
+         pierwotny plan, żeby mieć margines bezpieczeństwa, zanim zbierzemy
+         realne dane produkcyjne o zużyciu CPU przez pdf-lib. Podnieść te
+         limity można później, gdy będzie pewność, że się mieszczą —
+         znacznie bezpieczniej niż odkryć na żywo, że się nie mieszczą.
+      2. **Znaleziona luka w ochronie przed nadużyciem ("pętla ujemna"):**
+         samo sprawdzenie kosztu długiego PDF-a (`needs_confirmation`)
+         nie kosztuje nas pieniędzy (liczenie stron jest lokalne), ale
+         zużywa realny czas procesora — a NIE była to dotąd liczona jako
+         "nieudana próba" w systemie blokad (`logFailedAttempt()`), więc
+         ktoś mógłby bez końca "sondować" koszt dużych PDF-ów, nigdy nie
+         potwierdzając analizy, całkowicie poza systemem ochrony. Naprawione:
+         `needs_confirmation` teraz też woła `logFailedAttempt()` — 15
+         takich "sondowań" w 10 minut i konto trafia w tę samą, rosnącą
+         blokadę co przy nadużyciu innych trybów ("nieprzekraczalny mur",
+         cytując wprost prośbę użytkownika).
+      3. **Zidentyfikowana, ale ŚWIADOMIE NIE naprawiona teraz, druga
+         pętla ujemna** — jeśli limity z punktu 1 mimo wszystko okażą się
+         za wysokie (limit CPU i tak przekroczony), UCZCIWY użytkownik z
+         dużym, ale dozwolonym plikiem trafi na `gemini_error`, co TEŻ
+         liczy się jako "nieudana próba" w tym samym systemie blokad —
+         czyli nasza pomyłka kalibracji ukarałaby niewinnego użytkownika
+         coraz dłuższą blokadą. Nie ma tu dobrego technicznego obejścia
+         bez realnych danych produkcyjnych — jedyna obrona to zachowanie
+         ostrożnych limitów z punktu 1 i obserwacja pierwszych realnych
+         użyć. Jeśli po wdrożeniu ktoś zgłosi błąd na sporym (blisko 80
+         stron / 10 MB) PDF-ie, to sygnał, żeby PONOWNIE zweryfikować
+         limity, zanim ktoś inny oberwie za to blokadą.
+      4. **Podwójne wysyłanie dużego pliku** (raz żeby poznać koszt, raz
+         żeby analizować — patrz `needs_confirmation` wyżej) na wolnym
+         łączu to zauważalnie dłuższy czas/transfer niż przy pozostałych
+         trybach. Świadomie NIE naprawione architekturalnie teraz
+         (wymagałoby tymczasowego przechowywania pliku po stronie serwera
+         między sprawdzeniem kosztu a potwierdzeniem — magazyn, czyszczenie
+         porzuconych plików, bezpieczeństwo dostępu — osobny, większy
+         projekt na później, jeśli okaże się potrzebny). Zamiast tego:
+         prosta, wyraźna informacja w interfejsie ("duży plik — wysyłanie
+         może chwilę potrwać") od razu po wybraniu pliku większego niż 3 MB
+         (`PDF_LARGE_FILE_NOTICE_BYTES` w `index.html`).
   - **Awaryjne pobranie strony (`fetchUrlAsText()`)**: niektóre strony
     (np. duże portale newsowe typu onet.pl) odrzucają robota Google z
     ogólnym kodem `URL_RETRIEVAL_STATUS_ERROR` — bez podania konkretnego
