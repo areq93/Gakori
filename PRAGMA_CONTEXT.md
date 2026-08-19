@@ -581,6 +581,28 @@ zanim założysz, że działa.
     kodzie bardziej wyspecjalizowanych elementów tego samego typu, które
     trzeba jawnie wykluczyć przez `:not()`.
     `sw.js` `CACHE_NAME` podbite do `pragma-v19`.
+  - **POPRAWKA 2026-08-18(k) — runda 8**: użytkownik zgłosił, że wynik
+    analizy dalej nie pasuje do reszty aplikacji. Doprecyzowane (pytanie
+    wielokrotnego wyboru) na trzy konkretne rzeczy: (1) odznaka wyniku
+    (`.result-badge`/`.badge-*`) i tagi wzorców (`.pattern-tag`) były
+    płaskim, jednolitym kolorem — jedyne elementy w appce bez ŻADNEJ gry
+    światła; (2) pola cytatu/"Co teraz zrobić"/źródła (`.result-quote`,
+    `.pattern-tip`, `.scan-source-box`, `.scan-text-source-content`) też
+    wyglądały płasko; (3) kolorowe, platformowe emoji 💰/👤 w górnym pasku.
+    Naprawione: (1) odznaki/tagi dostały ten sam dwuwarstwowy gradient +
+    cień co przyciski/karty, ale W OBRĘBIE własnego odcienia (zielony/
+    żółty/czerwony/terakotowy zostaje — inaczej zniknęłoby znaczenie
+    koloru), `color-mix` rozjaśnia górny koniec w stronę bieli, ten sam
+    kierunek światła co reszta. (2) NOWA zmienna `--sculpt-inset` — celowo
+    ODWROTNA geometria względem `--sculpt-shadow` (cień od góry-wewnątrz +
+    jasna kreska od dołu-wewnątrz, `inset`), bo te panele są ŚWIADOMIE
+    wgłębione/recesywne (ustalone wcześniej: cytat ma wyglądać "lżej" niż
+    karta) — to wciąż jest "gra światła", tylko fizycznie odwrócona
+    (zagłębienie zamiast wypukłości), nie identyczna z kartami. (3) 💰/👤
+    zamienione na minimalistyczne ikony liniowe (inline SVG,
+    `stroke="currentColor"`) — ta sama konwencja co ikony zakładek z rundy
+    5, automatycznie dziedziczą kolor tekstu i odwracają się z motywem.
+    `sw.js` `CACHE_NAME` podbite do `pragma-v20`.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
