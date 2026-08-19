@@ -1304,7 +1304,7 @@
                 const buffer = await selectedPdfFile.arrayBuffer();
                 const hash = await sha256Hex(buffer);
                 const pdfBase64 = arrayBufferToBase64(buffer);
-                payload = { input_type: 'pdf', content_hash: hash, pdf_base64: pdfBase64, language: getCurrentLanguage() };
+                payload = { input_type: 'pdf', content_hash: hash, pdf_base64: pdfBase64, pdf_filename: selectedPdfFile.name, language: getCurrentLanguage() };
             }
 
             if (payload) runAnalysisRequest(payload, imagePreviewDataUrls);

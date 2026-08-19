@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pragma_theme') || 'light');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pragma - Twoje analizy PDF</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="shortcut icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#2b2a27">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <svg class="pragma-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+            <linearGradient id="pragmaBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+                <stop offset="0%" stop-color="#9a9184"/>
+                <stop offset="100%" stop-color="#3f3c35"/>
+            </linearGradient>
+        </defs>
+        <path transform="rotate(-18 50 50)" fill="url(#pragmaBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
+    </svg>
+
+    <!-- Ten sam górny pasek co account.html — ta strona ZAWSZE wymaga
+         zalogowania (patrz getSession() niżej), więc pasek jest zawsze
+         widoczny, bez ukrywania jak na scan.html (tamta strona jest
+         publiczna, ta nie). -->
+    <a id="userMenuBtn" href="account.html" style="display:flex;" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
+    <div id="creditBalance" class="credit-balance" style="display:flex;" data-i18n-aria-label="credit_balance_label" aria-label="Stan kredytów">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span id="creditBalanceValue" aria-live="polite">0</span>
+    </div>
+
+    <div class="card" style="max-width:480px; width:100%;">
+        <a href="account.html" class="back-link" data-i18n="history_back">← Wróć do konta</a>
+        <h2 data-i18n="history_title">Twoje analizy PDF</h2>
+        <p style="color:var(--ink-soft); font-size:13.5px; margin:0 0 14px 0;" data-i18n="history_intro">Tylko Ty widzisz tę listę — analizy PDF nie są publiczne.</p>
+
+        <div id="historyLoading">
+            <p style="color:var(--ink-soft); margin:0;" data-i18n="loading">Ładowanie...</p>
+        </div>
+
+        <div id="historyList" style="display:none;"></div>
+        <p id="historyEmpty" style="display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych analiz PDF.</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="i18n.js"></script>
+    <script>
+        applyTranslations();
+
+        const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd';
+
+        let sb = null;
+        try {
+            if (typeof supabase === 'undefined') throw new Error('Biblioteka Supabase nie wczytała się.');
+            sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch (e) {
+            console.error(e);
+        }
+
+        if (!sb) {
+            document.getElementById('historyLoading').innerHTML =
+                '<p class="status-err">' + t('account_load_error') + '</p>';
+        } else {
+            // Tak jak account.html — ta strona wymaga zalogowania, bo bez
+            // konta i tak nie ma żadnej prywatnej historii do pokazania.
+            sb.auth.onAuthStateChange((event, session) => {
+                if (!session) {
+                    window.location.href = 'index.html';
+                }
+            });
+
+            sb.auth.getSession().then(async ({ data: { session } }) => {
+                if (!session) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+                refreshCreditBalance(sb, session.user.id);
+
+                // `scan_access` (widoczne tylko dla właściciela, patrz RLS w
+                // PRAGMA_CONTEXT.md) trzyma nazwę pliku i moment ostatniego
+                // dostępu; dociągamy powiązany wynik (`scans`) przez wbudowane
+                // złączenie PostgREST — RLS na `scans` i tak pozwoli tu tylko
+                // na wiersze, do których ten użytkownik ma wpis w scan_access,
+                // więc to złączenie nie ujawnia nic więcej niż zapytanie samo
+                // w sobie już pozwala.
+                const { data, error } = await sb
+                    .from('scan_access')
+                    .select('scan_id, source_filename, created_at, scans(result)')
+                    .eq('user_id', session.user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(100);
+
+                document.getElementById('historyLoading').style.display = 'none';
+
+                if (error || !data || data.length === 0) {
+                    document.getElementById('historyEmpty').style.display = 'block';
+                    return;
+                }
+
+                const listEl = document.getElementById('historyList');
+                const dateFmt = new Intl.DateTimeFormat(getCurrentLanguage(), { dateStyle: 'medium', timeStyle: 'short' });
+
+                data.forEach((row) => {
+                    const r = (row.scans && row.scans.result) || {};
+                    const score = r.q_score;
+                    let badgeClass = 'badge-red', label = (typeof score === 'number' ? score : '?') + '/100';
+                    if (score >= 70) badgeClass = 'badge-green';
+                    else if (score >= 40) badgeClass = 'badge-yellow';
+
+                    const link = document.createElement('a');
+                    link.className = 'scan-row';
+                    link.href = 'scan.html?id=' + encodeURIComponent(row.scan_id);
+
+                    const icon = document.createElement('span');
+                    icon.className = 'scan-row-icon';
+                    icon.innerText = '📄';
+                    link.appendChild(icon);
+
+                    const badge = document.createElement('span');
+                    badge.className = 'result-badge ' + badgeClass;
+                    badge.innerText = label;
+                    link.appendChild(badge);
+
+                    // Nazwa pliku + data — jak "snippet" na liście publicznych
+                    // analiz w index.html, tylko tu to nazwa pliku, nie cytat.
+                    const snippet = document.createElement('span');
+                    snippet.className = 'scan-row-snippet';
+                    const name = row.source_filename || t('history_unnamed_file');
+                    snippet.innerText = name + ' · ' + dateFmt.format(new Date(row.created_at));
+                    link.appendChild(snippet);
+
+                    const arrow = document.createElement('span');
+                    arrow.className = 'scan-row-arrow';
+                    arrow.innerText = '→';
+                    link.appendChild(arrow);
+
+                    listEl.appendChild(link);
+                });
+
+                listEl.style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>

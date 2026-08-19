@@ -87,7 +87,15 @@
         } else {
             // Pasek profilu/kredytów — niezależnie od reszty strony (nie
             // blokuje pokazania wyniku skanu), tylko dla zalogowanych.
-            sb.auth.getSession().then(({ data: { session } }) => {
+            // `currentSession`/`sessionReady` są też potrzebne PRZED
+            // zapytaniem do `scans` niżej: PDF-y są teraz prywatne (RLS
+            // sprawdza auth.uid()), więc bez poczekania na sesję zapytanie
+            // mogłoby polecieć bez tokenu zalogowanego użytkownika i
+            // dostać "nie znaleziono" mimo że to WŁAŚCICIEL patrzy na
+            // własny wynik.
+            let currentSession = null;
+            const sessionReady = sb.auth.getSession().then(({ data: { session } }) => {
+                currentSession = session;
                 if (session) {
                     document.getElementById('userMenuBtn').style.display = 'flex';
                     document.getElementById('creditBalance').style.display = 'flex';
@@ -265,10 +273,10 @@
             if (!scanId) {
                 showNotFound();
             } else {
-                sb.from('scans')
+                sessionReady.then(() => sb.from('scans')
                     .select('input_type, source_url, text_content, result')
                     .eq('id', scanId)
-                    .maybeSingle()
+                    .maybeSingle())
                     .then(({ data, error }) => {
                         if (error || !data || !data.result) {
                             showNotFound();
@@ -316,7 +324,7 @@
                         if (score >= 70) { badgeClass = 'badge-green'; label = t('badge_clean', { score: score }); }
                         else if (score >= 40) { badgeClass = 'badge-yellow'; label = t('badge_partial', { score: score }); }
 
-                        const icon = data.input_type === 'url' ? '🔗' : data.input_type === 'image' ? '🖼️' : '📝';
+                        const icon = data.input_type === 'url' ? '🔗' : data.input_type === 'image' ? '🖼️' : data.input_type === 'pdf' ? '📄' : '📝';
                         // Pokazujemy link tylko, gdy to naprawdę http(s) - chroni przed
                         // wstrzyknięciem np. "javascript:" jako "źródła" przez złośliwe dane.
                         const isSafeUrl = data.source_url && /^https?:\/\//i.test(data.source_url);
@@ -330,6 +338,29 @@
                             link.rel = 'noopener noreferrer nofollow';
                             link.innerText = data.source_url;
                             sourceEl.appendChild(link);
+                        }
+
+                        // Nazwa oryginalnego pliku PDF — żyje w `scan_access` (per
+                        // użytkownik, nie w `scans` samym), bo dwie różne osoby mogły
+                        // przesłać ten sam plik pod różnymi nazwami (patrz analyze/index.ts).
+                        // Wymaga zalogowania — bez sesji ten wiersz i tak byłby
+                        // niewidoczny dla RLS, więc nie ma sensu nawet pytać.
+                        if (data.input_type === 'pdf' && currentSession) {
+                            sb.from('scan_access')
+                                .select('source_filename')
+                                .eq('scan_id', scanId)
+                                .eq('user_id', currentSession.user.id)
+                                .maybeSingle()
+                                .then(({ data: accessRow }) => {
+                                    if (accessRow && accessRow.source_filename) {
+                                        const sourceEl = document.getElementById('scanSource');
+                                        sourceEl.style.display = 'block';
+                                        sourceEl.innerText = icon + ' ' + t('scan_pdf_source_label');
+                                        const nameSpan = document.createElement('span');
+                                        nameSpan.innerText = accessRow.source_filename;
+                                        sourceEl.appendChild(nameSpan);
+                                    }
+                                });
                         }
 
                         // Tekst wklejony ręcznie: pokazujemy go w całości, zwinięty,
@@ -378,6 +409,16 @@
                                     name.className = 'pattern-name';
                                     name.innerText = p.name;
                                     header.appendChild(name);
+                                }
+                                // Numer strony — tylko PDF-y mają wiele stron, więc tylko
+                                // tam Gemini w ogóle wypełnia to pole (patrz PDF_RESPONSE_SCHEMA
+                                // w analyze/index.ts). Bez tego czytelnik nie wiedziałby, gdzie
+                                // w wielostronicowym dokumencie szukać danego cytatu.
+                                if (data.input_type === 'pdf' && typeof p.page === 'number') {
+                                    const pageBadge = document.createElement('span');
+                                    pageBadge.className = 'pattern-page';
+                                    pageBadge.innerText = t('pattern_page_label', { page: p.page });
+                                    header.appendChild(pageBadge);
                                 }
                                 item.appendChild(header);
 
