@@ -1143,11 +1143,18 @@ Deno.serve(async (req: Request) => {
         // sztywnego minimum wyników (to byłoby nieuczciwe — patrz sekcja
         // NEUTRALNOŚĆ w buildSystemPrompt), tylko wymuszamy REALNE przejrzenie
         // całego dokumentu i obowiązkowe podanie strony przy każdym wzorcu.
+        // POPRAWKA: nakaz przeczytania WSZYSTKICH stron obowiązuje ZAWSZE,
+        // niezależnie od długości pliku — krótszy dokument nie zasługuje na
+        // mniej uważne czytanie niż długi (zgłoszone wprost przez
+        // użytkownika). Próg >10 stron dotyczy WYŁĄCZNIE dodatkowego
+        // ostrzeżenia poniżej ("mało wyników przy długim dokumencie to
+        // podejrzane") — ten konkretny sygnał nie ma sensu przy krótkim
+        // pliku, gdzie 1-2 wzorce mogą być całkowicie prawdziwym wynikiem.
         const pdfThoroughnessNote =
           pdfPageCount > 10
-            ? ` UWAGA: to długi dokument (${pdfPageCount} stron) — użytkownik zapłacił za analizę CAŁEGO dokumentu, nie tylko wstępu czy najbardziej rzucających się w oczy fragmentów na początku. Przejrzyj GO CAŁEGO, strona po stronie — dokument tej długości niemal zawsze zawiera wiele wartych nazwania miejsc (manipulacji ALBO trafnego rozumowania), jeśli poszuka się ich uważnie w każdej sekcji, nie tylko na początku. Bardzo krótka lista wykrytych wzorców przy tak długim dokumencie zwykle oznacza, że większość tekstu została pominięta — zanim uznasz analizę za skończoną, sprawdź w myślach: "czy naprawdę przejrzałem/am WSZYSTKIE strony, a nie tylko pierwsze kilka?".`
+            ? ` Dodatkowo: to długi dokument (${pdfPageCount} stron) — dokument tej długości niemal zawsze zawiera wiele wartych nazwania miejsc (manipulacji ALBO trafnego rozumowania), jeśli poszuka się ich uważnie w każdej sekcji. Bardzo krótka lista wykrytych wzorców przy tak długim dokumencie zwykle oznacza, że większość tekstu została pominięta — zanim uznasz analizę za skończoną, sprawdź w myślach: "czy naprawdę przejrzałem/am WSZYSTKIE strony, a nie tylko pierwsze kilka?".`
             : ''
-        const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF (${pdfPageCount} ${pdfPageCount === 1 ? 'strona' : 'stron'}) — potraktuj go dokładnie tak samo jak tekst do analizy. Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony PDF-a (licząc od 1), na której faktycznie znajduje się cytowany fragment — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie w dokumencie szukać danego miejsca, sam cytat przy wielostronicowym pliku nie wystarczy. Jeśli cytat rozciąga się na dwie strony, podaj numer strony, na której się zaczyna.${pdfThoroughnessNote}`
+        const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF (${pdfPageCount} ${pdfPageCount === 1 ? 'strona' : 'stron'}) — potraktuj go dokładnie tak samo jak tekst do analizy. Użytkownik zapłacił za analizę CAŁEGO dokumentu — niezależnie od tego, czy PDF ma 2 strony czy 80, przeczytaj GO CAŁEGO, stronę po stronie, i każdą stronę sprawdź tak samo uważnie jak pierwszą; liczba stron nie jest powodem, żeby jakąkolwiek z nich czytać pobieżniej. Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony PDF-a (licząc od 1), na której faktycznie znajduje się cytowany fragment — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie w dokumencie szukać danego miejsca, sam cytat przy wielostronicowym pliku nie wystarczy. Jeśli cytat rozciąga się na dwie strony, podaj numer strony, na której się zaczyna.${pdfThoroughnessNote}`
         // Dłuższy limit czasu niż zwykłe zapytania (patrz PDF_GEMINI_TIMEOUT_MS) —
         // duży, ale wciąż dozwolony PDF (bliżej PDF_HARD_MAX_PAGES) potrzebuje
         // więcej czasu niż 20s, jakie starcza reszcie zapytań w tej funkcji.

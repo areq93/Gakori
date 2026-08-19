@@ -423,19 +423,25 @@ zanim założysz, że działa.
          inaczej pole `page` zgubiłoby się przy tłumaczeniu (schemat
          odpowiedzi ogranicza, co Gemini może zwrócić). Backend sprawdza to
          po `original.input_type === 'pdf'` przed wywołaniem tłumaczenia.
-      2. **Wzmocniona dokładność, BEZ fabrykowania wyników** — dla PDF-ów
-         dłuższych niż 10 stron `pdfInstruction` dostaje dodatkowy,
-         stanowczy fragment: dokument tej długości niemal zawsze zawiera
-         wiele wartych nazwania miejsc, model ma przejrzeć CAŁY dokument
-         strona po stronie (nie tylko wstęp), a bardzo krótka lista wyników
-         przy długim pliku to sygnał pominiętego tekstu. Świadomie NIE
-         wymuszamy sztywnego minimum liczby wzorców (np. "podaj co najmniej
-         10") — to byłoby fabrykowaniem nieistniejącej manipulacji i łamałoby
-         zasadę NEUTRALNOŚĆ z `buildSystemPrompt()`. Jeśli to wzmocnienie
-         instrukcji okaże się niewystarczające, następny krok to dzielenie
-         bardzo długich PDF-ów na części i łączenie wyników (nie zrobione
-         teraz — większa zmiana architektoniczna, dopiero jeśli faktycznie
-         potrzebna).
+      2. **Wzmocniona dokładność, BEZ fabrykowania wyników** — `pdfInstruction`
+         wprost nakazuje przeczytać CAŁY dokument, stronę po stronie, każdą
+         stronę tak samo uważnie jak pierwszą — TEN nakaz obowiązuje ZAWSZE,
+         niezależnie od liczby stron (krótszy plik nie zasługuje na mniej
+         uważne czytanie niż długi — poprawione po uwadze użytkownika, że
+         pierwsza wersja brzmiała, jakby dotyczyło to tylko długich PDF-ów).
+         Osobno, TYLKO dla PDF-ów dłuższych niż 10 stron, doklejony jest
+         dodatkowy fragment: dokument tej długości niemal zawsze zawiera
+         wiele wartych nazwania miejsc, a bardzo krótka lista wyników przy
+         długim pliku to sygnał pominiętego tekstu — ten konkretny sygnał
+         (mało wyników = podejrzane) ma sens tylko przy długim dokumencie,
+         nie przy krótkim (2-3 strony z 1-2 wzorcami mogą być całkowicie
+         prawdziwym, uczciwym wynikiem). Świadomie NIE wymuszamy sztywnego
+         minimum liczby wzorców (np. "podaj co najmniej 10") — to byłoby
+         fabrykowaniem nieistniejącej manipulacji i łamałoby zasadę
+         NEUTRALNOŚĆ z `buildSystemPrompt()`. Jeśli to wzmocnienie instrukcji
+         okaże się niewystarczające, następny krok to dzielenie bardzo
+         długich PDF-ów na części i łączenie wyników (nie zrobione teraz —
+         większa zmiana architektoniczna, dopiero jeśli faktycznie potrzebna).
       3. **PDF-y są teraz NAPRAWDĘ prywatne, nie tylko "ukryte z listy"** —
          patrz "Prywatność PDF-ów" niżej.
   - **Prywatność PDF-ów (dodane POPRAWKĄ 2026-08-19(b))** — do tej zmiany
