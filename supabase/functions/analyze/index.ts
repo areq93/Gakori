@@ -342,6 +342,38 @@ const IMAGE_RESPONSE_SCHEMA = {
   required: ['unsafe_content', 'unsafe_content_category', 'q_score', 'patterns', 'summary'],
 }
 
+// Schemat tylko dla PDF-ów — rozszerzony o numer strony przy KAŻDYM
+// wzorcu. Sam cytat nie wystarczy przy dokumencie wielostronicowym —
+// czytelnik musi wiedzieć, GDZIE w pliku szukać danego fragmentu (zgłoszone
+// wprost: "analiza musi też podawać z której strony pochodzi dany model").
+// Trzymany osobno od RESPONSE_SCHEMA, żeby nie ruszać sprawdzonego kształtu
+// wyniku dla tekstu/linku (patrz też translateResult() niżej — tłumaczenie
+// PDF-owego oryginału musi dostać TEN sam schemat, inaczej pole "page"
+// zgubiłoby się przy tłumaczeniu).
+const PDF_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    q_score: { type: 'integer' },
+    patterns: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          pattern_type: { type: 'string', enum: ['manipulation', 'reasoning'] },
+          name: { type: 'string' },
+          quote: { type: 'string' },
+          explanation: { type: 'string' },
+          tip: { type: 'string' },
+          page: { type: 'integer' },
+        },
+        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip', 'page'],
+      },
+    },
+    summary: { type: 'string' },
+  },
+  required: ['q_score', 'patterns', 'summary'],
+}
+
 const GEMINI_TIMEOUT_MS = 20000 // 20s na pojedyncze zapytanie do Gemini
 const FALLBACK_FETCH_TIMEOUT_MS = 10000 // 10s na awaryjne, bezpośrednie pobranie strony
 
@@ -401,7 +433,8 @@ async function callGemini(
 async function translateResult(
   result: Record<string, unknown>,
   targetLangCode: string,
-  geminiKey: string
+  geminiKey: string,
+  responseSchema: Record<string, unknown> = RESPONSE_SCHEMA
 ): Promise<Record<string, unknown> | null> {
   const langName = LANGUAGE_NAMES[targetLangCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const prompt = `Przetłumacz poniższy JSON na język ${langName}. Zasady:
@@ -409,6 +442,7 @@ async function translateResult(
 - Pole "quote" NIE tłumacz — zostaje dokładnie w oryginalnym brzmieniu, bez żadnych zmian.
 - Pole "pattern_type" NIE tłumacz — zostaje dokładnie tą samą wartością co w oryginale ("manipulation" albo "reasoning").
 - Pole "q_score" zostaje dokładnie taką samą liczbą jak w oryginale.
+- Jeśli pole "page" występuje, zostaje dokładnie taką samą liczbą jak w oryginale — to numer strony PDF-a, nie podlega tłumaczeniu.
 - Zachowaj dokładnie tę samą strukturę JSON i tę samą liczbę elementów w "patterns".
 - Zwróć WYŁĄCZNIE poprawny JSON, bez żadnego dodatkowego tekstu i bez komentarzy.
 
@@ -420,7 +454,7 @@ ${JSON.stringify(result)}`
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: RESPONSE_SCHEMA,
+        responseSchema,
       },
     },
     geminiKey
@@ -554,8 +588,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json()
-    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, confirmed } = body
+    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, confirmed } = body
     const outputLanguage = typeof language === 'string' && LANGUAGE_NAMES[language] ? language : DEFAULT_LANGUAGE
+    // Nazwa oryginalnego pliku PDF — WYŁĄCZNIE etykieta do wyświetlenia w
+    // prywatnej historii użytkownika (patrz `scan_access` niżej), nigdy nie
+    // wpływa na cenę ani analizę. Ucinamy do rozsądnej długości.
+    const pdfFilename = typeof pdf_filename === 'string' && pdf_filename ? pdf_filename.slice(0, 255) : null
 
     if (input_type !== 'text' && input_type !== 'url' && input_type !== 'image' && input_type !== 'pdf') {
       return new Response(
@@ -572,7 +610,28 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // 1. CACHE: czy ta treść była już analizowana W TYM SAMYM JĘZYKU WYNIKU?
+    // 1. UWIERZYTELNIENIE — weryfikacja tokenu JWT z nagłówka Authorization
+    // (Supabase Auth). POPRAWKA 2026-08-19: świadomie PRZED sekcją CACHE
+    // niżej (dawniej było na odwrót) — PDF-y są teraz prywatne (patrz CACHE
+    // i `scan_access`), więc żeby przyznać dostęp przy trafieniu w cache,
+    // trzeba już w tym miejscu wiedzieć, KTO pyta.
+    let user_id: string | null = null
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      if (!authError && user) {
+        user_id = user.id
+      }
+    }
+
+    let profile: { wallet_balance: number } | null = null
+    if (user_id) {
+      const { data } = await supabase.from('profiles').select('*').eq('id', user_id).single()
+      profile = data
+    }
+
+    // 2. CACHE: czy ta treść była już analizowana W TYM SAMYM JĘZYKU WYNIKU?
     // Cache jest wspólny dla wszystkich użytkowników, ale wynik AI jest teraz
     // generowany w wybranym języku — bez filtra po języku ktoś analizujący
     // po polsku mógłby dostać z cache'u wynik po angielsku (albo odwrotnie).
@@ -589,29 +648,28 @@ Deno.serve(async (req: Request) => {
         .update({ view_count: existing.view_count + 1 })
         .eq('id', existing.id)
 
+      // PDF: w przeciwieństwie do reszty trybów, wynik NIE jest publicznie
+      // czytelny (patrz RLS na `scans` w PRAGMA_CONTEXT.md) — dostęp mają
+      // WYŁĄCZNIE osoby z wpisem w `scan_access`. Jeśli dwie różne osoby
+      // prześlą DOKŁADNIE ten sam plik (to samo `content_hash`) w tym samym
+      // języku, druga też musi dostać własny wpis (z WŁASNĄ nazwą pliku,
+      // która mogła być inna niż u pierwszej osoby) — inaczej mimo że to
+      // ona poprosiła o analizę, nigdy nie mogłaby do niej wrócić.
+      if (existing.input_type === 'pdf' && user_id) {
+        await supabase
+          .from('scan_access')
+          .upsert(
+            { scan_id: existing.id, user_id, source_filename: pdfFilename },
+            { onConflict: 'scan_id,user_id' }
+          )
+      }
+
       return new Response(
         // "id" pozwala frontendowi otworzyć pełny wynik jako osobną stronę
         // (scan.html?id=...) zamiast pokazywać go na tej samej stronie.
         JSON.stringify({ cached: true, cost: 0, id: existing.id, result: existing.result }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
-    }
-
-    // 2. UWIERZYTELNIENIE — weryfikacja tokenu JWT z nagłówka Authorization (Supabase Auth)
-    let user_id: string | null = null
-    const authHeader = req.headers.get('Authorization')
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '')
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-      if (!authError && user) {
-        user_id = user.id
-      }
-    }
-
-    let profile: { wallet_balance: number } | null = null
-    if (user_id) {
-      const { data } = await supabase.from('profiles').select('*').eq('id', user_id).single()
-      profile = data
     }
 
     // 2b. OCHRONA PRZED NADUŻYCIEM — czy to konto ma teraz aktywną blokadę
@@ -910,7 +968,12 @@ Deno.serve(async (req: Request) => {
     )
 
     if (original) {
-      result = await translateResult(original.result as Record<string, unknown>, outputLanguage, geminiKey!)
+      result = await translateResult(
+        original.result as Record<string, unknown>,
+        outputLanguage,
+        geminiKey!,
+        original.input_type === 'pdf' ? PDF_RESPONSE_SCHEMA : RESPONSE_SCHEMA
+      )
       if (result) usedTranslation = true
     }
 
@@ -1071,7 +1134,20 @@ Deno.serve(async (req: Request) => {
         // wcześniej z użytkownikiem) — Gemini fizycznie "widzi" całą stronę
         // PDF-a (tekst i ewentualne obrazy razem), więc jedyny sposób to
         // wprost mu tego zabronić w instrukcji.
-        const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF (${pdfPageCount} ${pdfPageCount === 1 ? 'strona' : 'stron'}) — potraktuj go dokładnie tak samo jak tekst do analizy. Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst.`
+        // Dwa dopiski wymuszone realnym problemem zgłoszonym przez
+        // użytkownika (2026-08-19): (1) 40-stronicowy PDF zwrócił tylko 2
+        // wzorce — zbyt mało jak na zapłacony koszt, podejrzenie, że model
+        // czyta tylko początek/najbardziej rzucające się fragmenty zamiast
+        // całości; (2) brak numeru strony przy cytacie, więc nie da się
+        // sprawdzić, gdzie w dokumencie faktycznie coś jest. NIE fabrykujemy
+        // sztywnego minimum wyników (to byłoby nieuczciwe — patrz sekcja
+        // NEUTRALNOŚĆ w buildSystemPrompt), tylko wymuszamy REALNE przejrzenie
+        // całego dokumentu i obowiązkowe podanie strony przy każdym wzorcu.
+        const pdfThoroughnessNote =
+          pdfPageCount > 10
+            ? ` UWAGA: to długi dokument (${pdfPageCount} stron) — użytkownik zapłacił za analizę CAŁEGO dokumentu, nie tylko wstępu czy najbardziej rzucających się w oczy fragmentów na początku. Przejrzyj GO CAŁEGO, strona po stronie — dokument tej długości niemal zawsze zawiera wiele wartych nazwania miejsc (manipulacji ALBO trafnego rozumowania), jeśli poszuka się ich uważnie w każdej sekcji, nie tylko na początku. Bardzo krótka lista wykrytych wzorców przy tak długim dokumencie zwykle oznacza, że większość tekstu została pominięta — zanim uznasz analizę za skończoną, sprawdź w myślach: "czy naprawdę przejrzałem/am WSZYSTKIE strony, a nie tylko pierwsze kilka?".`
+            : ''
+        const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF (${pdfPageCount} ${pdfPageCount === 1 ? 'strona' : 'stron'}) — potraktuj go dokładnie tak samo jak tekst do analizy. Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony PDF-a (licząc od 1), na której faktycznie znajduje się cytowany fragment — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie w dokumencie szukać danego miejsca, sam cytat przy wielostronicowym pliku nie wystarczy. Jeśli cytat rozciąga się na dwie strony, podaj numer strony, na której się zaczyna.${pdfThoroughnessNote}`
         // Dłuższy limit czasu niż zwykłe zapytania (patrz PDF_GEMINI_TIMEOUT_MS) —
         // duży, ale wciąż dozwolony PDF (bliżej PDF_HARD_MAX_PAGES) potrzebuje
         // więcej czasu niż 20s, jakie starcza reszcie zapytań w tej funkcji.
@@ -1087,7 +1163,7 @@ Deno.serve(async (req: Request) => {
             ],
             generationConfig: {
               responseMimeType: 'application/json',
-              responseSchema: RESPONSE_SCHEMA,
+              responseSchema: PDF_RESPONSE_SCHEMA,
             },
           },
           geminiKey!,
@@ -1164,6 +1240,17 @@ Deno.serve(async (req: Request) => {
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // PDF: przyznajemy dostęp do prywatnego wyniku temu, kto go zlecił —
+    // ten sam mechanizm i uzasadnienie co przy trafieniu w cache wyżej.
+    if (input_type === 'pdf' && user_id) {
+      await supabase
+        .from('scan_access')
+        .upsert(
+          { scan_id: newScan.id, user_id, source_filename: pdfFilename },
+          { onConflict: 'scan_id,user_id' }
+        )
     }
 
     // 7. ODJĘCIE KREDYTÓW (tylko dla zalogowanych)

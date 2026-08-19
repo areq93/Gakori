@@ -317,11 +317,11 @@ zanim założysz, że działa.
       mechanizmu technicznego, który by to wymuszał.
     - **Analizy PDF-ów NIGDY nie są publiczne** — wykluczone z
       przeglądarki publicznych analiz (`index.html`, zapytanie
-      `.not('input_type', 'in', '(image,pdf)')`) SILNIEJ niż obrazy:
-      użytkownik wprost poprosił, żeby PDF-y w ogóle nie trafiały do tego
-      mechanizmu odkrywalności, nie tylko "nie pokazuj podglądu". Zwykły
-      link do konkretnej analizy (`scan.html?id=...`) nadal działa dla
-      osoby, która go ma.
+      `.not('input_type', 'in', '(image,pdf)')`) SILNIEJ niż obrazy, i (od
+      POPRAWKI 2026-08-19(b), patrz "Prywatność PDF-ów" niżej) NAPRAWDĘ
+      prywatne na poziomie bazy (RLS), nie tylko ukryte z listy —
+      `scan.html?id=...` do cudzego PDF-a od tej zmiany już NIE działa,
+      inaczej niż przy tekście/linku/obrazie.
     - **Limit czasu zapytania do Gemini**: PDF-y (zwłaszcza bliżej
       górnego limitu stron) potrafią potrzebować więcej niż standardowe
       20s reszty zapytań w tej funkcji — `callGemini()` przyjmuje teraz
@@ -409,6 +409,125 @@ zanim założysz, że działa.
          prosta, wyraźna informacja w interfejsie ("duży plik — wysyłanie
          może chwilę potrwać") od razu po wybraniu pliku większego niż 3 MB
          (`PDF_LARGE_FILE_NOTICE_BYTES` w `index.html`).
+    - **POPRAWKA 2026-08-19(b) — realna skarga użytkownika: 40-stronicowy
+      PDF zwrócił tylko 2 wzorce, mimo zapłaty ~300 kredytów ("dostałem
+      tyle co nic"). Dodatkowo brakowało numeru strony przy cytatach.**
+      Naprawione trzema niezależnymi zmianami:
+      1. **Numer strony przy KAŻDYM wzorcu** — osobny `PDF_RESPONSE_SCHEMA`
+         (obok `RESPONSE_SCHEMA`/`IMAGE_RESPONSE_SCHEMA`) z obowiązkowym
+         polem `page` (liczba, licząc od 1) w każdym elemencie `patterns`.
+         `pdfInstruction` wprost wymaga podania strony dla każdego cytatu.
+         WAŻNE: `translateResult()` (dotłumaczanie gotowego wyniku na inny
+         język, patrz "Ponowne użycie przez tłumaczenie") musi dostać TEN
+         SAM schemat, gdy tłumaczy wynik, którego oryginał był PDF-em —
+         inaczej pole `page` zgubiłoby się przy tłumaczeniu (schemat
+         odpowiedzi ogranicza, co Gemini może zwrócić). Backend sprawdza to
+         po `original.input_type === 'pdf'` przed wywołaniem tłumaczenia.
+      2. **Wzmocniona dokładność, BEZ fabrykowania wyników** — dla PDF-ów
+         dłuższych niż 10 stron `pdfInstruction` dostaje dodatkowy,
+         stanowczy fragment: dokument tej długości niemal zawsze zawiera
+         wiele wartych nazwania miejsc, model ma przejrzeć CAŁY dokument
+         strona po stronie (nie tylko wstęp), a bardzo krótka lista wyników
+         przy długim pliku to sygnał pominiętego tekstu. Świadomie NIE
+         wymuszamy sztywnego minimum liczby wzorców (np. "podaj co najmniej
+         10") — to byłoby fabrykowaniem nieistniejącej manipulacji i łamałoby
+         zasadę NEUTRALNOŚĆ z `buildSystemPrompt()`. Jeśli to wzmocnienie
+         instrukcji okaże się niewystarczające, następny krok to dzielenie
+         bardzo długich PDF-ów na części i łączenie wyników (nie zrobione
+         teraz — większa zmiana architektoniczna, dopiero jeśli faktycznie
+         potrzebna).
+      3. **PDF-y są teraz NAPRAWDĘ prywatne, nie tylko "ukryte z listy"** —
+         patrz "Prywatność PDF-ów" niżej.
+  - **Prywatność PDF-ów (dodane POPRAWKĄ 2026-08-19(b))** — do tej zmiany
+    PDF-y były wyłączone tylko z PRZEGLĄDARKI publicznych analiz
+    (`index.html`), ale sam wiersz w `scans` był nadal czytelny dla
+    KAŻDEGO, kto poznał/zgadł `scan.html?id=...` (RLS `scans` miała
+    publiczny odczyt dla wszystkich typów) — realna różnica między "nie
+    polecane do odkrycia" a "prywatne" była żadna. Użytkownik wprost
+    poprosił o prawdziwą prywatność ("wyniki (...) zostały w pamięci
+    prywatnej użytkownika ale nie publicznej") oraz o możliwość WRACANIA do
+    własnych analiz. Naprawione trzema elementami działającymi razem:
+    1. **Nowa tabela `scan_access`** (patrz struktura bazy wyżej) — osobny
+       wiersz na PARĘ (analiza, użytkownik z dostępem), nie kolumna w
+       `scans`. To rozróżnienie jest konieczne z powodu współdzielonego
+       cache'u: jeśli dwie różne osoby prześlą DOKŁADNIE ten sam plik (ten
+       sam `content_hash`) w tym samym języku, druga dostaje wynik za darmo
+       z cache'u (patrz sekcja CACHE w `analyze/index.ts`) — ale bez
+       własnego wpisu w `scan_access` nigdy nie mogłaby do niego wrócić,
+       mimo że to ona o analizę poprosiła. Backend robi `upsert` do
+       `scan_access` w OBU miejscach, gdzie PDF-owy wynik trafia do kogoś:
+       przy trafieniu w cache i przy świeżo policzonej analizie. Trzyma też
+       `source_filename` PER UŻYTKOWNIK (nie w `scans`) — bo dwie osoby z
+       identycznym plikiem mogły nadać mu różne nazwy.
+    2. **Zmieniona RLS na `scans`**: publiczny odczyt zostaje dla
+       `text`/`url`/`image` (to się nie zmienia — te typy mają być
+       odkrywalne/współdzielone), ale `input_type = 'pdf'` wymaga wpisu w
+       `scan_access` — patrz dokładna reguła w sekcji struktury bazy wyżej.
+       Backend (Edge Function) i tak zawsze czyta przez `service_role`,
+       który omija RLS, więc mechanizm dedukcji kosztu z cache'u działa
+       identycznie jak wcześniej — zmienia się TYLKO to, co widzi
+       przeglądarka z kluczem `anon`.
+    3. **Kolejność w `analyze/index.ts` zamieniona**: sekcja UWIERZYTELNIENIE
+       (rozpoznanie `user_id` z JWT) przeniesiona PRZED sekcję CACHE —
+       trzeba już przy trafieniu w cache wiedzieć, kto pyta, żeby przyznać
+       mu dostęp w `scan_access`. Nie zmienia to zachowania dla żadnego
+       innego trybu (kolejność auth vs cache nigdy nie miała znaczenia poza
+       tym nowym przypadkiem).
+    4. **`scan.html` czeka teraz na sesję PRZED zapytaniem do `scans`**
+       (dawniej leciało od razu) — inaczej zapytanie o PDF mogłoby polecieć
+       bez tokenu zalogowanego użytkownika (sesja jeszcze się nie
+       załadowała z `localStorage`) i dostać fałszywe "nie znaleziono" mimo
+       że to WŁAŚCICIEL patrzy na własny wynik. Dla pozostałych typów (nadal
+       publicznie czytelnych) to tylko nieszkodliwe, minimalne opóźnienie.
+    5. **Nowa podstrona `historia.html`** — wymaga zalogowania (tak jak
+       `account.html`), listuje własne analizy PDF przez `scan_access`
+       (złączenie PostgREST do `scans` po nazwę/wynik), z linkiem do
+       `scan.html?id=...` dla każdej. Link do niej dodany w `account.html`
+       ("Twoje analizy PDF →"). Dodana do `sw.js` (`ASSETS`, `CACHE_NAME`
+       podbite do `pragma-v23`).
+    - **SQL migracji** (wklejony i uruchomiony ręcznie w Supabase SQL
+      Editor — repo nie ma lokalnego Supabase CLI, patrz "Proces
+      wdrażania"):
+      ```sql
+      CREATE TABLE IF NOT EXISTS public.scan_access (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        scan_id uuid NOT NULL REFERENCES public.scans(id) ON DELETE CASCADE,
+        user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+        source_filename text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (scan_id, user_id)
+      );
+      ALTER TABLE public.scan_access ENABLE ROW LEVEL SECURITY;
+      CREATE POLICY "scan_access_select_own" ON public.scan_access
+        FOR SELECT USING (auth.uid() = user_id);
+
+      DO $$
+      DECLARE pol record;
+      BEGIN
+        FOR pol IN
+          SELECT policyname FROM pg_policies
+          WHERE schemaname = 'public' AND tablename = 'scans' AND cmd = 'SELECT'
+        LOOP
+          EXECUTE format('DROP POLICY %I ON public.scans', pol.policyname);
+        END LOOP;
+      END $$;
+      CREATE POLICY "scans_select_public_non_pdf" ON public.scans
+        FOR SELECT USING (input_type <> 'pdf');
+      CREATE POLICY "scans_select_own_pdf" ON public.scans
+        FOR SELECT USING (
+          input_type = 'pdf' AND EXISTS (
+            SELECT 1 FROM public.scan_access sa
+            WHERE sa.scan_id = scans.id AND sa.user_id = auth.uid()
+          )
+        );
+      ```
+      Ten skrypt sam znajduje i usuwa WSZYSTKIE dotychczasowe reguły
+      `SELECT` na `scans` (niezależnie od ich nazwy) i zastępuje je dwiema
+      nowymi — bezpieczne do jednorazowego uruchomienia; uruchomienie go
+      drugi raz też nie zaszkodzi (`DROP POLICY` na nieistniejącej regule
+      po prostu nic nie usunie, `CREATE POLICY` bez `IF NOT EXISTS` zgłosi
+      błąd przy drugim uruchomieniu — w takim wypadku wystarczy najpierw
+      ręcznie usunąć te dwie nowe reguły i uruchomić skrypt ponownie).
   - **Awaryjne pobranie strony (`fetchUrlAsText()`)**: niektóre strony
     (np. duże portale newsowe typu onet.pl) odrzucają robota Google z
     ogólnym kodem `URL_RETRIEVAL_STATUS_ERROR` — bez podania konkretnego
@@ -1296,9 +1415,11 @@ sprawdź, czy ten wyzwalacz nadal istnieje**
 — szukaj `on_auth_user_created` wśród standardowych
 `RI_ConstraintTrigger_...`), zanim zaczniesz szukać gdzie indziej.
 
-**`scans`** (współdzielony cache analiz, publiczny odczyt w RLS):
+**`scans`** (współdzielony cache analiz; publiczny odczyt w RLS dla
+`text`/`url`/`image` — **`pdf` jest wyjątkiem, patrz RLS niżej i
+`scan_access`**):
 - `id`, `content_hash` (klucz cache'u treści), `input_type` (`text`/`url`/
-  `image`), `language` (text, `NOT NULL DEFAULT 'en'` — **razem z
+  `image`/`pdf`), `language` (text, `NOT NULL DEFAULT 'en'` — **razem z
   `content_hash` tworzy właściwy klucz cache'u**), `is_translation`
   (boolean, `NOT NULL DEFAULT false` — `true`, gdy wynik powstał przez
   przetłumaczenie istniejącej analizy z innego języka, a nie przez pełną
@@ -1328,15 +1449,30 @@ cashflow" niżej):
 niżej):
 - `id`, `user_id`, `blocked_until`, `created_at`
 
-RLS: `scans` ma publiczny odczyt (używane przez niezalogowanych w
-przeglądarce publicznych analiz i na `scan.html`). Zapis do `scans`/
-`profiles`/`wallet_transactions`/`failed_scan_attempts`/`rate_limit_blocks`
-idzie przez `service_role` w Edge Function (backend), nie bezpośrednio z
-przeglądarki — **z jednym wyjątkiem**: `profiles.language` jest
-aktualizowane bezpośrednio z przeglądarki (`setLanguage()` w `i18n.js`,
-wywoływane z sesją zalogowanego użytkownika), więc `profiles` ma regułę RLS
-pozwalającą zalogowanemu użytkownikowi na `UPDATE` własnego wiersza
-(`auth.uid() = id`), obok istniejącej reguły `SELECT`.
+**`scan_access`** (dodane 2026-08-19 — kto ma prawo zobaczyć dany PDF,
+patrz "Prywatność PDF-ów" niżej):
+- `id`, `scan_id` (FK do `scans.id`, `ON DELETE CASCADE`), `user_id` (FK do
+  `auth.users.id`, `ON DELETE CASCADE`), `source_filename` (text, nullable —
+  oryginalna nazwa pliku, TYLKO etykieta, nie wpływa na cenę/analizę),
+  `created_at`.
+- `UNIQUE (scan_id, user_id)` — backend robi `upsert` z `onConflict:
+  'scan_id,user_id'`, więc ponowne przesłanie tego samego pliku przez tę
+  samą osobę odświeża `source_filename`/`created_at`, nie duplikuje wiersza.
+
+RLS: `scans` ma publiczny odczyt dla `input_type <> 'pdf'` (używane przez
+niezalogowanych w przeglądarce publicznych analiz i na `scan.html`). Dla
+`input_type = 'pdf'` odczyt ma WYŁĄCZNIE ten, kto ma odpowiadający wiersz w
+`scan_access` (`EXISTS (... WHERE scan_id = scans.id AND user_id =
+auth.uid())`) — patrz "Prywatność PDF-ów" niżej po pełne uzasadnienie i SQL.
+`scan_access` ma RLS `SELECT` tylko dla `auth.uid() = user_id` (każdy widzi
+wyłącznie własne wiersze). Zapis do `scans`/`scan_access`/`profiles`/
+`wallet_transactions`/`failed_scan_attempts`/`rate_limit_blocks` idzie przez
+`service_role` w Edge Function (backend), nie bezpośrednio z przeglądarki —
+**z jednym wyjątkiem**: `profiles.language` jest aktualizowane bezpośrednio
+z przeglądarki (`setLanguage()` w `i18n.js`, wywoływane z sesją
+zalogowanego użytkownika), więc `profiles` ma regułę RLS pozwalającą
+zalogowanemu użytkownikowi na `UPDATE` własnego wiersza (`auth.uid() =
+id`), obok istniejącej reguły `SELECT`.
 
 ## Ochrona cashflow przed nadużyciem (rate limiting) — dodane 2026-08-18
 

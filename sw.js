@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pragma-v22';
+const CACHE_NAME = 'pragma-v23';
 // Osobny, tymczasowy "schowek" na obraz udostępniony z innej aplikacji
 // (patrz handleShareTarget niżej) — celowo NIE ten sam co CACHE_NAME, żeby
 // czyszczenie starych wersji aplikacji (patrz "activate" niżej) nigdy
@@ -9,6 +9,7 @@ const ASSETS = [
   './index.html',
   './account.html',
   './scan.html',
+  './historia.html',
   './style.css',
   './i18n.js',
   './manifest.json',
