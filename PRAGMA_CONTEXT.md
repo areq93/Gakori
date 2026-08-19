@@ -291,7 +291,7 @@ zanim założysz, że działa.
     dzieje się PRZED ewentualną zgodą użytkownika na koszt:
     - **≤ `PDF_AUTO_ANALYZE_MAX_PAGES` (20) stron**: analiza rusza od razu,
       bez pytania — tak jak tekst/obraz/link.
-    - **21-`PDF_HARD_MAX_PAGES` (150) stron**: backend NIE wywołuje
+    - **21-`PDF_HARD_MAX_PAGES` (80) stron**: backend NIE wywołuje
       Gemini i NIC nie obciąża — zwraca `{ needs_confirmation: true,
       page_count, estimated_cost }`. Frontend pokazuje ekran zgody
       (`#pdfConfirmOverlay` w `index.html`) z liczbą stron, kosztem w
@@ -299,11 +299,12 @@ zanim założysz, że działa.
       niżej), użytkownik klika "Tak, analizuj" → frontend wysyła TO SAMO
       zapytanie ponownie z `confirmed: true`, dopiero wtedy leci dalej do
       Gemini i faktycznego obciążenia.
-    - **> 150 stron**: zawsze odrzucone (`pdf_too_long`), NIE do ominięcia
-      nawet przez `confirmed: true` — bezwzględny sufit ustalony wprost z
-      użytkownikiem (chroni przed absurdalnie dużym plikiem: czas
-      przetwarzania, limit tokenów pojedynczego zapytania, ryzyko
-      operacyjne).
+    - **> 80 stron**: zawsze odrzucone (`pdf_too_long`), NIE do ominięcia
+      nawet przez `confirmed: true` — bezwzględny sufit (patrz POPRAWKA
+      2026-08-19 niżej, dlaczego akurat 80, a nie pierwotnie planowane 150).
+    - **Rozmiar pliku**: twardy limit `MAX_PDF_BYTES` = **10 MB** (patrz
+      też POPRAWKA 2026-08-19 niżej) — świadomie mniej niż 20 MB limitu
+      łącznego dla obrazów.
     - **Koszt**: `PDF_PAGE_COST = IMAGE_SCAN_COST` (8 kredytów/stronę) —
       "jedna strona PDF-a ≈ jeden obraz kosztowo", patrz uzasadnienie w
       sekcji "Cennik" niżej (Google faktycznie liczy PDF wg tej samej
