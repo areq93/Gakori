@@ -75,6 +75,14 @@
        płaskiej naklejki i nie płaskiej kartki. */
     --sculpt-shadow: 0 20px 42px -14px var(--shadow-color), 0 7px 18px -3px var(--shadow-color-soft), inset 0 1.5px 0 var(--highlight-edge);
     --sculpt-shadow-sm: 0 10px 22px -8px var(--shadow-color), 0 3px 9px -1px var(--shadow-color-soft), inset 0 1.5px 0 var(--highlight-edge);
+    /* Odwrotność powyższego — dla WGŁĘBIONYCH paneli (cytat, "Co teraz
+       zrobić", pole źródła): ciemny cień od góry-wewnątrz (jakby światło
+       wpadało w zagłębienie) + jasna kreska od dołu-wewnątrz (odbite
+       światło na dnie wgłębienia). Ta sama "gra świateł" co na uniesionych
+       kartach/przyciskach, tylko odwrócona geometrycznie — bo te panele są
+       ŚWIADOMIE recesywne (patrz komentarz przy .result-quote niżej), nie
+       kolejnymi uniesionymi kartami. */
+    --sculpt-inset: inset 0 3px 8px -3px var(--shadow-color-soft), inset 0 -1px 0 var(--highlight-edge);
     /* Kolory sygnałowe (wynik analizy) — ŚWIADOMIE przygaszone/ziemiste, nie
        jaskrawe web-safe zielenie/żółcie/czerwienie. Nadal jednoznacznie
        rozróżnialne (inny odcień = inne znaczenie), ale należą do tej samej,
@@ -303,10 +311,21 @@ a { color: var(--accent); }
     width: 100%; max-width: 400px; margin-top: 16px; box-sizing: border-box; display: none;
     position: relative; z-index: 1;
 }
-.result-badge { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: bold; font-size: 14px; margin-bottom: 14px; border: 1.5px solid; }
-.badge-green { background: var(--ok-bg); color: var(--ok-text); border-color: var(--ok-border); }
-.badge-yellow { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-border); }
-.badge-red { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+/* POPRAWKA 2026-08-18: odznaka wyniku i tagi wzorców (niżej) były płaskim,
+   jednolitym kolorem — jedyny element w appce bez żadnej gry światła,
+   więc wyglądały jak wklejone z wcześniejszej, "płaskiej" wersji stylu.
+   Dostały ten sam dwuwarstwowy gradient + cień co reszta ("sculpt"), tylko
+   w OBRĘBIE własnego odcienia (zielony/żółty/czerwony/terakotowy zostaje,
+   inaczej znaczenie koloru by zniknęło) — `color-mix` rozjaśnia górny
+   koniec gradientu w stronę bieli, żeby zachować ten sam kierunek światła
+   co karty (patrz zasada --card-2 > --card > --paper wyżej). */
+.result-badge {
+    display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: bold; font-size: 14px; margin-bottom: 14px; border: 1.5px solid;
+    box-shadow: var(--sculpt-shadow-sm);
+}
+.badge-green { background: linear-gradient(160deg, color-mix(in srgb, var(--ok-bg) 55%, white) 0%, var(--ok-bg) 100%); color: var(--ok-text); border-color: var(--ok-border); }
+.badge-yellow { background: linear-gradient(160deg, color-mix(in srgb, var(--warn-bg) 55%, white) 0%, var(--warn-bg) 100%); color: var(--warn-text); border-color: var(--warn-border); }
+.badge-red { background: linear-gradient(160deg, color-mix(in srgb, var(--danger-bg) 55%, white) 0%, var(--danger-bg) 100%); color: var(--danger-text); border-color: var(--danger-border); }
 /* Delikatne pudełko z tłem zamiast kolorowej/kontrastowej linii z boku —
    PODOBNY pomysł co .pattern-tip niżej (subtelnie ciemniejsze tło niż karta),
    ale świadomie WŁASNY odcień (var(--quote-bg), nie var(--paper)), żeby te
@@ -317,13 +336,18 @@ a { color: var(--accent); }
    tak niesie już odznaka i lewa krawędź całej karty (patrz .pattern-item
    niżej) — tu nie dublujemy. Ta sama reguła obowiązuje wszędzie (index.html,
    scan.html), dla każdego trybu analizy. */
-.result-quote { background: var(--quote-bg); border-radius: var(--radius-sm); padding: 10px 12px; margin: 0 0 14px 0; font-style: italic; color: var(--ink-soft); line-height: 1.5; }
+.result-quote {
+    background: var(--quote-bg); border-radius: var(--radius-sm); padding: 10px 12px; margin: 0 0 14px 0;
+    font-style: italic; color: var(--ink-soft); line-height: 1.5;
+    box-shadow: var(--sculpt-inset);
+}
 
 /* Ramka wokół informacji o źródle (link analizowanej strony) na scan.html */
 .scan-source-box {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     background: var(--paper); border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm);
     padding: 10px 12px; margin: 0 0 18px 0; font-size: 13px; line-height: 1.4; word-break: break-all;
+    box-shadow: var(--sculpt-inset);
 }
 .scan-source-box a { font-weight: 600; }
 
@@ -343,6 +367,7 @@ a { color: var(--accent); }
     font-size: 13.5px; line-height: 1.6; color: var(--ink-soft);
     white-space: pre-wrap; word-break: break-word;
     max-height: 320px; overflow-y: auto;
+    box-shadow: var(--sculpt-inset);
 }
 /* Kolor podświetlenia zależy od typu wzorca — ta sama konwencja co odznaka
    i lewa krawędź karty wzorca niżej (.pattern-item), żeby nie było
@@ -377,9 +402,10 @@ a { color: var(--accent); }
 .pattern-tag {
     font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
     padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+    box-shadow: var(--sculpt-shadow-sm);
 }
-.pattern-manipulation .pattern-tag { background: var(--accent-soft); color: var(--accent-dark); }
-.pattern-reasoning .pattern-tag { background: var(--ok-bg); color: var(--ok-text); }
+.pattern-manipulation .pattern-tag { background: linear-gradient(160deg, color-mix(in srgb, var(--accent-soft) 55%, white) 0%, var(--accent-soft) 100%); color: var(--accent-dark); }
+.pattern-reasoning .pattern-tag { background: linear-gradient(160deg, color-mix(in srgb, var(--ok-bg) 55%, white) 0%, var(--ok-bg) 100%); color: var(--ok-text); }
 .pattern-name { font-weight: 700; font-size: 13.5px; color: var(--ink); }
 
 .pattern-item .result-quote { margin: 0 0 8px 0; }
@@ -396,6 +422,7 @@ a { color: var(--accent); }
 .pattern-tip {
     display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; line-height: 1.55; color: var(--ink);
     background: var(--paper); border: 1.5px dashed var(--card-border); border-radius: var(--radius-sm); padding: 12px 14px;
+    box-shadow: var(--sculpt-inset);
 }
 .pattern-tip-label {
     font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
