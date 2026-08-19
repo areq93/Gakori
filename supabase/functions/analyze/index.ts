@@ -76,6 +76,26 @@ const MAX_PDF_BYTES = 10 * 1024 * 1024 // 10 MB (świadomie mniej niż 20 MB lim
 // limitu CPU opisanego wyżej — bezpiecznie mieści się też w limicie 400s
 // na całą odpowiedź.
 const PDF_GEMINI_TIMEOUT_MS = 60000 // 60s
+// POPRAWKA 2026-08-19(c) — realny dowód od użytkownika: 40-stronicowy
+// raport (NVIDIA, potem Komputronik) dostał tylko 2-3 wykryte wzorce,
+// a znalezione strony leżały PODEJRZANIE BLISKO SIEBIE (np. 23/27/31,
+// 13/16) — mocny sygnał, że model NIE czyta całego dokumentu, tylko
+// skupia się na jednym fragmencie, MIMO wyraźnej instrukcji tekstowej
+// (patrz POPRAWKA 2026-08-19(b) wyżej — samo "proszenie ładniejszymi
+// słowami" się wyczerpało, to wymagało zmiany architektury, nie kolejnego
+// zdania w promptcie). Rozwiązanie: PDF dłuższy niż ten próg jest DZIELONY
+// na części po tyle stron i KAŻDA część leci jako OSOBNE, pełne zapytanie
+// do Gemini (patrz sekcja PDF w Deno.serve niżej, `analyzePdfChunk()`) —
+// model fizycznie nie ma jak "przeoczyć" żadnej strony, bo każda należy do
+// jakiejś części z własnym, kompletnym zapytaniem. Świadomie MAŁA wartość
+// (nie np. 20-30) — mniejszy fragment daje Gemini dużo mniej tekstu do
+// "zgubienia" w jednym wywołaniu, kosztem większej liczby zapytań (a
+// więc i realnego kosztu Gemini — patrz zadanie "przeliczyć cashflow z
+// nowymi scenariuszami" w PRAGMA_CONTEXT.md, które to jeszcze bardziej
+// uzasadnia). Części lecą RÓWNOLEGLE (Promise.all), więc łączny czas
+// odpowiedzi rośnie nieznacznie (ograniczony najwolniejszą częścią, nie
+// sumą wszystkich) — wciąż bezpiecznie mieści się w limicie 400s.
+const PDF_CHUNK_PAGES = 8
 
 // Nazwy języków (po polsku, w formie "w języku X") używane do parametryzacji
 // instrukcji językowej promptu — patrz buildSystemPrompt(). Klucze muszą się
@@ -223,18 +243,34 @@ function isPdfFile(bytes: Uint8Array): boolean {
   )
 }
 
-// Liczy strony PDF-a LOKALNIE (pdf-lib), bez angażowania Gemini — musi być
+// Wczytuje PDF LOKALNIE (pdf-lib), bez angażowania Gemini — musi być
 // tanie/darmowe, bo wywołujemy to PRZED ewentualnym ekranem potwierdzenia
 // kosztu (patrz PDF_AUTO_ANALYZE_MAX_PAGES w Deno.serve niżej): użytkownik
 // nie zapłacił jeszcze za nic, więc nie możemy jeszcze nic wydać na Gemini.
+// Zwraca cały wczytany dokument (nie tylko liczbę stron) — potrzebny
+// później też do wycinania fragmentów przy analizie w częściach (patrz
+// PDF_CHUNK_PAGES niżej), żeby nie parsować tych samych bajtów dwa razy.
 // null = plik uszkodzony/nie do odczytania jako PDF.
-async function countPdfPages(bytes: Uint8Array): Promise<number | null> {
+async function loadPdfDocument(bytes: Uint8Array): Promise<PDFDocument | null> {
   try {
-    const doc = await PDFDocument.load(bytes, { updateMetadata: false, ignoreEncryption: true })
-    return doc.getPageCount()
+    return await PDFDocument.load(bytes, { updateMetadata: false, ignoreEncryption: true })
   } catch {
     return null
   }
+}
+
+// Koduje bajty do base64 w kawałkach — bezpieczny sposób w Deno dla
+// większych plików. `String.fromCharCode(...bytes)` na dużej tablicy
+// (rozłożonej jako pojedyncze argumenty) potrafi przekroczyć limit
+// wielkości stosu silnika JS — tu unikamy tego, sklejając wynik po
+// małych kawałkach.
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
 }
 
 // Instrukcje dla Gemini są napisane po polsku (to nie ma znaczenia — model
@@ -466,6 +502,36 @@ ${JSON.stringify(result)}`
   } catch {
     return null
   }
+}
+
+// Buduje JEDNO spójne podsumowanie z połączonych wzorców wykrytych we
+// WSZYSTKICH częściach długiego PDF-a (patrz PDF_CHUNK_PAGES i
+// analyzePdfChunk() w Deno.serve niżej) — każda część dostała własne,
+// osobne zapytanie do Gemini, więc żadna z nich "nie widziała" całego
+// dokumentu i nie mogła sama napisać sensownego podsumowania całości.
+// Świadomie NIE wysyłamy tu ponownie treści PDF-a (drogie, zbędne) —
+// tylko krótką listę już wykrytych wzorców (typ + nazwa) i ogólny wynik,
+// więc to tanie, szybkie zapytanie.
+async function composePdfSummary(
+  patterns: Array<{ pattern_type: string; name: string }>,
+  qScore: number,
+  langCode: string,
+  geminiKey: string
+): Promise<string> {
+  const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
+  const compactList =
+    patterns.length > 0
+      ? patterns.map((p) => `- [${p.pattern_type}] ${p.name}`).join('\n')
+      : '(brak wykrytych wzorców)'
+  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych w dokumencie PDF, oraz ogólny wynik rzetelności (q_score, 0-100, gdzie 100 = w pełni merytoryczny dokument bez manipulacji). Napisz DWUZDANIOWE podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek — konkretne, bez lania wody, bez żargonu. NIGDY nie pisz "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko neutralny opis tego, co znaleziono (patrz zasada NEUTRALNOŚĆ). Zwróć WYŁĄCZNIE sam tekst podsumowania, bez cudzysłowów i bez dodatkowego komentarza.
+
+q_score: ${qScore}
+Wykryte wzorce:
+${compactList}`
+
+  const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] }, geminiKey)
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  return typeof text === 'string' && text.trim() ? text.trim() : ''
 }
 
 // Awaryjne pobranie strony, gdy wbudowany pobieracz Gemini (URL Context)
@@ -739,6 +805,11 @@ Deno.serve(async (req: Request) => {
     let imageBytesList: Uint8Array[] = []
     let imageMimeTypes: string[] = []
     let pdfPageCount = 0
+    // Wczytany dokument PDF (pdf-lib) — ustawiany niżej w gałęzi "pdf",
+    // trzymany tu, żeby sekcja 5 (wywołanie Gemini, `analyzePdfChunk()`)
+    // mogła z niego wycinać fragmenty bez ponownego parsowania tych samych
+    // bajtów (patrz PDF_CHUNK_PAGES wyżej).
+    let pdfDoc: PDFDocument | null = null
     if (input_type === 'image') {
       // Tak jak link — obraz zawsze wymaga konta (płaska, wyższa stawka niż
       // darmowy limit anonimowy dla krótkiego tekstu).
@@ -846,13 +917,14 @@ Deno.serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      const pageCount = await countPdfPages(pdfBytes)
-      if (pageCount === null) {
+      pdfDoc = await loadPdfDocument(pdfBytes)
+      if (!pdfDoc) {
         return new Response(
           JSON.stringify({ error: 'invalid_pdf', message: 'Nie udało się odczytać liczby stron PDF-a — plik może być uszkodzony.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+      const pageCount = pdfDoc.getPageCount()
       // Bezwzględny sufit — nie do ominięcia nawet przez confirmed:true.
       if (pageCount > PDF_HARD_MAX_PAGES) {
         return new Response(
@@ -1126,56 +1198,135 @@ Deno.serve(async (req: Request) => {
           return await respondUnsafeContent('blocked_by_provider')
         }
       } else if (input_type === 'pdf') {
-        // Bez taniego etapu kategoryzacji z góry (tak jak przy obrazie) —
-        // nie mamy z góry żadnego wyciągniętego tekstu, po którym dałoby się
-        // zgrubnie dobrać kategorie; sam PDF czyta dopiero Gemini niżej.
+        // POPRAWKA 2026-08-19(c) — realny dowód od użytkownika (dwa różne
+        // ~40-stronicowe raporty finansowe, oba dostały tylko 2-3 wykryte
+        // wzorce ze stronami leżącymi PODEJRZANIE BLISKO SIEBIE — np.
+        // 23/27/31, 13/16) pokazał, że jedno duże zapytanie z całym PDF-em
+        // NIE gwarantuje realnego przeczytania całości, mimo wyraźnej
+        // instrukcji tekstowej (patrz historia POPRAWEK 2026-08-19(a)/(b)
+        // wyżej — samo "proszenie ładniejszymi słowami" się wyczerpało).
+        // Zamiast tego: DZIELIMY dokument na części po PDF_CHUNK_PAGES
+        // stron (patrz stała wyżej) i KAŻDA część leci jako OSOBNE, pełne
+        // zapytanie do Gemini, równolegle — model fizycznie nie ma jak
+        // pominąć żadnej strony, bo każda należy do jakiejś części z
+        // własnym, kompletnym zapytaniem. Bez taniego etapu kategoryzacji
+        // z góry (tak jak przy obrazie) — nie mamy z góry żadnego
+        // wyciągniętego tekstu, po którym dałoby się zgrubnie dobrać
+        // kategorie.
         const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
-        // Obrazy WEWNĄTRZ PDF-a mają być pomijane, nie analizowane (ustalone
-        // wcześniej z użytkownikiem) — Gemini fizycznie "widzi" całą stronę
-        // PDF-a (tekst i ewentualne obrazy razem), więc jedyny sposób to
-        // wprost mu tego zabronić w instrukcji.
-        // Dwa dopiski wymuszone realnym problemem zgłoszonym przez
-        // użytkownika (2026-08-19): (1) 40-stronicowy PDF zwrócił tylko 2
-        // wzorce — zbyt mało jak na zapłacony koszt, podejrzenie, że model
-        // czyta tylko początek/najbardziej rzucające się fragmenty zamiast
-        // całości; (2) brak numeru strony przy cytacie, więc nie da się
-        // sprawdzić, gdzie w dokumencie faktycznie coś jest. NIE fabrykujemy
-        // sztywnego minimum wyników (to byłoby nieuczciwe — patrz sekcja
-        // NEUTRALNOŚĆ w buildSystemPrompt), tylko wymuszamy REALNE przejrzenie
-        // całego dokumentu i obowiązkowe podanie strony przy każdym wzorcu.
-        // POPRAWKA: nakaz przeczytania WSZYSTKICH stron obowiązuje ZAWSZE,
-        // niezależnie od długości pliku — krótszy dokument nie zasługuje na
-        // mniej uważne czytanie niż długi (zgłoszone wprost przez
-        // użytkownika). Próg >10 stron dotyczy WYŁĄCZNIE dodatkowego
-        // ostrzeżenia poniżej ("mało wyników przy długim dokumencie to
-        // podejrzane") — ten konkretny sygnał nie ma sensu przy krótkim
-        // pliku, gdzie 1-2 wzorce mogą być całkowicie prawdziwym wynikiem.
-        const pdfThoroughnessNote =
-          pdfPageCount > 10
-            ? ` Dodatkowo: to długi dokument (${pdfPageCount} stron) — dokument tej długości niemal zawsze zawiera wiele wartych nazwania miejsc (manipulacji ALBO trafnego rozumowania), jeśli poszuka się ich uważnie w każdej sekcji. Bardzo krótka lista wykrytych wzorców przy tak długim dokumencie zwykle oznacza, że większość tekstu została pominięta — zanim uznasz analizę za skończoną, sprawdź w myślach: "czy naprawdę przejrzałem/am WSZYSTKIE strony, a nie tylko pierwsze kilka?".`
-            : ''
-        const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF (${pdfPageCount} ${pdfPageCount === 1 ? 'strona' : 'stron'}) — potraktuj go dokładnie tak samo jak tekst do analizy. Użytkownik zapłacił za analizę CAŁEGO dokumentu — niezależnie od tego, czy PDF ma 2 strony czy 80, przeczytaj GO CAŁEGO, stronę po stronie, i każdą stronę sprawdź tak samo uważnie jak pierwszą; liczba stron nie jest powodem, żeby jakąkolwiek z nich czytać pobieżniej. Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony PDF-a (licząc od 1), na której faktycznie znajduje się cytowany fragment — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie w dokumencie szukać danego miejsca, sam cytat przy wielostronicowym pliku nie wystarczy. Jeśli cytat rozciąga się na dwie strony, podaj numer strony, na której się zaczyna.${pdfThoroughnessNote}`
-        // Dłuższy limit czasu niż zwykłe zapytania (patrz PDF_GEMINI_TIMEOUT_MS) —
-        // duży, ale wciąż dozwolony PDF (bliżej PDF_HARD_MAX_PAGES) potrzebuje
-        // więcej czasu niż 20s, jakie starcza reszcie zapytań w tej funkcji.
-        geminiData = await callGemini(
-          {
-            contents: [
-              {
-                parts: [
-                  { text: `${systemPrompt}\n\n${pdfInstruction}` },
-                  { inlineData: { mimeType: 'application/pdf', data: pdf_base64 } },
-                ],
+
+        const chunkRanges: Array<{ start: number; end: number }> = []
+        for (let start = 0; start < pdfPageCount; start += PDF_CHUNK_PAGES) {
+          chunkRanges.push({ start, end: Math.min(start + PDF_CHUNK_PAGES, pdfPageCount) })
+        }
+
+        // Wycina fragment dokumentu jako osobny, samodzielny PDF (pdf-lib
+        // `copyPages`) — a gdy dokument mieści się w JEDNEJ części (typowy,
+        // krótszy PDF), świadomie NIE odtwarzamy go przez pdf-lib na nowo:
+        // używamy oryginalnych bajtów `pdf_base64` wprost, żeby uniknąć
+        // choćby teoretycznego ryzyka, że pdf-lib coś zgubi/zmieni przy
+        // przepisywaniu pliku (np. nietypowe czcionki) — po co ryzykować
+        // tam, gdzie dzielenie i tak nic nie zmienia.
+        async function buildChunkBase64(start: number, end: number): Promise<string> {
+          if (chunkRanges.length === 1) return pdf_base64
+          const subDoc = await PDFDocument.create()
+          const pageIndices = Array.from({ length: end - start }, (_, i) => start + i)
+          const copiedPages = await subDoc.copyPages(pdfDoc!, pageIndices)
+          copiedPages.forEach((p) => subDoc.addPage(p))
+          const subBytes = await subDoc.save()
+          return uint8ArrayToBase64(subBytes)
+        }
+
+        // Analizuje JEDNĄ część — zwraca q_score i wzorce z numerem strony
+        // PRZELICZONYM na numerację całego, oryginalnego dokumentu (Gemini
+        // widzi tylko tę część, więc liczy strony od 1 W JEJ OBRĘBIE; my
+        // deterministycznie dodajemy przesunięcie `start`, żeby nie polegać
+        // na tym, że model sam poprawnie policzy przesunięcie w pamięci).
+        // null = ta część się nie udała (timeout/błąd Gemini/nie do
+        // sparsowania) — cała analiza PDF-a wtedy kończy się błędem
+        // (patrz niżej), zamiast po cichu zgubić fragment wyników.
+        async function analyzePdfChunk(
+          start: number,
+          end: number
+        ): Promise<{ q_score: number; patterns: Array<Record<string, unknown>> } | null> {
+          const chunkBase64 = await buildChunkBase64(start, end)
+          const chunkPageCount = end - start
+          const isOnlyChunk = chunkRanges.length === 1
+          const rangeNote = isOnlyChunk
+            ? ''
+            : ` To jest FRAGMENT większego dokumentu — strony ${start + 1}-${end} z ${pdfPageCount}-stronicowego pliku. W polu "page" podawaj numer strony LICZĄC OD 1 W OBRĘBIE TEGO FRAGMENTU (nie oryginalnego dokumentu), czyli liczbę od 1 do ${chunkPageCount}.`
+          const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF — potraktuj go dokładnie tak samo jak tekst do analizy. Przeczytaj GO CAŁEGO, stronę po stronie, każdą stronę sprawdź tak samo uważnie jak pierwszą — nie ograniczaj się do najbardziej rzucających się w oczy fragmentów.${rangeNote} Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie szukać danego miejsca, sam cytat nie wystarczy.`
+          const geminiData = await callGemini(
+            {
+              contents: [
+                {
+                  parts: [
+                    { text: `${systemPrompt}\n\n${pdfInstruction}` },
+                    { inlineData: { mimeType: 'application/pdf', data: chunkBase64 } },
+                  ],
+                },
+              ],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: PDF_RESPONSE_SCHEMA,
               },
-            ],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              responseSchema: PDF_RESPONSE_SCHEMA,
             },
-          },
-          geminiKey!,
-          PDF_GEMINI_TIMEOUT_MS
+            geminiKey!,
+            PDF_GEMINI_TIMEOUT_MS
+          )
+          const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
+          if (!text) return null
+          try {
+            const parsed = JSON.parse(text)
+            const patterns = Array.isArray(parsed.patterns)
+              ? parsed.patterns.map((p: Record<string, unknown>) => ({
+                  ...p,
+                  page: (typeof p.page === 'number' ? p.page : 1) + start,
+                }))
+              : []
+            return { q_score: typeof parsed.q_score === 'number' ? parsed.q_score : 50, patterns }
+          } catch {
+            return null
+          }
+        }
+
+        // RÓWNOLEGLE — łączny czas odpowiedzi ograniczony najwolniejszą
+        // częścią, nie sumą wszystkich (patrz uzasadnienie przy
+        // PDF_CHUNK_PAGES wyżej, dlaczego to bezpiecznie mieści się w
+        // limicie 400s Supabase).
+        const chunkResults = await Promise.all(chunkRanges.map((r) => analyzePdfChunk(r.start, r.end)))
+
+        if (chunkResults.some((r) => r === null)) {
+          await logFailedAttempt()
+          return new Response(
+            JSON.stringify({
+              error: 'gemini_error',
+              message: 'Nie udało się przeanalizować wszystkich części dokumentu.',
+            }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        const allPatterns = chunkResults.flatMap((r) => r!.patterns)
+        // Średnia ważona liczbą stron w każdej części — przybliża "jakość
+        // całego tekstu", nie tylko średnią arytmetyczną z części o różnej
+        // długości (ostatnia część bywa krótsza niż PDF_CHUNK_PAGES).
+        const weightedScoreSum = chunkResults.reduce(
+          (sum, r, i) => sum + r!.q_score * (chunkRanges[i].end - chunkRanges[i].start),
+          0
         )
+        const pdfQScore = Math.round(weightedScoreSum / pdfPageCount)
+        const pdfSummary = await composePdfSummary(
+          allPatterns as Array<{ pattern_type: string; name: string }>,
+          pdfQScore,
+          outputLanguage,
+          geminiKey!
+        )
+        // Ustawiamy `result` BEZPOŚREDNIO (z pominięciem współdzielonego
+        // `geminiData` niżej) — PDF ma teraz inną architekturę (wiele
+        // zapytań + scalanie), więc generyczna ścieżka "jedno zapytanie →
+        // jeden JSON" go już nie dotyczy (patrz `if (!result)` niżej).
+        result = { q_score: pdfQScore, patterns: allPatterns, summary: pdfSummary }
       } else {
         // ETAP 1 (tani) + ETAP 2 — patrz komentarz w gałęzi "url" wyżej.
         const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!)
@@ -1192,23 +1343,29 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      if (!geminiData?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        await logFailedAttempt()
-        return new Response(
-          JSON.stringify({ error: 'gemini_error', details: geminiData }),
-          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+      // Gałąź "pdf" wyżej ustawia `result` SAMODZIELNIE (własna architektura
+      // wielu zapytań + scalanie, patrz POPRAWKA 2026-08-19(c) wyżej) —
+      // `geminiData` zostaje tam `null` i generyczne parsowanie niżej musi
+      // być pominięte, inaczej nadpisałoby już gotowy, scalony wynik.
+      if (!result) {
+        if (!geminiData?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          await logFailedAttempt()
+          return new Response(
+            JSON.stringify({ error: 'gemini_error', details: geminiData }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
 
-      result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
+        result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
 
-      // Nasz własny klasyfikator (patrz moderationInstruction w gałęzi
-      // "image" wyżej) — druga warstwa moderacji, obok wbudowanego
-      // mechanizmu bezpieczeństwa dostawcy sprawdzonego przed parsowaniem.
-      if (input_type === 'image') {
-        const imgResult = result as { unsafe_content?: boolean; unsafe_content_category?: string }
-        if (imgResult.unsafe_content) {
-          return await respondUnsafeContent(imgResult.unsafe_content_category || 'unspecified')
+        // Nasz własny klasyfikator (patrz moderationInstruction w gałęzi
+        // "image" wyżej) — druga warstwa moderacji, obok wbudowanego
+        // mechanizmu bezpieczeństwa dostawcy sprawdzonego przed parsowaniem.
+        if (input_type === 'image') {
+          const imgResult = result as { unsafe_content?: boolean; unsafe_content_category?: string }
+          if (imgResult.unsafe_content) {
+            return await respondUnsafeContent(imgResult.unsafe_content_category || 'unspecified')
+          }
         }
       }
     }

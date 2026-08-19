@@ -287,7 +287,7 @@ zanim założysz, że działa.
     (w przeciwieństwie do obrazów, gdzie można kilka naraz — PDF-y bywają
     duże/wielostronicowe, wiele naraz to zbyt duże ryzyko kosztowe na
     start). Backend liczy strony LOKALNIE (`npm:pdf-lib`,
-    `countPdfPages()`), BEZ angażowania Gemini — to musi być darmowe, bo
+    `loadPdfDocument()`), BEZ angażowania Gemini — to musi być darmowe, bo
     dzieje się PRZED ewentualną zgodą użytkownika na koszt:
     - **≤ `PDF_AUTO_ANALYZE_MAX_PAGES` (20) stron**: analiza rusza od razu,
       bez pytania — tak jak tekst/obraz/link.
@@ -362,7 +362,7 @@ zanim założysz, że działa.
       1. **Limit czasu procesora Supabase (sprawdzone na żywo w
          dokumentacji, 19.08.2026) to tylko 2 SEKUNDY realnej pracy
          procesora na całe zapytanie** — czekanie na Gemini w to NIE
-         wlicza się (to I/O, nie liczenie), ale `countPdfPages()`
+         wlicza się (to I/O, nie liczenie), ale `loadPdfDocument()`
          (pdf-lib) to prawdziwa, synchroniczna praca procesora, na
          słabszym/współdzielonym sprzęcie serwera niż komputer
          deweloperski. Limit czasu ODPOWIEDZI (400s) i limit PAMIĘCI (150
@@ -423,27 +423,102 @@ zanim założysz, że działa.
          inaczej pole `page` zgubiłoby się przy tłumaczeniu (schemat
          odpowiedzi ogranicza, co Gemini może zwrócić). Backend sprawdza to
          po `original.input_type === 'pdf'` przed wywołaniem tłumaczenia.
-      2. **Wzmocniona dokładność, BEZ fabrykowania wyników** — `pdfInstruction`
-         wprost nakazuje przeczytać CAŁY dokument, stronę po stronie, każdą
-         stronę tak samo uważnie jak pierwszą — TEN nakaz obowiązuje ZAWSZE,
-         niezależnie od liczby stron (krótszy plik nie zasługuje na mniej
-         uważne czytanie niż długi — poprawione po uwadze użytkownika, że
-         pierwsza wersja brzmiała, jakby dotyczyło to tylko długich PDF-ów).
-         Osobno, TYLKO dla PDF-ów dłuższych niż 10 stron, doklejony jest
-         dodatkowy fragment: dokument tej długości niemal zawsze zawiera
-         wiele wartych nazwania miejsc, a bardzo krótka lista wyników przy
-         długim pliku to sygnał pominiętego tekstu — ten konkretny sygnał
-         (mało wyników = podejrzane) ma sens tylko przy długim dokumencie,
-         nie przy krótkim (2-3 strony z 1-2 wzorcami mogą być całkowicie
-         prawdziwym, uczciwym wynikiem). Świadomie NIE wymuszamy sztywnego
-         minimum liczby wzorców (np. "podaj co najmniej 10") — to byłoby
-         fabrykowaniem nieistniejącej manipulacji i łamałoby zasadę
-         NEUTRALNOŚĆ z `buildSystemPrompt()`. Jeśli to wzmocnienie instrukcji
-         okaże się niewystarczające, następny krok to dzielenie bardzo
-         długich PDF-ów na części i łączenie wyników (nie zrobione teraz —
-         większa zmiana architektoniczna, dopiero jeśli faktycznie potrzebna).
+      2. **Wzmocniona dokładność, BEZ fabrykowania wyników — okazała się
+         NIEWYSTARCZAJĄCA, patrz POPRAWKA 2026-08-19(c) niżej.**
+         `pdfInstruction` wprost nakazywała przeczytać CAŁY dokument,
+         stronę po stronie, każdą stronę tak samo uważnie jak pierwszą —
+         TEN nakaz obowiązywał ZAWSZE, niezależnie od liczby stron
+         (krótszy plik nie zasługuje na mniej uważne czytanie niż długi —
+         poprawione po uwadze użytkownika, że pierwsza wersja brzmiała,
+         jakby dotyczyło to tylko długich PDF-ów). Osobno, TYLKO dla
+         PDF-ów dłuższych niż 10 stron, doklejony był dodatkowy fragment:
+         dokument tej długości niemal zawsze zawiera wiele wartych nazwania
+         miejsc, a bardzo krótka lista wyników przy długim pliku to sygnał
+         pominiętego tekstu. Świadomie NIE wymuszaliśmy (i nadal nie
+         wymuszamy) sztywnego minimum liczby wzorców (np. "podaj co
+         najmniej 10") — to byłoby fabrykowaniem nieistniejącej manipulacji
+         i łamałoby zasadę NEUTRALNOŚĆ z `buildSystemPrompt()`. Problem:
+         samo "proszenie ładniejszymi słowami" ma twardy sufit skuteczności
+         przy naprawdę długich dokumentach — patrz dowód w POPRAWCE
+         2026-08-19(c).
       3. **PDF-y są teraz NAPRAWDĘ prywatne, nie tylko "ukryte z listy"** —
          patrz "Prywatność PDF-ów" niżej.
+    - **POPRAWKA 2026-08-19(c) — dowód, że samo proszenie o dokładność NIE
+      WYSTARCZA, i architektoniczna naprawa (dzielenie na części).**
+      Użytkownik przetestował realne dokumenty (~40-stronicowy raport
+      kwartalny NVIDIA, potem raport Komputronika) — oba dostały tylko 2-3
+      wykryte wzorce mimo POPRAWKI 2026-08-19(b) opisanej wyżej. Kluczowa
+      obserwacja użytkownika, która to udowodniła: **numery stron
+      znalezionych wzorców leżały PODEJRZANIE BLISKO SIEBIE** (np.
+      23/27/31 na 40 stron; 13/16 na kilkanaście stron) — gdyby model
+      naprawdę czytał cały dokument równie uważnie, wyniki rozkładałyby się
+      po całej jego długości, nie w jednym skupisku. To mocny, empiryczny
+      dowód, że jedno duże zapytanie z całym PDF-em NIE gwarantuje
+      realnego przeczytania całości, niezależnie jak stanowczo się o to
+      poprosi w promptcie — klasyczne ograniczenie modeli językowych przy
+      bardzo długim kontekście i zadaniu "wypisz WSZYSTKO, co znajdziesz"
+      (model ma skłonność skupiać się na jednym, najbardziej "wyrazistym"
+      fragmencie zamiast równomiernie przeszukać całość).
+
+      **Naprawa: dzielenie PDF-a na części (`PDF_CHUNK_PAGES` = 8 stron) i
+      NIEZALEŻNE zapytanie do Gemini dla KAŻDEJ części, równolegle:**
+      - `loadPdfDocument()` (dawniej `countPdfPages()`) zwraca teraz cały
+        wczytany dokument (pdf-lib), nie tylko liczbę stron — trzymany w
+        `pdfDoc` (zmienna na poziomie funkcji, obok `pdfPageCount`), żeby
+        nie parsować tych samych bajtów dwa razy.
+      - `analyzePdfChunk(start, end)` w sekcji 5 (`Deno.serve`): dla
+        dokumentu mieszczącego się w JEDNEJ części (typowy, krótszy PDF)
+        używa oryginalnych bajtów `pdf_base64` wprost (bez odtwarzania
+        przez pdf-lib — unika ryzyka utraty czcionek/formatowania przy
+        przepisywaniu pliku). Dla dłuższych — wycina fragment przez
+        `subDoc.copyPages()` i koduje go do base64 (`uint8ArrayToBase64()`,
+        bezpieczna wersja dla dużych plików — zwykłe rozłożenie tablicy
+        bajtów jako argumentów `String.fromCharCode(...bytes)` potrafi
+        przekroczyć limit stosu silnika JS).
+      - Model widzi TYLKO swoją część, więc liczy numer strony od 1 W JEJ
+        OBRĘBIE — backend DETERMINISTYCZNIE dodaje przesunięcie (`+ start`)
+        przy scalaniu wyników, żeby finalny numer strony był poprawny
+        względem CAŁEGO oryginalnego dokumentu. Świadomie NIE proszymy
+        modelu, żeby sam policzył to przesunięcie (mniej pewne niż prosta
+        arytmetyka po naszej stronie).
+      - Części lecą RÓWNOLEGLE (`Promise.all`) — łączny czas odpowiedzi
+        ograniczony najwolniejszą częścią, nie sumą wszystkich, więc nadal
+        bezpiecznie mieści się w limicie 400s Supabase nawet dla
+        maksymalnego, 80-stronicowego (10 części) dokumentu.
+      - Jeśli KTÓRAKOLWIEK część się nie uda (timeout/błąd/niesparsowalny
+        JSON) — cała analiza kończy się błędem `gemini_error` (jak
+        dotychczas), zamiast po cichu zgubić fragment wyników i pokazać
+        niekompletną analizę jako pełną.
+      - `q_score` całości = średnia ważona liczbą stron każdej części (nie
+        zwykła średnia arytmetyczna — ostatnia część bywa krótsza niż
+        `PDF_CHUNK_PAGES`).
+      - `summary` całości: żadna pojedyncza część "nie widziała" całego
+        dokumentu, więc żadna nie mogła sama napisać sensownego
+        podsumowania całości. Nowa funkcja `composePdfSummary()` robi to
+        OSOBNYM, TANIM zapytaniem — dostaje tylko krótką listę już
+        wykrytych wzorców (typ + nazwa, BEZ ponownego wysyłania treści
+        PDF-a) i ogólny `q_score`, i pisze jedno, spójne dwuzdaniowe
+        podsumowanie w stylu identycznym jak reszta aplikacji.
+      - **Realny wzrost kosztu Gemini** — to jest architektura z WIELOMA
+        zapytaniami zamiast jednego: długi (80-stronicowy) PDF to teraz aż
+        10 wywołań zamiast 1, każde z osobno wysyłanym `systemPrompt`
+        (biblioteka 100 modeli mentalnych, kilka tysięcy tokenów) —
+        znacząco podnosi to realny koszt operacyjny per PDF, silniej niż
+        liniowo względem liczby stron. To WZMACNIA (nie zastępuje) zadanie
+        "Po PDF: przeliczyć cashflow z nowymi scenariuszami" — cennik
+        `PDF_PAGE_COST` (8 kredytów/stronę) był ustalony PRZED tą zmianą i
+        może już nie pokrywać realnego kosztu dla dłuższych dokumentów;
+        zweryfikować priorytetowo przy najbliższej okazji.
+      - **Do obserwowania**: wycinanie fragmentów przez pdf-lib
+        (`copyPages`/`save()`) to, tak jak liczenie stron, prawdziwa
+        synchroniczna praca procesora (patrz limit 2s CPU Supabase,
+        opisany przy `PDF_HARD_MAX_PAGES` wyżej) — dla maksymalnego,
+        10-częściowego dokumentu robimy to teraz do 10 razy zamiast raz.
+        Brak jeszcze realnych danych produkcyjnych, czy to bezpiecznie
+        mieści się w budżecie CPU dla największych dozwolonych plików —
+        jeśli po wdrożeniu pojawią się błędy na dużych PDF-ach, to
+        pierwsze miejsce do sprawdzenia (obok już wcześniej znanego ryzyka
+        przy `PDF_HARD_MAX_PAGES`/`MAX_PDF_BYTES`).
   - **Prywatność PDF-ów (dodane POPRAWKĄ 2026-08-19(b))** — do tej zmiany
     PDF-y były wyłączone tylko z PRZEGLĄDARKI publicznych analiz
     (`index.html`), ale sam wiersz w `scans` był nadal czytelny dla
