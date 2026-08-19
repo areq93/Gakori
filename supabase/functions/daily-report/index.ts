@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // --- Najpopularniejsze analizy (top 5 wg wyświetleń) w każdym języku, w którym coś jest ---
-  const SITE_URL = 'https://areq93.github.io/pragma'
+  const SITE_URL = 'https://areq93.github.io/Gakori'
   const topByLanguage: { langName: string; items: { label: string; views: number; url: string }[] }[] = []
   try {
     for (const lang of LANGUAGES) {
