@@ -1259,9 +1259,11 @@ zanim założysz, że działa.
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
   kluczowych w czasie rzeczywistym (debounce, sanityzacja wejścia przed
   wstawieniem do filtra PostgREST), okno ograniczone do ~6 wierszy z
-  suwakiem, klik prowadzi do `scan.html?id=...` **w nowej karcie**
-  (`target="_blank"`) — celowo, żeby klik w wynik nie gubił przewijanej
-  listy pod spodem. Widoczna zawsze (i dla zalogowanych, i dla
+  suwakiem, klik prowadzi do `scan.html?id=...` **w TEJ SAMEJ karcie**
+  (POPRAWKA 2026-08-19: wcześniej otwierało nową kartę, `target="_blank"`,
+  żeby klik w wynik nie gubił przewijanej listy pod spodem — użytkownik
+  uznał to za niepotrzebne, wolał zwykłe przekierowanie bez mnożenia kart).
+  Widoczna zawsze (i dla zalogowanych, i dla
   niezalogowanych) — celowa decyzja: to mechanizm wzrostu/odkrywalności o
   zerowym koszcie krańcowym (czyta się z już policzonego, współdzielonego
   cache'u, bez wywoływania Gemini).

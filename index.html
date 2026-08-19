@@ -418,10 +418,6 @@
                 const row = document.createElement('a');
                 row.className = 'scan-row';
                 row.href = 'scan.html?id=' + encodeURIComponent(scan.id);
-                // Otwiera się w nowej karcie, żeby klik w wynik nie zgubił
-                // przewijanej listy publicznych analiz.
-                row.target = '_blank';
-                row.rel = 'noopener';
 
                 const icon = document.createElement('span');
                 icon.className = 'scan-row-icon';
