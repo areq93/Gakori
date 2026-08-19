@@ -390,6 +390,9 @@
                         // r.source_quote — obsługujemy oba warianty.
                         const patternsEl = document.getElementById('scanPatterns');
                         if (Array.isArray(r.patterns)) {
+                            // Najwyższy numer obrazu w całej liście — mówi nam, czy w ogóle
+                            // był to zestaw WIELU obrazów naraz (patrz odznaka niżej).
+                            const maxImageIndex = r.patterns.reduce((max, p) => typeof p.image_index === 'number' && p.image_index > max ? p.image_index : max, 0);
                             r.patterns.forEach(p => {
                                 // Starsze, już zcache'owane analizy sprzed tej zmiany nie mają
                                 // pattern_type/tip — domyślnie traktujemy je jako "manipulation"
@@ -419,6 +422,16 @@
                                     pageBadge.className = 'pattern-page';
                                     pageBadge.innerText = t('pattern_page_label', { page: p.page });
                                     header.appendChild(pageBadge);
+                                }
+                                // Numer obrazu — tylko gdy przesłano więcej niż jeden naraz
+                                // (każdy obraz ma teraz własne, osobne zapytanie do Gemini,
+                                // patrz POPRAWKA 2026-08-19(e) w analyze/index.ts), inaczej
+                                // odznaka "Obraz 1" przy pojedynczym obrazie byłaby zbędnym szumem.
+                                if (data.input_type === 'image' && typeof p.image_index === 'number' && maxImageIndex > 1) {
+                                    const imageBadge = document.createElement('span');
+                                    imageBadge.className = 'pattern-page';
+                                    imageBadge.innerText = t('pattern_image_label', { index: p.image_index });
+                                    header.appendChild(imageBadge);
                                 }
                                 item.appendChild(header);
 

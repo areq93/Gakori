@@ -353,9 +353,14 @@ const UNSAFE_CONTENT_CATEGORIES = [
   'disaster_with_graphic_injuries',
 ]
 
-// Schemat tylko dla obrazów — rozszerzony o pola moderacji treści. Trzymany
-// osobno od RESPONSE_SCHEMA (tekst/link), żeby nie ruszać sprawdzonego,
-// stabilnego kształtu wyniku dla tamtych trybów.
+// Schemat PERSYSTOWANEGO wyniku obrazu (to, co ląduje w `scans.result`) —
+// rozszerzony o "image_index" przy każdym wzorcu (który obraz z zestawu go
+// dotyczy — patrz POPRAWKA 2026-08-19(e) niżej: każdy obraz ma teraz WŁASNE,
+// osobne zapytanie do Gemini, więc przypisanie do obrazu jest znane z góry,
+// nie musi go zgadywać model). Trzymany osobno od RESPONSE_SCHEMA
+// (tekst/link), żeby nie ruszać sprawdzonego, stabilnego kształtu wyniku dla
+// tamtych trybów. Używany też przez translateResult() (tłumaczenie gotowego
+// wyniku) i przez IMAGE_VERIFICATION_SCHEMA niżej (Etap 2).
 const IMAGE_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -372,13 +377,43 @@ const IMAGE_RESPONSE_SCHEMA = {
           quote: { type: 'string' },
           explanation: { type: 'string' },
           tip: { type: 'string' },
+          image_index: { type: 'integer' },
         },
-        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip'],
+        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip', 'image_index'],
       },
     },
     summary: { type: 'string' },
   },
   required: ['unsafe_content', 'unsafe_content_category', 'q_score', 'patterns', 'summary'],
+}
+
+// Schemat dla ETAPU 1 (jeden obraz na zapytanie, patrz analyzeImageChunk()
+// niżej) — BEZ "image_index" (dopisywany deterministycznie w kodzie, tak jak
+// "page" przy PDF-ie — model i tak wie tylko o JEDNYM obrazie na raz, więc
+// nie ma sensu prosić go o numer, który już znamy). Wzorce w tym samym
+// kształcie co RESPONSE_SCHEMA (przez `.properties.patterns`, bez
+// duplikowania definicji).
+const IMAGE_CHUNK_SCHEMA = {
+  type: 'object',
+  properties: {
+    unsafe_content: { type: 'boolean' },
+    unsafe_content_category: { type: 'string' },
+    q_score: { type: 'integer' },
+    patterns: RESPONSE_SCHEMA.properties.patterns,
+  },
+  required: ['unsafe_content', 'unsafe_content_category', 'q_score', 'patterns'],
+}
+
+// Schemat dla ETAPU 2 obrazu (weryfikacja/scalanie, patrz
+// verifyAndRefineImagePatterns() niżej) — sam `patterns` (z "image_index"),
+// bez `q_score`/`summary`/pól moderacji (te już rozstrzygnięte w Etapie 1 —
+// Etap 2 nigdy nie widzi surowych obrazów).
+const IMAGE_VERIFICATION_SCHEMA = {
+  type: 'object',
+  properties: {
+    patterns: IMAGE_RESPONSE_SCHEMA.properties.patterns,
+  },
+  required: ['patterns'],
 }
 
 // Schemat tylko dla PDF-ów — rozszerzony o numer strony przy KAŻDYM
@@ -494,6 +529,7 @@ async function translateResult(
 - Pole "pattern_type" NIE tłumacz — zostaje dokładnie tą samą wartością co w oryginale ("manipulation" albo "reasoning").
 - Pole "q_score" zostaje dokładnie taką samą liczbą jak w oryginale.
 - Jeśli pole "page" występuje, zostaje dokładnie taką samą liczbą jak w oryginale — to numer strony PDF-a, nie podlega tłumaczeniu.
+- Jeśli pole "image_index" występuje, zostaje dokładnie taką samą liczbą jak w oryginale — to numer obrazu, z którego pochodzi wzorzec, nie podlega tłumaczeniu.
 - Zachowaj dokładnie tę samą strukturę JSON i tę samą liczbę elementów w "patterns".
 - Zwróć WYŁĄCZNIE poprawny JSON, bez żadnego dodatkowego tekstu i bez komentarzy.
 
@@ -595,6 +631,77 @@ async function composePdfSummary(
       ? patterns.map((p) => `- [${p.pattern_type}] ${p.name}`).join('\n')
       : '(brak wykrytych wzorców)'
   const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych w dokumencie PDF, oraz ogólny wynik rzetelności (q_score, 0-100, gdzie 100 = w pełni merytoryczny dokument bez manipulacji). Napisz DWUZDANIOWE podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek — konkretne, bez lania wody, bez żargonu. NIGDY nie pisz "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko neutralny opis tego, co znaleziono (patrz zasada NEUTRALNOŚĆ). Zwróć WYŁĄCZNIE sam tekst podsumowania, bez cudzysłowów i bez dodatkowego komentarza.
+
+q_score: ${qScore}
+Wykryte wzorce:
+${compactList}`
+
+  const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] }, geminiKey)
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  return typeof text === 'string' && text.trim() ? text.trim() : ''
+}
+
+// ETAP 2 obrazu — ten sam mechanizm i uzasadnienie co verifyAndRefinePdfPatterns()
+// wyżej, tylko dla wyników ze WSZYSTKICH obrazów zestawu zamiast kawałków
+// PDF-a (patrz POPRAWKA 2026-08-19(e) — każdy obraz dostaje teraz WŁASNE,
+// osobne zapytanie w Etapie 1, więc ta sama treść mogła zostać przypadkiem
+// wykryta na więcej niż jednym obrazie, np. dwa zrzuty ekranu tej samej
+// rozmowy). Usuwa duplikaty i poprawia zbyt ogólnikowe uzasadnienia. Pole
+// "image_index" zostaje nietknięte. Fail-open: błąd/timeout zwraca
+// ORYGINALNĄ, niezweryfikowaną listę — to wzbogacenie jakości, nie gwarancja
+// pokrycia (tę już zapewnia samo osobne zapytanie na obraz w Etapie 1).
+async function verifyAndRefineImagePatterns(
+  patterns: Array<Record<string, unknown>>,
+  langCode: string,
+  geminiKey: string
+): Promise<Array<Record<string, unknown>>> {
+  if (patterns.length === 0) return patterns
+  const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
+  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych OSOBNO na kolejnych obrazach przesłanych w jednym zestawie (każdy obraz analizowany był bez wiedzy o pozostałych) — dlatego ta sama treść mogła zostać przypadkiem wykryta na więcej niż jednym obrazie (np. dwa zrzuty ekranu tej samej rozmowy). Twoje zadanie:
+1. Znajdź i usuń duplikaty/prawie-duplikaty (ten sam albo bardzo podobny cytat/mechanizm) — zostaw tylko JEDEN egzemplarz każdego.
+2. Jeśli któreś "explanation" lub "tip" jest zbyt ogólnikowe/niejasne, popraw je (prosty język, zrozumiały dla 12-latka, bez żargonu, "tip" bez słów "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko konkretna czynność do wykonania).
+3. NIE DODAWAJ żadnych nowych wzorców, których nie ma na liście poniżej — to jest WYŁĄCZNIE czyszczenie i poprawianie istniejącej listy, nie nowa analiza. Pola "quote" i "image_index" zostają dokładnie takie same jak w oryginale (nie zmieniaj ich).
+4. Język pól "name"/"explanation"/"tip": ${langName}.
+
+Zwróć WYŁĄCZNIE poprawioną listę w polu "patterns", zgodnie ze schematem.
+
+JSON wejściowy:
+${JSON.stringify(patterns)}`
+
+  const data = await callGemini(
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: IMAGE_VERIFICATION_SCHEMA,
+      },
+    },
+    geminiKey
+  )
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) return patterns
+  try {
+    const parsed = JSON.parse(text)
+    return Array.isArray(parsed.patterns) && parsed.patterns.length > 0 ? parsed.patterns : patterns
+  } catch {
+    return patterns
+  }
+}
+
+// Odpowiednik composePdfSummary() dla obrazu — tanie zapytanie na samej
+// skróconej liście (typ + nazwa), bez ponownego wysyłania obrazów.
+async function composeImageSummary(
+  patterns: Array<{ pattern_type: string; name: string }>,
+  qScore: number,
+  langCode: string,
+  geminiKey: string
+): Promise<string> {
+  const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
+  const compactList =
+    patterns.length > 0
+      ? patterns.map((p) => `- [${p.pattern_type}] ${p.name}`).join('\n')
+      : '(brak wykrytych wzorców)'
+  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych na przesłanych obrazach, oraz ogólny wynik rzetelności (q_score, 0-100, gdzie 100 = brak manipulacji). Napisz DWUZDANIOWE podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek — konkretne, bez lania wody, bez żargonu. NIGDY nie pisz "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko neutralny opis tego, co znaleziono (patrz zasada NEUTRALNOŚĆ). Zwróć WYŁĄCZNIE sam tekst podsumowania, bez cudzysłowów i bez dodatkowego komentarza.
 
 q_score: ${qScore}
 Wykryte wzorce:
@@ -1115,7 +1222,11 @@ Deno.serve(async (req: Request) => {
         original.result as Record<string, unknown>,
         outputLanguage,
         geminiKey!,
-        original.input_type === 'pdf' ? PDF_RESPONSE_SCHEMA : RESPONSE_SCHEMA
+        original.input_type === 'pdf'
+          ? PDF_RESPONSE_SCHEMA
+          : original.input_type === 'image'
+            ? IMAGE_RESPONSE_SCHEMA
+            : RESPONSE_SCHEMA
       )
       if (result) usedTranslation = true
     }
@@ -1201,73 +1312,124 @@ Deno.serve(async (req: Request) => {
           }
         }
       } else if (input_type === 'image') {
-        // Jedno wywołanie, z pełną biblioteką modeli (bez taniego etapu
-        // kategoryzacji jak przy tekście/linku — tu nie mamy z góry żadnego
-        // tekstu, po którym dałoby się zgrubnie wybrać kategorie, a płaska
-        // stawka i tak ma duży margines na dodatkowe tokeny pełnej biblioteki).
+        // POPRAWKA 2026-08-19(e) — ten sam mechanizm i uzasadnienie co
+        // chunking PDF-a (patrz gałąź "pdf" niżej): przy kilku obrazach w
+        // JEDNYM wspólnym zapytaniu model skupiał się tylko na NAJBARDZIEJ
+        // RZUCAJĄCYM SIĘ W OCZY obrazie i ignorował resztę, mimo wyraźnej
+        // instrukcji tekstowej ("sprawdź wszystkie") — to samo doświadczenie
+        // co przy PDF-ach: samo słowne polecenie tylko łagodzi problem, nie
+        // usuwa go. Naprawa: KAŻDY obraz dostaje WŁASNE, osobne, pełne
+        // zapytanie (Etap 1) — model fizycznie nie ma jak pominąć żadnego na
+        // rzecz innego. Bonus: skoro wynik z każdego zapytania z definicji
+        // dotyczy JEDNEGO obrazu, przypisanie wzorca do konkretnego obrazu
+        // (image_index) wychodzi praktycznie za darmo — dopisywane
+        // deterministycznie w kodzie, tak jak numer strony przy PDF-ie.
+        // Bez taniego etapu kategoryzacji jak przy tekście/linku — pełna
+        // biblioteka 100 modeli w każdym zapytaniu (patrz uzasadnienie przy
+        // gałęzi "pdf" niżej, ten sam powód).
         const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
-        // Moderacja treści — pierwsza rzecz, o którą pytamy Gemini, zanim
-        // pójdzie dalej do właściwej analizy. To DODATKOWA warstwa do
-        // wbudowanego mechanizmu bezpieczeństwa dostawcy (sprawdzanego niżej
-        // przez promptFeedback.blockReason/finishReason) — łapie też
-        // przypadki z listy użytkownika (katastrofy, zranienia, znęcanie
-        // się), które niekoniecznie trafiają w kategorie blokowane
-        // automatycznie przez samego dostawcę.
-        const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy KTÓRYKOLWIEK z przesłanych obrazów przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK (choćby na jednym z obrazów) — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "q_score", "patterns" i "summary" zostaw odpowiednio: 0, pusta lista, pusty tekst. NIE opisuj ani nie analizuj dalej żadnego z obrazów. Jeśli ŻADEN obraz nie przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.`
-        // Przy więcej niż jednym obrazie naraz Gemini ma zwrócić JEDNĄ wspólną
-        // listę wzorców dla wszystkich obrazów razem, bez dzielenia jej według
-        // obrazu (świadoma decyzja: prostszy wynik, patrz PRAGMA_CONTEXT.md).
-        // ALE — zaobserwowane na żywo z użytkownikiem: bez wyraźnego
-        // rozgraniczenia i jednoznacznego nakazu model skupiał się tylko na
-        // NAJBARDZIEJ RZUCAJĄCYM SIĘ W OCZY obrazie (zwykle pierwszym) i
-        // całkowicie ignorował resztę — mimo poprawnego wywołania ze
-        // wszystkimi obrazami w zapytaniu. Naprawa dwuczęściowa: (1) każdy
-        // obraz dostaje jawną etykietę tekstową "OBRAZ N" bezpośrednio przed
-        // nim (patrz budowanie "parts" niżej), żeby model w ogóle "widział"
-        // osobne, policzalne elementy, a nie jeden nieopisany zbiór; (2)
-        // instrukcja wprost zabrania pomijania któregokolwiek i wymusza, żeby
-        // pole "summary" jawnie potwierdzało sprawdzenie WSZYSTKICH obrazów —
-        // które miały wzorce, a które nie.
-        const multiImageInstruction =
-          imageMimeTypes.length > 1
-            ? ` Przesłano ${imageMimeTypes.length} obrazów naraz, oznaczonych poniżej etykietami "OBRAZ 1", "OBRAZ 2" itd. MUSISZ przeanalizować KAŻDY z nich osobno i uważnie, po kolei, bez pomijania żadnego — to, że jeden obraz zawiera wyraźny, rzucający się w oczy wzorzec, NIE zwalnia Cię z równie dokładnego sprawdzenia pozostałych. Zwróć JEDNĄ wspólną listę "patterns" dla wszystkich wykrytych wzorców łącznie (bez dzielenia jej według obrazu) — ale w polu "summary" WPROST napisz, w których obrazach (po numerze) wykryto wzorce, a w których nie wykryto żadnych (np. "W obrazie 1 wykryto X. Obrazy 2-6 nie zawierają wyraźnych wzorców manipulacji."). Czytelnik musi mieć pewność, że każdy obraz został realnie sprawdzony, a nie tylko ten najbardziej widoczny.`
-            : ''
-        const imageParts =
-          imageMimeTypes.length > 1
-            ? imageMimeTypes.flatMap((mimeType, i) => [
-                { text: `OBRAZ ${i + 1}:` },
-                { inlineData: { mimeType, data: images_base64[i] } },
-              ])
-            : imageMimeTypes.map((mimeType, i) => ({ inlineData: { mimeType, data: images_base64[i] } }))
-        geminiData = await callGemini(
-          {
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `${systemPrompt}\n\n${moderationInstruction}\n\nPrzeanalizuj treść widoczną na przesłanym obrazie lub obrazach (to może być zrzut ekranu, zdjęcie tekstu, wykres, post z mediów społecznościowych itp.) — potraktuj ją dokładnie tak samo jak tekst do analizy.${multiImageInstruction}`,
-                  },
-                  ...imageParts,
-                ],
+
+        // ETAP 1 — analizuje JEDEN obraz, zwraca q_score, informację o
+        // niedozwolonej treści i wzorce (bez image_index — dopisujemy go
+        // niżej, wywołanie zna swój własny numer obrazu z zamknięcia).
+        // null = ten obraz się nie udał (timeout/błąd Gemini/nie do
+        // sparsowania) — cała analiza kończy się wtedy błędem, zamiast po
+        // cichu zgubić wynik dla jednego z obrazów.
+        async function analyzeImageChunk(
+          mimeType: string,
+          base64Data: string
+        ): Promise<{ unsafe: boolean; unsafeCategory: string; q_score: number; patterns: Array<Record<string, unknown>> } | null> {
+          const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy przesłany obraz przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "q_score" i "patterns" zostaw odpowiednio: 0, pusta lista. NIE opisuj ani nie analizuj dalej obrazu. Jeśli obraz NIE przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.`
+          const geminiData = await callGemini(
+            {
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `${systemPrompt}\n\n${moderationInstruction}\n\nPrzeanalizuj treść widoczną na przesłanym obrazie (to może być zrzut ekranu, zdjęcie tekstu, wykres, post z mediów społecznościowych itp.) — potraktuj ją dokładnie tak samo jak tekst do analizy.`,
+                    },
+                    { inlineData: { mimeType, data: base64Data } },
+                  ],
+                },
+              ],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: IMAGE_CHUNK_SCHEMA,
               },
-            ],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              responseSchema: IMAGE_RESPONSE_SCHEMA,
             },
-          },
-          geminiKey!
+            geminiKey!
+          )
+          // Gemini może sam zablokować odpowiedź na poziomie WŁASNYCH filtrów
+          // bezpieczeństwa (najbardziej drastyczne przypadki) — wtedy nie ma
+          // żadnego tekstu do sparsowania. Traktujemy to identycznie jak nasz
+          // własny klasyfikator.
+          const blockReason = geminiData?.promptFeedback?.blockReason
+          const finishReason = geminiData?.candidates?.[0]?.finishReason
+          if (blockReason || finishReason === 'SAFETY') {
+            return { unsafe: true, unsafeCategory: 'blocked_by_provider', q_score: 0, patterns: [] }
+          }
+          const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
+          if (!text) return null
+          try {
+            const parsed = JSON.parse(text)
+            return {
+              unsafe: !!parsed.unsafe_content,
+              unsafeCategory: typeof parsed.unsafe_content_category === 'string' ? parsed.unsafe_content_category : 'unspecified',
+              q_score: typeof parsed.q_score === 'number' ? parsed.q_score : 50,
+              patterns: Array.isArray(parsed.patterns) ? parsed.patterns : [],
+            }
+          } catch {
+            return null
+          }
+        }
+
+        // RÓWNOLEGLE — tak jak kawałki PDF-a, łączny czas ograniczony
+        // najwolniejszym obrazem, nie sumą wszystkich.
+        const imageResults = await Promise.all(
+          imageMimeTypes.map((mimeType, i) => analyzeImageChunk(mimeType, images_base64[i]))
         )
 
-        // Gemini może sam zablokować odpowiedź na poziomie WŁASNYCH filtrów
-        // bezpieczeństwa (najbardziej drastyczne przypadki) — wtedy nie ma
-        // żadnego tekstu do sparsowania niżej. Traktujemy to identycznie jak
-        // nasz klasyfikator: karzemy za próbę, nic nie zapisujemy publicznie.
-        const blockReason = geminiData?.promptFeedback?.blockReason
-        const imageFinishReason = geminiData?.candidates?.[0]?.finishReason
-        if (blockReason || imageFinishReason === 'SAFETY') {
-          return await respondUnsafeContent('blocked_by_provider')
+        if (imageResults.some((r) => r === null)) {
+          await logFailedAttempt()
+          return new Response(
+            JSON.stringify({ error: 'gemini_error', message: 'Nie udało się przeanalizować wszystkich obrazów.' }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
+
+        // Jeśli KTÓRYKOLWIEK obraz jest niedozwolony — cała próba (wszystkie
+        // obrazy w tym zestawie) jest karana pełną, zsumowaną stawką, tak
+        // jak wcześniej (patrz respondUnsafeContent wyżej).
+        const unsafeResult = imageResults.find((r) => r!.unsafe)
+        if (unsafeResult) {
+          return await respondUnsafeContent(unsafeResult.unsafeCategory)
+        }
+
+        const allImagePatterns = imageResults.flatMap((r, i) =>
+          r!.patterns.map((p) => ({ ...p, image_index: i + 1 }))
+        )
+        // ETAP 2 — scala wyniki wszystkich obrazów w jedną listę (usuwa
+        // duplikaty, poprawia słabe uzasadnienia) i pisze jedno wspólne
+        // podsumowanie. Przy maks. MAX_IMAGES_PER_SCAN (6) wynikach do
+        // scalenia nie potrzeba osobnego trzeciego etapu jak przy PDF-ie
+        // (który mógł mieć nawet 20 kawałków) — patrz PRAGMA_CONTEXT.md.
+        // q_score liczony jako zwykła średnia z Etapu 1 (nie z listy po
+        // Etapie 2) — ocena rzetelności nie zależy od tego, ile duplikatów
+        // akurat usunęliśmy.
+        const imageQScore = Math.round(
+          imageResults.reduce((sum, r) => sum + r!.q_score, 0) / imageResults.length
+        )
+        const verifiedImagePatterns = await verifyAndRefineImagePatterns(allImagePatterns, outputLanguage, geminiKey!)
+        const imageSummary = await composeImageSummary(
+          verifiedImagePatterns as Array<{ pattern_type: string; name: string }>,
+          imageQScore,
+          outputLanguage,
+          geminiKey!
+        )
+        // Ustawiamy `result` BEZPOŚREDNIO (z pominięciem współdzielonego
+        // `geminiData` niżej) — tak samo jak PDF, obraz ma teraz inną
+        // architekturę (wiele zapytań + scalanie), patrz `if (!result)` niżej.
+        result = { q_score: imageQScore, patterns: verifiedImagePatterns, summary: imageSummary }
       } else if (input_type === 'pdf') {
         // POPRAWKA 2026-08-19(c) — realny dowód od użytkownika (dwa różne
         // ~40-stronicowe raporty finansowe, oba dostały tylko 2-3 wykryte
@@ -1424,10 +1586,12 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // Gałąź "pdf" wyżej ustawia `result` SAMODZIELNIE (własna architektura
-      // wielu zapytań + scalanie, patrz POPRAWKA 2026-08-19(c) wyżej) —
-      // `geminiData` zostaje tam `null` i generyczne parsowanie niżej musi
-      // być pominięte, inaczej nadpisałoby już gotowy, scalony wynik.
+      // Gałęzie "image" i "pdf" wyżej ustawiają `result` SAMODZIELNIE (własna
+      // architektura wielu zapytań + scalanie, patrz POPRAWKA 2026-08-19(c)/
+      // (e) wyżej) — `geminiData` zostaje tam `null` i generyczne parsowanie
+      // niżej musi być pominięte, inaczej nadpisałoby już gotowy, scalony
+      // wynik. Moderacja dla obrazu jest już rozstrzygnięta w Etapie 1 (patrz
+      // gałąź "image" wyżej) — nie ma tu już nic do sprawdzenia.
       if (!result) {
         if (!geminiData?.candidates?.[0]?.content?.parts?.[0]?.text) {
           await logFailedAttempt()
@@ -1438,16 +1602,6 @@ Deno.serve(async (req: Request) => {
         }
 
         result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
-
-        // Nasz własny klasyfikator (patrz moderationInstruction w gałęzi
-        // "image" wyżej) — druga warstwa moderacji, obok wbudowanego
-        // mechanizmu bezpieczeństwa dostawcy sprawdzonego przed parsowaniem.
-        if (input_type === 'image') {
-          const imgResult = result as { unsafe_content?: boolean; unsafe_content_category?: string }
-          if (imgResult.unsafe_content) {
-            return await respondUnsafeContent(imgResult.unsafe_content_category || 'unspecified')
-          }
-        }
       }
     }
 

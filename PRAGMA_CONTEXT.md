@@ -1677,32 +1677,58 @@ bez żadnego przychodu.
   można wybrać **więcej niż jeden obraz naraz** (do `MAX_IMAGES_PER_SCAN =
   6`, ta sama liczba musi się zgadzać w `index.html` jako
   `MAX_SELECTED_IMAGES` — jeśli zmieniasz limit, zmień w obu miejscach) —
-  koszt to `IMAGE_SCAN_COST × liczba obrazów`, ale **analiza jest jedna,
-  wspólna dla wszystkich obrazów razem** (jedna lista wzorców, bez
-  przypisania który wzorzec pochodzi z którego obrazu — świadoma decyzja
-  na rzecz prostoty, patrz decyzja użytkownika z 2026-08-18: "bez
-  przypisania" zamiast dodatkowego pola i UI na numer obrazu). Limit
-  rozmiaru pliku: **8 MB na obraz** + dodatkowy, ostrożny limit **20 MB
-  łącznie** (`MAX_TOTAL_IMAGE_BYTES`) dla całego zestawu — oba egzekwowane
-  PO OBU stronach (przeglądarka daje szybki komunikat, ale prawdziwe
+  koszt to `IMAGE_SCAN_COST × liczba obrazów`. Limit rozmiaru pliku: **8 MB
+  na obraz** + dodatkowy, ostrożny limit **20 MB łącznie**
+  (`MAX_TOTAL_IMAGE_BYTES`) dla całego zestawu — oba egzekwowane PO OBU
+  stronach (przeglądarka daje szybki komunikat, ale prawdziwe
   zabezpieczenie jest w backendzie — nigdy nie ufamy samej przeglądarce).
   Backend rozpoznaje prawdziwy typ pliku po jego zawartości (magiczne
   bajty na początku pliku — JPEG/PNG/GIF/WEBP), nie po tym, co deklaruje
   przeglądarka — ten sam wzorzec "zero zaufania" co przy `user_id` z body
-  — sprawdzane dla KAŻDEGO obrazu z osobna. Jedno wywołanie Gemini (ze
-  wszystkimi obrazami jako kolejne części `inlineData` w tej samej
-  wiadomości) z pełną biblioteką 100 modeli (bez taniego etapu
-  kategoryzacji jak przy tekście/linku — nie ma z góry żadnego tekstu, po
-  którym dałoby się zgrubnie wybrać kategorie). Moderacja niedozwolonej
-  treści (patrz niżej) sprawdza WSZYSTKIE obrazy naraz — jeśli
-  którykolwiek jest niedozwolony, cała próba (wszystkie obrazy w tym
-  zestawie) jest karana pełną, zsumowaną stawką, tak jak dziś dla
-  pojedynczego obrazu. `content_hash` dla cache'u to hash CAŁEGO zestawu
-  (konkatenacja hashów poszczególnych obrazów w kolejności wyboru, potem
-  zahashowana ponownie) — inny zestaw albo inna kolejność to inna,
-  osobno wyceniona analiza. Podglądy w `scan.html` (jednorazowe, z
-  sessionStorage, nigdy nie trafiają na serwer) też są teraz tablicą,
+  — sprawdzane dla KAŻDEGO obrazu z osobna. `content_hash` dla cache'u to
+  hash CAŁEGO zestawu (konkatenacja hashów poszczególnych obrazów w
+  kolejności wyboru, potem zahashowana ponownie) — inny zestaw albo inna
+  kolejność to inna, osobno wyceniona analiza. Podglądy w `scan.html`
+  (jednorazowe, z sessionStorage, nigdy nie trafiają na serwer) są tablicą,
   jedną na obraz.
+  - **POPRAWKA 2026-08-19(e) — architektura wieloetapowa dla obrazów, ten
+    sam mechanizm co PDF-owy chunking**: pierwotnie WSZYSTKIE obrazy z
+    zestawu leciały w JEDNYM wspólnym zapytaniu do Gemini (bez taniego
+    etapu kategoryzacji jak przy tekście/linku — nie ma z góry żadnego
+    tekstu, po którym dałoby się zgrubnie wybrać kategorie), z jedną,
+    wspólną listą wzorców, BEZ przypisania który wzorzec pochodzi z
+    którego obrazu (świadoma decyzja z 2026-08-18 na rzecz prostoty). Na
+    żywo zaobserwowano, że przy kilku obrazach naraz model skupiał się
+    tylko na NAJBARDZIEJ RZUCAJĄCYM SIĘ W OCZY obrazie i ignorował resztę —
+    nawet mimo wyraźnej instrukcji tekstowej wymuszającej sprawdzenie
+    wszystkich. To dokładnie ten sam rodzaj problemu, co przy PDF-ach
+    (patrz POPRAWKA 2026-08-19(c) niżej) — i naprawiono go tą samą metodą:
+    KAŻDY obraz dostaje teraz WŁASNE, osobne, pełne zapytanie (**Etap 1**,
+    `analyzeImageChunk()`), równolegle — model fizycznie nie ma jak
+    pominąć żadnego na rzecz innego. Bonus: skoro wynik z każdego
+    zapytania z definicji dotyczy JEDNEGO obrazu, przypisanie wzorca do
+    konkretnego obrazu (`image_index`, analogicznie do `page` przy PDF-ie)
+    wychodzi praktycznie za darmo — dopisywane deterministycznie w kodzie,
+    nie zgadywane przez model. Moderacja niedozwolonej treści też jest
+    teraz PER OBRAZ (mocniejsza niż wcześniej — nie może już "zgubić się"
+    przy obrazie, którym model się mniej zainteresował); jeśli
+    KTÓRYKOLWIEK obraz jest niedozwolony, cała próba nadal jest karana
+    pełną, zsumowaną stawką, tak jak wcześniej. **Etap 2**
+    (`verifyAndRefineImagePatterns()` + `composeImageSummary()`) scala
+    wyniki wszystkich obrazów w jedną listę (usuwa duplikaty — ta sama
+    treść mogła się powtórzyć na dwóch różnych obrazach, np. dwa zrzuty
+    ekranu tej samej rozmowy), poprawia słabe uzasadnienia i pisze jedno
+    wspólne podsumowanie — fail-open (błąd/timeout zwraca oryginalną listę
+    zamiast wywalać analizę). Przy maks. `MAX_IMAGES_PER_SCAN` (6) wynikach
+    do scalenia nie potrzeba osobnego trzeciego etapu jak przy PDF-ie
+    (który mógł mieć nawet 20 kawałków) — Etap 2 sam pisze finalne
+    podsumowanie. `q_score` liczony jako zwykła średnia z surowych wyników
+    Etapu 1 (nie z listy po Etapie 2), tym samym uzasadnieniem co przy
+    PDF-ie: ocena rzetelności nie zależy od tego, ile duplikatów akurat
+    usunięto. Koszt: powtarza się tylko lista 100 modeli w promptcie
+    (tekst, tani element) N razy zamiast raz — ten sam, już policzony
+    wcześniej wzorzec kosztowy co przy PDF-owym Etapie 1 — realny wpływ na
+    marżę jest pomijalny (grosze przy przychodzie liczonym w złotówkach).
 - **Wciąż nieustalone**: ile 1 kredyt ma być wart w złotówkach/dolarach.
   Bez tego nie da się policzyć realnej marży w walucie, tylko w
   procentach. Jak wypadnie ta rozmowa — dopisz tu ustaloną wartość.
