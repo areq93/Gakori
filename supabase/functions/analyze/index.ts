@@ -467,10 +467,11 @@ const FALLBACK_FETCH_TIMEOUT_MS = 10000 // 10s na awaryjne, bezpośrednie pobran
 // zawieszone żądanie (np. do wolnej/nieodpowiadającej strony przy analizie
 // linku) potrafiło trzymać całą analizę w nieskończoność, bez żadnego
 // komunikatu dla użytkownika (zgłoszone na żywo: ponad 2 minuty czekania
-// zanim w ogóle pojawił się błąd). Analiza linku robi do 5 kolejnych
-// zapytań sieciowych w najgorszym razie (kategoryzacja → właściwa analiza →
-// awaryjne pobranie strony → sito → druga właściwa analiza) — z tymi
-// limitami czasu górna granica całości to ok. 90s zamiast "bez ograniczeń".
+// zanim w ogóle pojawił się błąd). Analiza linku robi do 3 kolejnych
+// zapytań sieciowych w najgorszym razie (właściwa analiza → awaryjne
+// pobranie strony → druga właściwa analiza, patrz POPRAWKA 2026-08-19(f) —
+// dawniej do 5, z osobną kategoryzacją i sitem) — z tymi limitami czasu
+// górna granica całości to ok. 50s zamiast "bez ograniczeń".
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -773,57 +774,6 @@ const RATE_LIMIT_STRIKE_RESET_DAYS = 30
 const RATE_LIMIT_BASE_MINUTES = 10
 const RATE_LIMIT_MULTIPLIER = 3
 const RATE_LIMIT_MAX_MINUTES = 30 * 24 * 60 // sufit: 30 dni, żeby kara nie rosła bez końca
-
-const FALLBACK_SIFT_SCHEMA = {
-  type: 'object',
-  properties: {
-    clean_text: { type: 'string' },
-    categories: { type: 'array', items: { type: 'string' } },
-  },
-  required: ['clean_text', 'categories'],
-}
-
-// Tanie "sitowe" zapytanie dla ścieżki awaryjnej (fetchUrlAsText): surowy,
-// zdarty z HTML tekst zwykle miesza właściwą treść z menu/stopką/reklamami
-// (patrz model mentalny GIGO w bibliotece) — zanim zapłacimy za pełną
-// analizę, jednym tanim zapytaniem naraz (a) wyciągamy samą treść artykułu
-// i (b) zgrubnie wskazujemy pasujące kategorie modeli mentalnych. Dwa
-// zadania w jednym zapytaniu celowo — żeby ta ścieżka nadal miała tylko 2
-// zapytania do Gemini (sito + właściwa analiza), a nie 3.
-async function siftFallbackText(
-  rawText: string,
-  geminiKey: string
-): Promise<{ cleanText: string; categories: string[] } | null> {
-  const prompt = `Poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Masz dwa zadania:
-1. clean_text: wyciągnij WYŁĄCZNIE właściwą treść artykułu/strony (bez menu, stopki, reklam, list linków) — nie streszczaj, nie skracaj treści, po prostu usuń szum wokół niej.
-2. categories: oceń dopasowanie KAŻDEJ z 15 kategorii z listy do tej treści z osobna i wybierz WSZYSTKIE, które faktycznie pasują — bez sztywnego limitu liczby (czasem jedna, czasem kilka naraz, np. tekst finansowy może pasować jednocześnie do EKONOMIA, MATEMATYKA I STATYSTYKA i PSYCHOLOGIA), nie ograniczaj się z góry do jednej, najbardziej oczywistej kategorii. Lista (dokładnie w tym brzmieniu): ${MENTAL_MODEL_CATEGORIES.join(', ')}
-
-SUROWY TEKST:
-${rawText}`
-
-  const data = await callGemini(
-    {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: FALLBACK_SIFT_SCHEMA,
-      },
-    },
-    geminiKey
-  )
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) return null
-  try {
-    const parsed = JSON.parse(text)
-    if (typeof parsed.clean_text !== 'string' || !parsed.clean_text.trim()) return null
-    return {
-      cleanText: parsed.clean_text,
-      categories: Array.isArray(parsed.categories) ? parsed.categories : [],
-    }
-  } catch {
-    return null
-  }
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -1236,19 +1186,21 @@ Deno.serve(async (req: Request) => {
       let geminiData: any = null
 
       if (input_type === 'url') {
-        // ETAP 1 (tani): zanim zapłacimy za pełną analizę, zgrubnie pytamy,
-        // do których kategorii modeli mentalnych prawdopodobnie pasuje ta
-        // strona — patrz pickRelevantCategories(). Etap 2 dostanie już tylko
-        // przefiltrowaną, mniejszą bibliotekę zamiast wszystkich 100 modeli.
-        const categories = await pickRelevantCategories(
-          `Przeanalizuj treść strony pod adresem:\n${source_url}`,
-          true,
-          geminiKey!
-        )
-        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
+        // POPRAWKA 2026-08-19(f) — ograniczenie ścieżki awaryjnej (dawniej do
+        // 4 zapytań do Gemini w najgorszym przypadku: kategoryzacja →
+        // właściwa analiza → sito → druga właściwa analiza). Usunięty etap
+        // kategoryzacji dla LINKU (zostaje dla tekstu, patrz gałąź "text"
+        // niżej) — przy linku ten etap i tak kazał Gemini SAMEMU pobierać
+        // stronę przez narzędzie "URL context", czyli DWA razy w NAJLEPSZYM
+        // przypadku (raz do kategoryzacji, raz do właściwej analizy), zanim
+        // jeszcze cokolwiek zawiodło. Pełna biblioteka 100 modeli od razu —
+        // ten sam kompromis co przy obrazie/PDF-ie (koszt biblioteki to
+        // grosze, korzyść to mniej zapytań i mniej miejsc do awarii). Nowy
+        // najgorszy przypadek: 2 zapytania do Gemini zamiast 4.
+        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
 
-        // ETAP 2, próba 1: wbudowane narzędzie Gemini "URL context" — samo
-        // pobiera i czyta treść strony, nie potrzebujemy własnego scrapera.
+        // Próba 1: wbudowane narzędzie Gemini "URL context" — samo pobiera i
+        // czyta treść strony, nie potrzebujemy własnego scrapera.
         geminiData = await callGemini(
           {
             contents: [
@@ -1272,22 +1224,20 @@ Deno.serve(async (req: Request) => {
           // tylko w panelu debugowania ?debug=1, nie dla zwykłego użytkownika).
           const fallbackText = await fetchUrlAsText(source_url)
           if (fallbackText) {
-            // Etap 1 dla tej ścieżki: jedno tanie zapytanie naraz oczyszcza
-            // surowy tekst (menu/stopka wymieszane z artykułem — patrz model
-            // GIGO) i wskazuje pasujące kategorie — patrz siftFallbackText().
-            const sift = await siftFallbackText(fallbackText, geminiKey!)
-            const cleanText = sift?.cleanText || fallbackText
-            const fallbackSystemPrompt = buildSystemPrompt(
-              outputLanguage,
-              buildMentalModelsLibrary(sift?.categories || [])
-            )
+            // POPRAWKA 2026-08-19(f): usunięty osobny etap "sito" — surowy,
+            // zdarty z HTML tekst (menu/stopka wymieszane z artykułem, patrz
+            // model GIGO w bibliotece) leci od razu do właściwej analizy, z
+            // dopiskiem wprost każącym Gemini zignorować ten szum — jedno
+            // zapytanie mniej niż osobne czyszczenie, bo model i tak musi
+            // "przeczytać całość, żeby cokolwiek ocenić".
+            const rawTextNotice = `\n\nUWAGA: poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Skup się WYŁĄCZNIE na rzeczywistej treści artykułu/strony, ten szum wokół niej całkowicie zignoruj.`
             geminiData = await callGemini(
               {
                 contents: [
                   {
                     parts: [
                       {
-                        text: `${fallbackSystemPrompt}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony):\n${cleanText}`,
+                        text: `${systemPrompt}${rawTextNotice}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony):\n${fallbackText}`,
                       },
                     ],
                   },

@@ -668,10 +668,11 @@ zanim założysz, że działa.
     powodu. Gdy tak się stanie, backend sam pobiera stronę bezpośrednio
     (nagłówki jak z przeglądarki), zdejmuje znaczniki HTML "na surowo" —
     to samo w sobie NIE jest inteligentny ekstraktor treści (może złapać
-    menu/stopkę razem z artykułem) — ale zanim ten surowy tekst trafi do
-    właściwej analizy, przechodzi jeszcze przez `siftFallbackText()`
-    (patrz "Kaskada dwuetapowa" wyżej), które go czyści z szumu. Jeśli i to
-    się nie uda (np. strona ma prawdziwą ochronę typu
+    menu/stopkę razem z artykułem) — ten surowy tekst leci od razu do
+    właściwej analizy, z dopiskiem każącym Gemini samodzielnie zignorować
+    ten szum (patrz POPRAWKA 2026-08-19(f) w "Kaskada dwuetapowa" niżej —
+    dawniej osobny etap czyszczący `siftFallbackText()`, usunięty). Jeśli i
+    to się nie uda (np. strona ma prawdziwą ochronę typu
     Cloudflare/JS-challenge, nie tylko blokadę po nazwie robota) — dopiero
     wtedy użytkownik widzi błąd `url_fetch_failed`. Prawdziwy powód
     (`retrievalStatus` z Gemini) trafia do pola `details` w odpowiedzi,
@@ -1375,7 +1376,9 @@ zanim założysz, że działa.
     `translateResult()` jej nie używa). Przy stawce $0,30/milion tokenów
     wejścia to ułamek grosza na analizę — świadomie zaakceptowany koszt w
     zamian za wyraźnie wyższą trafność i różnorodność nazw wzorców.
-  - **Kaskada dwuetapowa (kategoria → szczegół)**: modele językowe mają
+  - **Kaskada dwuetapowa (kategoria → szczegół), TYLKO tryb tekstowy** (patrz
+    POPRAWKA 2026-08-19(f) niżej — dla linku ten etap został usunięty):
+    modele językowe mają
     naturalną skłonność wybierać częściej te modele mentalne, które są
     "popularniejsze"/lepiej znane (Dowód Społeczny, Efekt Halo...), nawet
     gdy rzadszy model pasowałby trafniej — to nie błąd naszego kodu, tylko
@@ -1420,12 +1423,32 @@ zanim założysz, że działa.
       naprawdę nie ma, co złamałoby zasadę wierności źródłu (patrz "WIERNOŚĆ
       CYTATU" wyżej) — jakość i uczciwość analizy są tu nadrzędne nad samą
       liczbą wykrytych wzorców.
-    - **Ścieżka awaryjnego pobrania strony** (`fetchUrlAsText`, patrz niżej)
-      ma własny, POŁĄCZONY etap 1: `siftFallbackText()` jednym zapytaniem
-      naraz (a) czyści surowy, zaszumiony tekst z menu/stopki/reklam
-      (odwołanie do modelu GIGO w bibliotece) i (b) wskazuje kategorie —
-      połączone w jedno zapytanie celowo, żeby ta ścieżka też miała tylko 2
-      zapytania do Gemini, nie 3.
+    - **POPRAWKA 2026-08-19(f) — ograniczenie ścieżki awaryjnej Linku**
+      (zadanie #10 z listy TODO): dawniej analiza linku w najgorszym
+      przypadku robiła AŻ 4 zapytania do Gemini (kategoryzacja → właściwa
+      analiza → sito → druga właściwa analiza). Problem: etap kategoryzacji
+      dla LINKU (w przeciwieństwie do tekstu) kazał Gemini SAMEMU pobierać
+      stronę przez narzędzie "URL context" — czyli nawet w NAJLEPSZYM
+      przypadku (strona dostępna od razu, bez awarii) Gemini i tak pobierał
+      tę samą stronę DWA razy (raz do kategoryzacji, raz do właściwej
+      analizy), zanim jeszcze cokolwiek zawiodło. Naprawa: usunięty etap
+      kategoryzacji WYŁĄCZNIE dla linku (tekst go zachowuje, patrz wyżej —
+      tam faktycznie nic nie dubluje pobierania strony, bo treść i tak
+      przychodzi wprost w zapytaniu użytkownika) — pełna biblioteka 100
+      modeli od razu, ten sam kompromis co przy obrazie/PDF-ie (koszt
+      biblioteki w promptcie to grosze, korzyść to mniej zapytań i mniej
+      miejsc do awarii). Przy okazji uproszczona też ścieżka awaryjnego
+      pobrania strony (`fetchUrlAsText`, patrz niżej) — dawniejszy osobny
+      etap `siftFallbackText()` (czyszczenie surowego tekstu z szumu
+      menu/stopki/reklam + kategoryzacja w jednym zapytaniu) został
+      usunięty; surowy tekst leci teraz od razu do właściwej analizy z
+      dopiskiem każącym Gemini samodzielnie zignorować ten szum (patrz
+      model GIGO w bibliotece) — model i tak musi "przeczytać całość, żeby
+      cokolwiek ocenić", więc pomijanie szumu przy tej samej okazji nie jest
+      wartą osobnego zapytania dodatkową pracą. **Nowy najgorszy przypadek:
+      2 zapytania do Gemini zamiast 4** (właściwa analiza → awaryjne
+      pobranie strony → druga właściwa analiza, czyli 3 zapytania sieciowe
+      łącznie licząc samo pobranie strony, nie tylko Gemini).
     - **Limity czasu (`fetchWithTimeout`), zdiagnozowane na żywo z
       użytkownikiem** — analiza linku do wolnej/nieodpowiadającej strony
       potrafiła czekać ponad 2 minuty, zanim w ogóle pojawił się jakikolwiek
@@ -1436,9 +1459,10 @@ zanim założysz, że działa.
       obiekt, więc dalszy kod traktuje to jak zwykły błąd Gemini — nie
       wywala się nieobsłużonym wyjątkiem), `fetchUrlAsText()` ma
       `FALLBACK_FETCH_TIMEOUT_MS = 10000`. Analiza linku w najgorszym razie
-      robi 5 kolejnych zapytań sieciowych (kategoryzacja → właściwa analiza
-      → awaryjne pobranie strony → sito → druga właściwa analiza) — z tymi
-      limitami górna granica całości to ok. 90s, nie "bez ograniczeń".
+      robi teraz 3 kolejne zapytania sieciowe (właściwa analiza → awaryjne
+      pobranie strony → druga właściwa analiza, patrz POPRAWKA
+      2026-08-19(f) wyżej — dawniej 5) — z tymi limitami górna granica
+      całości to ok. 50s (dawniej ok. 90s), nie "bez ograniczeń".
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
