@@ -519,6 +519,59 @@ zanim założysz, że działa.
         jeśli po wdrożeniu pojawią się błędy na dużych PDF-ach, to
         pierwsze miejsce do sprawdzenia (obok już wcześniej znanego ryzyka
         przy `PDF_HARD_MAX_PAGES`/`MAX_PDF_BYTES`).
+    - **POPRAWKA 2026-08-19(d) — realne liczby kosztu policzone na życzenie
+      użytkownika PRZED decyzją, żeby nie zgadywać: `PDF_CHUNK_PAGES`
+      obniżone z 8 na 4, plus nowy ETAP 2 (weryfikacja/scalanie).**
+      Trzy etapy analizy PDF-a, każdy z innym zadaniem (nazewnictwo wprost
+      z rozmowy z użytkownikiem — pomaga trzymać się tego, co która funkcja
+      naprawdę robi):
+      1. **ETAP 1 (podstawowe)** — `analyzePdfChunk()`: każda 4-stronicowa
+         część osobno szuka wzorców. Bez zmian względem POPRAWKI (c), poza
+         mniejszym `PDF_CHUNK_PAGES`.
+      2. **ETAP 2 (złożone, NOWE)** — `verifyAndRefinePdfPatterns()`:
+         dostaje całą sklejoną listę wzorców ze WSZYSTKICH części Etapu 1 i
+         (a) usuwa duplikaty/prawie-duplikaty, zwłaszcza na granicach
+         sąsiednich części (realny, nowy problem, który samo dzielenie na
+         części wprowadza — ten sam fragment może zostać wykryty dwa razy
+         przez dwie sąsiednie, niezależne części), (b) poprawia wyraźnie
+         zbyt ogólnikowe `explanation`/`tip`. KRYTYCZNIE WAŻNE: nie dostaje
+         treści PDF-a wcale, więc fizycznie nie może dodać wzorca, którego
+         nie było na wejściowej liście — to czyszczenie istniejących
+         wyników, nie nowa analiza (żeby nie złamać zasady NEUTRALNOŚĆ /
+         nie fabrykować manipulacji). Fail-open: błąd/timeout zwraca
+         ORYGINALNĄ, niezweryfikowaną listę zamiast wywalać całą analizę —
+         to wzbogacenie jakości, nie gwarancja pokrycia (tę już daje samo
+         dzielenie z Etapu 1).
+      3. **ETAP 3 (analiza)** — `composePdfSummary()` (bez zmian nazwy
+         funkcji, tylko teraz świadomie dostaje OCZYSZCZONĄ listę z Etapu 2,
+         nie surową listę z Etapu 1 — inaczej podsumowanie mogłoby
+         wspominać usunięte duplikaty).
+      `q_score` całości liczony jest ŚWIADOMIE z wyników ETAPU 1
+      (`chunkResults`), nie z listy po Etapie 2 — ocena rzetelności tekstu
+      nie zależy od tego, ile duplikatów akurat usunięto z listy wzorców.
+
+      **Konkretne liczby kosztu (dodatkowy koszt Gemini WZGLĘDEM stanu
+      sprzed POPRAWKI (c), czyli sprzed jakiegokolwiek dzielenia na
+      części)** — policzone na żywo na prośbę użytkownika przed podjęciem
+      decyzji, model gemini-3.5-flash-lite, 0,30 USD/mln tokenów wejścia,
+      2,50 USD/mln tokenów wyjścia:
+      | Wariant | 40 stron | 80 stron (limit) |
+      |---|---|---|
+      | 8 stron/część, bez Etapu 2 (POPRAWKA (c)) | +0,003 USD | +0,008 USD |
+      | 4 strony/część, bez Etapu 2 | +0,006 USD | +0,016 USD |
+      | **4 strony/część + Etap 2 (wdrożone teraz)** | **+0,010 USD** | **+0,021 USD** |
+
+      Nawet w najgorszym wypadku (80 stron) to ok. 2 centy więcej niż
+      pierwotna wersja sprzed dzisiejszych poprawek — przy 640 kredytach
+      pobieranych za taką analizę (80 stron × 8 kredytów) to pomijalne.
+      **Realnym ryzykiem dla cennika nie jest sam mechanizm wieloetapowy
+      (tani), tylko to, że dokładniejsza analiza znajduje realnie WIĘCEJ
+      wzorców niż poprzednio — a to podnosi koszt WYJŚCIA (2,50 USD/mln, 8x
+      droższe niż wejście), proporcjonalnie do liczby faktycznie
+      znalezionych wzorców, nie do liczby stron.** To jeszcze mocniej
+      uzasadnia priorytet zadania "Po PDF: przeliczyć cashflow z nowymi
+      scenariuszami" — ale na realnych danych z produkcji, nie
+      przybliżeniach z tej analizy.
   - **Prywatność PDF-ów (dodane POPRAWKĄ 2026-08-19(b))** — do tej zmiany
     PDF-y były wyłączone tylko z PRZEGLĄDARKI publicznych analiz
     (`index.html`), ale sam wiersz w `scans` był nadal czytelny dla

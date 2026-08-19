@@ -95,7 +95,10 @@ const PDF_GEMINI_TIMEOUT_MS = 60000 // 60s
 // uzasadnia). Części lecą RÓWNOLEGLE (Promise.all), więc łączny czas
 // odpowiedzi rośnie nieznacznie (ograniczony najwolniejszą częścią, nie
 // sumą wszystkich) — wciąż bezpiecznie mieści się w limicie 400s.
-const PDF_CHUNK_PAGES = 8
+// POPRAWKA 2026-08-19(d) — po policzeniu realnego kosztu (grosze nawet dla
+// największych dozwolonych plików) obniżone z 8 na 4: mniejsza część to
+// jeszcze mocniejsza gwarancja, że model nie "zgubi" żadnego fragmentu.
+const PDF_CHUNK_PAGES = 4
 
 // Nazwy języków (po polsku, w formie "w języku X") używane do parametryzacji
 // instrukcji językowej promptu — patrz buildSystemPrompt(). Klucze muszą się
@@ -410,6 +413,18 @@ const PDF_RESPONSE_SCHEMA = {
   required: ['q_score', 'patterns', 'summary'],
 }
 
+// Schemat dla ETAPU 2 (weryfikacja/scalanie, patrz verifyAndRefinePdfPatterns()
+// niżej) — sam `patterns`, bez `q_score`/`summary` (te liczymy/piszemy
+// osobno). Ten sam kształt pojedynczego wzorca co w PDF_RESPONSE_SCHEMA
+// (przez `.properties.patterns`, żeby nie duplikować definicji).
+const PDF_VERIFICATION_SCHEMA = {
+  type: 'object',
+  properties: {
+    patterns: PDF_RESPONSE_SCHEMA.properties.patterns,
+  },
+  required: ['patterns'],
+}
+
 const GEMINI_TIMEOUT_MS = 20000 // 20s na pojedyncze zapytanie do Gemini
 const FALLBACK_FETCH_TIMEOUT_MS = 10000 // 10s na awaryjne, bezpośrednie pobranie strony
 
@@ -504,14 +519,70 @@ ${JSON.stringify(result)}`
   }
 }
 
-// Buduje JEDNO spójne podsumowanie z połączonych wzorców wykrytych we
-// WSZYSTKICH częściach długiego PDF-a (patrz PDF_CHUNK_PAGES i
-// analyzePdfChunk() w Deno.serve niżej) — każda część dostała własne,
-// osobne zapytanie do Gemini, więc żadna z nich "nie widziała" całego
-// dokumentu i nie mogła sama napisać sensownego podsumowania całości.
-// Świadomie NIE wysyłamy tu ponownie treści PDF-a (drogie, zbędne) —
-// tylko krótką listę już wykrytych wzorców (typ + nazwa) i ogólny wynik,
-// więc to tanie, szybkie zapytanie.
+// ETAP 2 (złożone zadanie — weryfikacja i scalanie) analizy PDF-a, między
+// ETAPEM 1 (analyzePdfChunk — podstawowe: znajdź wzorce w JEDNEJ części) a
+// ETAPEM 3 (composePdfSummary niżej — analiza: napisz spójne podsumowanie
+// z gotowej listy). Dzielenie dokumentu na małe części (patrz
+// PDF_CHUNK_PAGES) rozwiązuje problem "model gubi fragmenty", ale
+// wprowadza NOWY, własny problem: ten sam wzorzec może zostać wykryty
+// DWA RAZY, jeśli fragmentuje się dokładnie na granicy dwóch części (np.
+// akapit rozjechany między stroną 8 a 9 trafia do obu sąsiednich zapytań
+// osobno). Ta funkcja dostaje CAŁĄ już sklejoną listę ze wszystkich części
+// i ma za zadanie: (1) usunąć duplikaty/prawie-duplikaty, zwłaszcza na
+// sąsiadujących stronach, (2) poprawić wyraźnie słabe uzasadnienia
+// (np. zbyt ogólnikowe "explanation"/"tip"), zgodnie z sekcjami PROSTOTA i
+// NEUTRALNOŚĆ z buildSystemPrompt(). KRYTYCZNIE WAŻNE: NIE wolno jej
+// dodawać wzorców, których nie było na wejściowej liście — to czyszczenie
+// i poprawianie ISTNIEJĄCYCH wyników, nie nowa analiza treści (tej dokonały
+// już części w Etapie 1, ta funkcja w ogóle nie dostaje treści PDF-a).
+// Fail-open: błąd/timeout zwraca ORYGINALNĄ, niezweryfikowaną listę zamiast
+// wywalać całą analizę — to wzbogacenie jakości, nie gwarancja pokrycia
+// (tę już zapewnia samo dzielenie na części w Etapie 1).
+async function verifyAndRefinePdfPatterns(
+  patterns: Array<Record<string, unknown>>,
+  langCode: string,
+  geminiKey: string
+): Promise<Array<Record<string, unknown>>> {
+  if (patterns.length === 0) return patterns
+  const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
+  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych OSOBNO w kolejnych, sąsiadujących fragmentach jednego dokumentu PDF (każdy fragment analizowany był bez wiedzy o pozostałych) — dlatego ta sama treść mogła zostać przypadkiem wykryta dwukrotnie, zwłaszcza gdy pochodzi z bliskich, sąsiadujących numerów stron. Twoje zadanie:
+1. Znajdź i usuń duplikaty/prawie-duplikaty (ten sam albo bardzo podobny cytat/mechanizm, zwłaszcza z bliskich stron) — zostaw tylko JEDEN egzemplarz każdego.
+2. Jeśli któreś "explanation" lub "tip" jest zbyt ogólnikowe/niejasne, popraw je (prosty język, zrozumiały dla 12-latka, bez żargonu, "tip" bez słów "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko konkretna czynność do wykonania).
+3. NIE DODAWAJ żadnych nowych wzorców, których nie ma na liście poniżej — to jest WYŁĄCZNIE czyszczenie i poprawianie istniejącej listy, nie nowa analiza. Pola "quote" i "page" zostają dokładnie takie same jak w oryginale (nie tłumacz/nie zmieniaj cytatów).
+4. Język pól "name"/"explanation"/"tip": ${langName}.
+
+Zwróć WYŁĄCZNIE poprawioną listę w polu "patterns", zgodnie ze schematem.
+
+JSON wejściowy:
+${JSON.stringify(patterns)}`
+
+  const data = await callGemini(
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: PDF_VERIFICATION_SCHEMA,
+      },
+    },
+    geminiKey
+  )
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) return patterns
+  try {
+    const parsed = JSON.parse(text)
+    return Array.isArray(parsed.patterns) && parsed.patterns.length > 0 ? parsed.patterns : patterns
+  } catch {
+    return patterns
+  }
+}
+
+// ETAP 3 (analiza) — buduje JEDNO spójne podsumowanie z OCZYSZCZONEJ,
+// scalonej listy wzorców po Etapie 2 (patrz verifyAndRefinePdfPatterns()
+// wyżej) — każda część z Etapu 1 "nie widziała" całego dokumentu i nie
+// mogła sama napisać sensownego podsumowania całości. Świadomie NIE
+// wysyłamy tu ponownie treści PDF-a (drogie, zbędne) — tylko krótką listę
+// już wykrytych wzorców (typ + nazwa) i ogólny wynik, więc to tanie,
+// szybkie zapytanie.
 async function composePdfSummary(
   patterns: Array<{ pattern_type: string; name: string }>,
   qScore: number,
@@ -1237,14 +1308,15 @@ Deno.serve(async (req: Request) => {
           return uint8ArrayToBase64(subBytes)
         }
 
-        // Analizuje JEDNĄ część — zwraca q_score i wzorce z numerem strony
-        // PRZELICZONYM na numerację całego, oryginalnego dokumentu (Gemini
-        // widzi tylko tę część, więc liczy strony od 1 W JEJ OBRĘBIE; my
-        // deterministycznie dodajemy przesunięcie `start`, żeby nie polegać
-        // na tym, że model sam poprawnie policzy przesunięcie w pamięci).
-        // null = ta część się nie udała (timeout/błąd Gemini/nie do
-        // sparsowania) — cała analiza PDF-a wtedy kończy się błędem
-        // (patrz niżej), zamiast po cichu zgubić fragment wyników.
+        // ETAP 1 (podstawowe) — analizuje JEDNĄ część, zwraca q_score i
+        // wzorce z numerem strony PRZELICZONYM na numerację całego,
+        // oryginalnego dokumentu (Gemini widzi tylko tę część, więc liczy
+        // strony od 1 W JEJ OBRĘBIE; my deterministycznie dodajemy
+        // przesunięcie `start`, żeby nie polegać na tym, że model sam
+        // poprawnie policzy przesunięcie w pamięci). null = ta część się
+        // nie udała (timeout/błąd Gemini/nie do sparsowania) — cała
+        // analiza PDF-a wtedy kończy się błędem (patrz niżej), zamiast po
+        // cichu zgubić fragment wyników.
         async function analyzePdfChunk(
           start: number,
           end: number
@@ -1308,16 +1380,25 @@ Deno.serve(async (req: Request) => {
         }
 
         const allPatterns = chunkResults.flatMap((r) => r!.patterns)
+        // ETAP 2 — czyści listę zebraną z WSZYSTKICH części (duplikaty na
+        // granicach sąsiednich fragmentów, słabe uzasadnienia) PRZED
+        // pokazaniem jej użytkownikowi i PRZED napisaniem podsumowania
+        // (Etap 3 niżej musi dostać już oczyszczoną listę, inaczej
+        // podsumowanie mogłoby wspominać usunięte duplikaty).
+        const verifiedPatterns = await verifyAndRefinePdfPatterns(allPatterns, outputLanguage, geminiKey!)
         // Średnia ważona liczbą stron w każdej części — przybliża "jakość
         // całego tekstu", nie tylko średnią arytmetyczną z części o różnej
         // długości (ostatnia część bywa krótsza niż PDF_CHUNK_PAGES).
+        // Świadomie liczona z WYNIKÓW ETAPU 1 (chunkResults), nie z listy
+        // po Etapie 2 — ocena rzetelności całego tekstu nie zależy od tego,
+        // ile duplikatów akurat usunęliśmy z listy wzorców.
         const weightedScoreSum = chunkResults.reduce(
           (sum, r, i) => sum + r!.q_score * (chunkRanges[i].end - chunkRanges[i].start),
           0
         )
         const pdfQScore = Math.round(weightedScoreSum / pdfPageCount)
         const pdfSummary = await composePdfSummary(
-          allPatterns as Array<{ pattern_type: string; name: string }>,
+          verifiedPatterns as Array<{ pattern_type: string; name: string }>,
           pdfQScore,
           outputLanguage,
           geminiKey!
@@ -1326,7 +1407,7 @@ Deno.serve(async (req: Request) => {
         // `geminiData` niżej) — PDF ma teraz inną architekturę (wiele
         // zapytań + scalanie), więc generyczna ścieżka "jedno zapytanie →
         // jeden JSON" go już nie dotyczy (patrz `if (!result)` niżej).
-        result = { q_score: pdfQScore, patterns: allPatterns, summary: pdfSummary }
+        result = { q_score: pdfQScore, patterns: verifiedPatterns, summary: pdfSummary }
       } else {
         // ETAP 1 (tani) + ETAP 2 — patrz komentarz w gałęzi "url" wyżej.
         const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!)
