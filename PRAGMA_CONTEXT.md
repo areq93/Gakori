@@ -551,6 +551,36 @@ zanim założysz, że działa.
     to nowa, dedykowana klasa na `<span>` z tekstem rady (wcześniej był bez
     klasy, więc nie dało się go ostylować osobno).
     `sw.js` `CACHE_NAME` podbite do `pragma-v18`.
+  - **POPRAWKA 2026-08-18(j) — runda 7**: użytkownik wskazał DWIE konkretne
+    referencje ze zrzutów ekranu: (1) jasny motyw, aktywna zakładka/przycisk
+    "Analizuj" — lite, czarne wypełnienie z wyraźną grą światła — to
+    podobało się, ale przycisk "Wyloguj" (i inne drugoplanowe z rundy 4:
+    tylko obrys) NIE miały tej samej mocy efektu; (2) ciemny motyw, przycisk
+    "Wyloguj" na koncie — jasny PIERŚCIEŃ (obrys) na ciemnym wypełnieniu —
+    to też się podobało, ale NIE zostało zastosowane na głównej stronie w
+    ciemnym motywie (tam zakładki/Analizuj miały wcześniej lite jasne
+    wypełnienie, nie pierścień). Wniosek: obie formy ("lite wypełnienie" w
+    jasnym, "pierścień" w ciemnym) są już akceptowane przez użytkownika —
+    tylko nie były stosowane WSZĘDZIE konsekwentnie. Naprawione radykalnie:
+    usunięta osobna klasa `.btn-secondary` (i wszystkie jej odwołania w
+    HTML) — od teraz KAŻDY zwykły `<button>` w całej appce (główny,
+    drugoplanowy, wszystko) używa DOKŁADNIE tego samego stylu co reszta:
+    w jasnym motywie lite czarne wypełnienie (bazowa reguła `button`), w
+    ciemnym motywie jasny pierścień (`:root[data-theme="dark"] button`).
+    Ten sam ciemny override objął też `.tab-btn.active` i `#userMenuBtn`
+    (ikona konta, `<a>` nie `<button>`, stąd osobny selektor) — one już
+    dawniej dzieliły wzór z głównym przyciskiem, teraz dzielą też jego
+    "odwrócenie" w ciemnym motywie. WAŻNA PUŁAPKA znaleziona przy
+    wdrażaniu: selektor `:root[data-theme="dark"] button` ma WYŻSZĄ
+    specyficzność niż samo `.tab-btn` (dwa poziomy klas kontra jeden), więc
+    bez jawnego `:not(.tab-btn)` po cichu nadpisałby też wygląd
+    NIEaktywnych zakładek (które też są `<button>`) — i analogicznie
+    `:not(.image-preview-remove)` dla małego okrągłego "×" na miniaturce
+    zdjęcia. Ogólna zasada na przyszłość: przy dodawaniu reguły
+    `[data-theme] jakiś-selektor-ogólny`, zawsze sprawdzić, czy nie ma w
+    kodzie bardziej wyspecjalizowanych elementów tego samego typu, które
+    trzeba jawnie wykluczyć przez `:not()`.
+    `sw.js` `CACHE_NAME` podbite do `pragma-v19`.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
