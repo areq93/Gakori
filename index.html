@@ -890,11 +890,25 @@
         // obrazów), bo PDF-y bywają duże/wielostronicowe; kilka naraz
         // to zbyt duże, nieprzewidywalne ryzyko kosztowe na start.
         let selectedPdfFile = null;
+        // Duży PDF wysyłany jest do serwera DWA razy w najgorszym przypadku
+        // (raz żeby poznać koszt, raz żeby faktycznie analizować, patrz
+        // needs_confirmation w runAnalysisRequest()) — na wolniejszym łączu
+        // to zauważalnie dłuższe wysyłanie niż przy tekście/obrazie. Zamiast
+        // przebudowywać cały mechanizm (tymczasowe przechowywanie pliku na
+        // serwerze — rozważane na później), na razie prosta, wyraźna
+        // informacja od razu po wybraniu większego pliku.
+        const PDF_LARGE_FILE_NOTICE_BYTES = 3 * 1024 * 1024 // 3 MB
         function renderPdfSelectionInfo() {
             const infoEl = document.getElementById('pdfSelectionInfo');
-            infoEl.innerText = selectedPdfFile
-                ? t('label_pdf_selected', { name: selectedPdfFile.name })
-                : '';
+            if (!selectedPdfFile) {
+                infoEl.innerText = '';
+                return;
+            }
+            let text = t('label_pdf_selected', { name: selectedPdfFile.name });
+            if (selectedPdfFile.size > PDF_LARGE_FILE_NOTICE_BYTES) {
+                text += ' ' + t('label_pdf_large_file_notice');
+            }
+            infoEl.innerText = text;
         }
         document.getElementById('pdfInputTrigger').addEventListener('click', () => {
             document.getElementById('pdfInput').click();
@@ -1282,9 +1296,11 @@
 
             } else if (currentMode === 'pdf') {
                 if (!selectedPdfFile) return alert(t('alert_choose_pdf_file'));
-                // Ten sam limit co po stronie backendu (20 MB) — tylko szybka
-                // informacja zwrotna, backend i tak sprawdza to sam niezależnie.
-                if (selectedPdfFile.size > 20 * 1024 * 1024) return alert(t('alert_pdf_too_large'));
+                // Ten sam limit co po stronie backendu (10 MB — świadomie
+                // ostrożny start, patrz PRAGMA_CONTEXT.md/analyze/index.ts)
+                // — tylko szybka informacja zwrotna, backend i tak sprawdza
+                // to sam niezależnie.
+                if (selectedPdfFile.size > 10 * 1024 * 1024) return alert(t('alert_pdf_too_large'));
                 const buffer = await selectedPdfFile.arrayBuffer();
                 const hash = await sha256Hex(buffer);
                 const pdfBase64 = arrayBufferToBase64(buffer);
