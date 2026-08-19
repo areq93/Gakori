@@ -263,6 +263,11 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
 .mode-panel.active { display: block; }
 
 #imageSelectionInfo { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+/* Nazwy plików (zwłaszcza PDF z systemów typu ESPI/EBI) bywają jednym
+   długim ciągiem znaków bez spacji (same kropki/podkreślenia) — bez tej
+   reguły przeglądarka nie ma gdzie "złamać" tekstu do nowej linii i nazwa
+   wyjeżdża poza ramkę karty (zgłoszone 2026-08-19). */
+#pdfSelectionInfo { font-size: 13px; color: var(--ink-soft); margin-top: 4px; overflow-wrap: break-word; word-break: break-word; }
 
 /* Siatka miniaturek wybranych obrazów (index.html, tryb "Obraz" — teraz
    można dodać więcej niż jeden naraz) — każda miniaturka ma własny przycisk
