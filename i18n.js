@@ -89,6 +89,7 @@ const TRANSLATIONS = {
         err_too_many_images: "Można analizować maksymalnie {max} obrazów naraz.",
         label_images_selected: "Wybrano {count}/{max} obrazów",
         alert_max_images: "Możesz dodać maksymalnie {max} obrazów naraz.",
+        tab_pdf: "PDF", analyze_label_pdf: "Analizuj PDF", label_choose_pdf: "Wybierz plik PDF do analizy:", btn_choose_pdf: "Wybierz PDF", label_pdf_selected: "Wybrano plik: {name}", alert_choose_pdf: "Wybrany plik nie jest plikiem PDF.", alert_choose_pdf_file: "Najpierw wybierz plik PDF do analizy.", alert_pdf_too_large: "Plik PDF jest za duży (limit 20 MB).", pdf_confirm_title: "Potwierdź analizę", pdf_confirm_pages: "Liczba stron: {count}", pdf_confirm_cost: "Koszt: {cost} kredytów", pdf_confirm_wait_notice: "Dłuższe pliki mogą się analizować zauważalnie dłużej niż zwykle — to normalne.", btn_pdf_confirm_yes: "Tak, analizuj", btn_pdf_confirm_no: "Anuluj", err_invalid_pdf: "Przesłany plik nie jest prawidłowym PDF-em.", err_pdf_too_long: "Ten plik ma {count} stron — maksymalnie obsługujemy {max}.", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "Usuń ten obraz",
         image_not_saved_notice: "Ten obraz jest analizowany na bieżąco i nie jest zapisywany w naszym systemie — widzisz go tylko Ty, teraz.",
         label_paste_image_zone: "Wklej obraz tutaj (np. zrzut ekranu)",
@@ -165,6 +166,7 @@ const TRANSLATIONS = {
         err_too_many_images: "You can analyze up to {max} images at once.",
         label_images_selected: "{count}/{max} images selected",
         alert_max_images: "You can add up to {max} images at once.",
+        tab_pdf: "PDF", analyze_label_pdf: "Analyze PDF", label_choose_pdf: "Choose a PDF file to analyze:", btn_choose_pdf: "Choose PDF", label_pdf_selected: "Selected file: {name}", alert_choose_pdf: "The selected file is not a PDF.", alert_choose_pdf_file: "Choose a PDF file first.", alert_pdf_too_large: "The PDF file is too large (20 MB limit).", pdf_confirm_title: "Confirm analysis", pdf_confirm_pages: "Page count: {count}", pdf_confirm_cost: "Cost: {cost} credits", pdf_confirm_wait_notice: "Longer files may take noticeably longer to analyze than usual — that's normal.", btn_pdf_confirm_yes: "Yes, analyze", btn_pdf_confirm_no: "Cancel", err_invalid_pdf: "The uploaded file is not a valid PDF.", err_pdf_too_long: "This file has {count} pages — we support up to {max}.", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "Remove this image",
         image_not_saved_notice: "This image is analyzed on the spot and isn't saved in our system — you're the only one who sees it, right now.",
         label_paste_image_zone: "Paste an image here (e.g. a screenshot)",
@@ -241,6 +243,7 @@ const TRANSLATIONS = {
         err_too_many_images: "Puedes analizar un máximo de {max} imágenes a la vez.",
         label_images_selected: "{count}/{max} imágenes seleccionadas",
         alert_max_images: "Puedes añadir un máximo de {max} imágenes a la vez.",
+        tab_pdf: "PDF", analyze_label_pdf: "Analizar PDF", label_choose_pdf: "Elige un archivo PDF para analizar:", btn_choose_pdf: "Elegir PDF", label_pdf_selected: "Archivo seleccionado: {name}", alert_choose_pdf: "El archivo seleccionado no es un PDF.", alert_choose_pdf_file: "Elige primero un archivo PDF.", alert_pdf_too_large: "El archivo PDF es demasiado grande (límite de 20 MB).", pdf_confirm_title: "Confirmar análisis", pdf_confirm_pages: "Número de páginas: {count}", pdf_confirm_cost: "Coste: {cost} créditos", pdf_confirm_wait_notice: "Los archivos más largos pueden tardar notablemente más de lo habitual — es normal.", btn_pdf_confirm_yes: "Sí, analizar", btn_pdf_confirm_no: "Cancelar", err_invalid_pdf: "El archivo enviado no es un PDF válido.", err_pdf_too_long: "Este archivo tiene {count} páginas — el máximo permitido es {max}.", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "Quitar esta imagen",
         image_not_saved_notice: "Esta imagen se analiza al momento y no se guarda en nuestro sistema — solo tú la ves, ahora.",
         label_paste_image_zone: "Pega una imagen aquí (p. ej. una captura de pantalla)",
@@ -317,6 +320,7 @@ const TRANSLATIONS = {
         err_too_many_images: "Du kannst maximal {max} Bilder auf einmal analysieren.",
         label_images_selected: "{count}/{max} Bilder ausgewählt",
         alert_max_images: "Du kannst maximal {max} Bilder auf einmal hinzufügen.",
+        tab_pdf: "PDF", analyze_label_pdf: "PDF analysieren", label_choose_pdf: "Wähle eine PDF-Datei zur Analyse:", btn_choose_pdf: "PDF wählen", label_pdf_selected: "Ausgewählte Datei: {name}", alert_choose_pdf: "Die ausgewählte Datei ist kein PDF.", alert_choose_pdf_file: "Wähle zuerst eine PDF-Datei aus.", alert_pdf_too_large: "Die PDF-Datei ist zu groß (Limit 20 MB).", pdf_confirm_title: "Analyse bestätigen", pdf_confirm_pages: "Seitenzahl: {count}", pdf_confirm_cost: "Kosten: {cost} Credits", pdf_confirm_wait_notice: "Längere Dateien können spürbar länger dauern als gewöhnlich — das ist normal.", btn_pdf_confirm_yes: "Ja, analysieren", btn_pdf_confirm_no: "Abbrechen", err_invalid_pdf: "Die hochgeladene Datei ist kein gültiges PDF.", err_pdf_too_long: "Diese Datei hat {count} Seiten — wir unterstützen maximal {max}.", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "Dieses Bild entfernen",
         image_not_saved_notice: "Dieses Bild wird sofort analysiert und nicht in unserem System gespeichert — nur du siehst es, jetzt gerade.",
         label_paste_image_zone: "Bild hier einfügen (z. B. einen Screenshot)",
@@ -393,6 +397,7 @@ const TRANSLATIONS = {
         err_too_many_images: "Vous pouvez analyser au maximum {max} images à la fois.",
         label_images_selected: "{count}/{max} images sélectionnées",
         alert_max_images: "Vous pouvez ajouter au maximum {max} images à la fois.",
+        tab_pdf: "PDF", analyze_label_pdf: "Analyser le PDF", label_choose_pdf: "Choisissez un fichier PDF à analyser :", btn_choose_pdf: "Choisir un PDF", label_pdf_selected: "Fichier sélectionné : {name}", alert_choose_pdf: "Le fichier sélectionné n'est pas un PDF.", alert_choose_pdf_file: "Choisissez d'abord un fichier PDF.", alert_pdf_too_large: "Le fichier PDF est trop volumineux (limite de 20 Mo).", pdf_confirm_title: "Confirmer l'analyse", pdf_confirm_pages: "Nombre de pages : {count}", pdf_confirm_cost: "Coût : {cost} crédits", pdf_confirm_wait_notice: "Les fichiers plus longs peuvent prendre nettement plus de temps que d'habitude — c'est normal.", btn_pdf_confirm_yes: "Oui, analyser", btn_pdf_confirm_no: "Annuler", err_invalid_pdf: "Le fichier envoyé n'est pas un PDF valide.", err_pdf_too_long: "Ce fichier comporte {count} pages — nous prenons en charge {max} maximum.", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "Retirer cette image",
         image_not_saved_notice: "Cette image est analysée à la volée et n'est pas enregistrée dans notre système — vous êtes le seul à la voir, maintenant.",
         label_paste_image_zone: "Collez une image ici (par ex. une capture d'écran)",
@@ -469,6 +474,7 @@ const TRANSLATIONS = {
         err_too_many_images: "Можно анализировать не более {max} изображений за раз.",
         label_images_selected: "Выбрано {count}/{max} изображений",
         alert_max_images: "Можно добавить не более {max} изображений за раз.",
+        tab_pdf: "PDF", analyze_label_pdf: "Анализировать PDF", label_choose_pdf: "Выберите PDF-файл для анализа:", btn_choose_pdf: "Выбрать PDF", label_pdf_selected: "Выбран файл: {name}", alert_choose_pdf: "Выбранный файл не является PDF.", alert_choose_pdf_file: "Сначала выберите PDF-файл.", alert_pdf_too_large: "PDF-файл слишком большой (лимит 20 МБ).", pdf_confirm_title: "Подтвердите анализ", pdf_confirm_pages: "Количество страниц: {count}", pdf_confirm_cost: "Стоимость: {cost} кредитов", pdf_confirm_wait_notice: "Более длинные файлы могут анализироваться заметно дольше обычного — это нормально.", btn_pdf_confirm_yes: "Да, анализировать", btn_pdf_confirm_no: "Отмена", err_invalid_pdf: "Загруженный файл не является корректным PDF.", err_pdf_too_long: "В этом файле {count} страниц — максимум поддерживается {max}.", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "Убрать это изображение",
         image_not_saved_notice: "Это изображение анализируется на лету и не сохраняется в нашей системе — его видите только вы, сейчас.",
         label_paste_image_zone: "Вставьте изображение сюда (например, скриншот)",
@@ -545,6 +551,7 @@ const TRANSLATIONS = {
         err_too_many_images: "一次最多可以分析 {max} 张图片。",
         label_images_selected: "已选择 {count}/{max} 张图片",
         alert_max_images: "一次最多可以添加 {max} 张图片。",
+        tab_pdf: "PDF", analyze_label_pdf: "分析 PDF", label_choose_pdf: "选择要分析的 PDF 文件：", btn_choose_pdf: "选择 PDF", label_pdf_selected: "已选择文件：{name}", alert_choose_pdf: "所选文件不是 PDF。", alert_choose_pdf_file: "请先选择一个 PDF 文件。", alert_pdf_too_large: "PDF 文件过大（限制 20 MB）。", pdf_confirm_title: "确认分析", pdf_confirm_pages: "页数：{count}", pdf_confirm_cost: "费用：{cost} 积分", pdf_confirm_wait_notice: "较长的文件分析时间可能明显更久，这是正常的。", btn_pdf_confirm_yes: "是，分析", btn_pdf_confirm_no: "取消", err_invalid_pdf: "上传的文件不是有效的 PDF。", err_pdf_too_long: "此文件有 {count} 页 — 我们最多支持 {max} 页。", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "移除这张图片",
         image_not_saved_notice: "这张图片是即时分析的，不会保存在我们的系统中——现在只有你能看到它。",
         label_paste_image_zone: "在此粘贴图片（例如截图）",
@@ -621,6 +628,7 @@ const TRANSLATIONS = {
         err_too_many_images: "一度に分析できる画像は最大{max}枚です。",
         label_images_selected: "{count}/{max}枚の画像を選択済み",
         alert_max_images: "一度に追加できる画像は最大{max}枚です。",
+        tab_pdf: "PDF", analyze_label_pdf: "PDFを分析", label_choose_pdf: "分析するPDFファイルを選択:", btn_choose_pdf: "PDFを選択", label_pdf_selected: "選択したファイル: {name}", alert_choose_pdf: "選択したファイルはPDFではありません。", alert_choose_pdf_file: "先にPDFファイルを選択してください。", alert_pdf_too_large: "PDFファイルが大きすぎます(上限20MB)。", pdf_confirm_title: "分析を確認", pdf_confirm_pages: "ページ数: {count}", pdf_confirm_cost: "費用: {cost} クレジット", pdf_confirm_wait_notice: "長いファイルは通常より明らかに時間がかかることがあります — 正常な動作です。", btn_pdf_confirm_yes: "はい、分析する", btn_pdf_confirm_no: "キャンセル", err_invalid_pdf: "アップロードされたファイルは有効なPDFではありません。", err_pdf_too_long: "このファイルは{count}ページあります — 対応できるのは最大{max}ページです。", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "この画像を削除",
         image_not_saved_notice: "この画像はその場で分析され、システムには保存されません — 今、これを見ているのはあなただけです。",
         label_paste_image_zone: "ここに画像を貼り付け（スクリーンショットなど）",
@@ -697,6 +705,7 @@ const TRANSLATIONS = {
         err_too_many_images: "एक बार में अधिकतम {max} छवियों का विश्लेषण किया जा सकता है।",
         label_images_selected: "{count}/{max} छवियां चुनी गईं",
         alert_max_images: "आप एक बार में अधिकतम {max} छवियां जोड़ सकते हैं।",
+        tab_pdf: "PDF", analyze_label_pdf: "PDF का विश्लेषण करें", label_choose_pdf: "विश्लेषण के लिए एक PDF फ़ाइल चुनें:", btn_choose_pdf: "PDF चुनें", label_pdf_selected: "चुनी गई फ़ाइल: {name}", alert_choose_pdf: "चुनी गई फ़ाइल PDF नहीं है।", alert_choose_pdf_file: "पहले एक PDF फ़ाइल चुनें।", alert_pdf_too_large: "PDF फ़ाइल बहुत बड़ी है (सीमा 20 MB)।", pdf_confirm_title: "विश्लेषण की पुष्टि करें", pdf_confirm_pages: "पृष्ठों की संख्या: {count}", pdf_confirm_cost: "लागत: {cost} क्रेडिट", pdf_confirm_wait_notice: "लंबी फ़ाइलों के विश्लेषण में सामान्य से काफी अधिक समय लग सकता है — यह सामान्य है।", btn_pdf_confirm_yes: "हां, विश्लेषण करें", btn_pdf_confirm_no: "रद्द करें", err_invalid_pdf: "अपलोड की गई फ़ाइल मान्य PDF नहीं है।", err_pdf_too_long: "इस फ़ाइल में {count} पृष्ठ हैं — हम अधिकतम {max} तक समर्थन देते हैं।", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "यह छवि हटाएं",
         image_not_saved_notice: "यह छवि तुरंत विश्लेषित की जाती है और हमारे सिस्टम में सहेजी नहीं जाती — इसे अभी केवल आप ही देख रहे हैं।",
         label_paste_image_zone: "यहाँ एक छवि चिपकाएं (जैसे स्क्रीनशॉट)",
@@ -773,6 +782,7 @@ const TRANSLATIONS = {
         err_too_many_images: "يمكنك تحليل {max} صور كحد أقصى في المرة الواحدة.",
         label_images_selected: "تم اختيار {count}/{max} صور",
         alert_max_images: "يمكنك إضافة {max} صور كحد أقصى في المرة الواحدة.",
+        tab_pdf: "PDF", analyze_label_pdf: "تحليل PDF", label_choose_pdf: "اختر ملف PDF للتحليل:", btn_choose_pdf: "اختيار PDF", label_pdf_selected: "الملف المختار: {name}", alert_choose_pdf: "الملف المختار ليس PDF.", alert_choose_pdf_file: "اختر أولاً ملف PDF.", alert_pdf_too_large: "ملف PDF كبير جدًا (الحد الأقصى 20 ميغابايت).", pdf_confirm_title: "تأكيد التحليل", pdf_confirm_pages: "عدد الصفحات: {count}", pdf_confirm_cost: "التكلفة: {cost} رصيد", pdf_confirm_wait_notice: "قد تستغرق الملفات الأطول وقتًا أطول ملحوظًا من المعتاد — هذا أمر طبيعي.", btn_pdf_confirm_yes: "نعم، حلّل", btn_pdf_confirm_no: "إلغاء", err_invalid_pdf: "الملف المرفوع ليس PDF صالحًا.", err_pdf_too_long: "يحتوي هذا الملف على {count} صفحة — الحد الأقصى المدعوم هو {max}.", cost_comparison_one: "≈ {item}", cost_comparison_many: "≈ {count} × {item}",
         btn_remove_image: "إزالة هذه الصورة",
         image_not_saved_notice: "يتم تحليل هذه الصورة فورًا ولا يتم حفظها في نظامنا — أنت الوحيد الذي يراها الآن.",
         label_paste_image_zone: "الصق صورة هنا (مثل لقطة شاشة)",
@@ -895,6 +905,86 @@ function syncThemeFromProfile(sb, userId) {
             applyTheme();
         }
     });
+}
+
+// Porównanie kosztu dużej analizy (na razie: PDF powyżej progu stron) z
+// czymś codziennym i tanim, zamiast suchej liczby kredytów — użytkownik
+// wprost poprosił o to zamiast pokazywania kwoty w walucie (2026-08-19):
+// duża liczba kredytów ma się kojarzyć z drobnostką, na którą ludzie
+// wydają pieniądze bez wahania kilka razy w miesiącu, a nie z abstrakcyjną
+// liczbą. Dwie decyzje projektowe warte zapamiętania:
+// 1. Zamiast odmieniać rzeczownik przez liczbę (co w części języków, np.
+//    polskim czy rosyjskim, wymagałoby osobnej gramatyki dla 1/2-4/5+),
+//    używamy zapisu "N × przedmiot" (jak na paragonie) — to samo brzmi
+//    naturalnie w każdym języku bez żadnej odmiany.
+// 2. To CELOWO NIE jest przelicznik po realnym kursie waluty — cena
+//    kawy/herbaty w Indiach czy Egipcie przeliczona 1:1 dawałaby absurdalne
+//    "21 herbat" zamiast "to mniej więcej tyle, ile wydajesz na kawę".
+//    Zamiast tego: jedna, stała liczba kredytów = "1 sztuka" wszędzie na
+//    świecie (450 kr., oparta o realny punkt odniesienia użytkownika: mała
+//    kawa w Polsce, 16-20 zł) — zmienia się tylko NAZWA przedmiotu i jego
+//    ROZMIAR (mała/średnia/duża) wraz z progiem kredytów, nie kurs.
+const COST_COMPARISON_UNIT_PRICE_SMALL = 450 // < 1000 kredytów
+const COST_COMPARISON_UNIT_PRICE_MEDIUM = 900 // 1000-3000 kredytów
+const COST_COMPARISON_UNIT_PRICE_LARGE = 1800 // > 3000 kredytów
+// Powyżej tylu "sztuk" porównanie przestaje być pomocne (przestaje czuć
+// się jak drobnostka) — wtedy costComparisonText() zwraca null, a wołający
+// (patrz index.html) po prostu nie pokazuje tej linijki, tylko samą liczbę
+// kredytów.
+const COST_COMPARISON_CAP_UNITS = 4
+
+// Dwie opcje na język (losowane przy każdym wywołaniu), żeby nie było
+// zawsze identycznie — dobrane kulturowo, nie tłumaczone dosłownie z
+// polskiego (np. w Chinach zwykła herbata bywa prawie darmowa, więc
+// zamiennikiem jest bardziej "drobna przyjemność" — herbata mleczna).
+const COST_COMPARISON_ITEMS = {
+    pl: { small: ['mała kawa', 'mała herbata'], medium: ['średnia kawa', 'średnia herbata'], large: ['duża kawa', 'duża herbata'] },
+    en: { small: ['small coffee', 'small tea'], medium: ['medium coffee', 'medium tea'], large: ['large coffee', 'large tea'] },
+    es: { small: ['café pequeño', 'té pequeño'], medium: ['café mediano', 'té mediano'], large: ['café grande', 'té grande'] },
+    de: { small: ['kleiner Kaffee', 'kleiner Tee'], medium: ['mittlerer Kaffee', 'mittlerer Tee'], large: ['großer Kaffee', 'großer Tee'] },
+    fr: { small: ['petit café', 'petit thé'], medium: ['café moyen', 'thé moyen'], large: ['grand café', 'grand thé'] },
+    ru: { small: ['маленький кофе', 'маленький чай'], medium: ['средний кофе', 'средний чай'], large: ['большой кофе', 'большой чай'] },
+    zh: { small: ['小杯咖啡', '小杯奶茶'], medium: ['中杯咖啡', '中杯奶茶'], large: ['大杯咖啡', '大杯奶茶'] },
+    ja: { small: ['小さいコーヒー', '小さい緑茶'], medium: ['普通のコーヒー', '普通の緑茶'], large: ['大きいコーヒー', '大きい緑茶'] },
+    hi: { small: ['छोटी चाय', 'छोटी कॉफ़ी'], medium: ['मध्यम चाय', 'मध्यम कॉफ़ी'], large: ['बड़ी चाय', 'बड़ी कॉफ़ी'] },
+    ar: { small: ['شاي صغير', 'قهوة صغيرة'], medium: ['شاي متوسط', 'قهوة متوسطة'], large: ['شاي كبير', 'قهوة كبيرة'] },
+}
+
+function costComparisonUnitPrice(credits) {
+    if (credits < 1000) return COST_COMPARISON_UNIT_PRICE_SMALL
+    if (credits <= 3000) return COST_COMPARISON_UNIT_PRICE_MEDIUM
+    return COST_COMPARISON_UNIT_PRICE_LARGE
+}
+function costComparisonSizeKey(credits) {
+    if (credits < 1000) return 'small'
+    if (credits <= 3000) return 'medium'
+    return 'large'
+}
+// Poniżej 3 sztuk zaokrąglamy do najbliższej połówki (dokładniej przy
+// małych wartościach), od 3 w górę do pełnej sztuki (prościej przy
+// większych) — czysto kosmetyczna decyzja czytelności.
+function costComparisonRoundUnits(raw) {
+    if (raw < 3) return Math.round(raw * 2) / 2
+    return Math.round(raw)
+}
+const COST_COMPARISON_LOCALES = {
+    pl: 'pl-PL', en: 'en-US', es: 'es-ES', de: 'de-DE', fr: 'fr-FR',
+    ru: 'ru-RU', zh: 'zh-CN', ja: 'ja-JP', hi: 'hi-IN', ar: 'ar-EG',
+}
+// Zwraca gotowy do wyświetlenia napis (np. "≈ 2 × mała kawa") albo null,
+// jeśli koszt przekracza COST_COMPARISON_CAP_UNITS sztuk — wtedy wołający
+// ma pokazać samą liczbę kredytów, bez tej linijki.
+function costComparisonText(credits, langCode) {
+    if (typeof credits !== 'number' || credits <= 0) return null
+    const unitPrice = costComparisonUnitPrice(credits)
+    const units = costComparisonRoundUnits(credits / unitPrice)
+    if (units <= 0 || units > COST_COMPARISON_CAP_UNITS) return null
+    const items = COST_COMPARISON_ITEMS[langCode] || COST_COMPARISON_ITEMS.en
+    const options = items[costComparisonSizeKey(credits)]
+    const item = options[Math.floor(Math.random() * options.length)]
+    if (units === 1) return t('cost_comparison_one', { item })
+    const numFmt = new Intl.NumberFormat(COST_COMPARISON_LOCALES[langCode] || 'en-US', { maximumFractionDigits: 1 })
+    return t('cost_comparison_many', { count: numFmt.format(units), item })
 }
 
 // Stan kredytów: zawsze czytany na żywo z profilu (nigdy z pamięci
