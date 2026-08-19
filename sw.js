@@ -1,9 +1,9 @@
-const CACHE_NAME = 'pragma-v23';
+const CACHE_NAME = 'gakori-v23';
 // Osobny, tymczasowy "schowek" na obraz udostępniony z innej aplikacji
 // (patrz handleShareTarget niżej) — celowo NIE ten sam co CACHE_NAME, żeby
 // czyszczenie starych wersji aplikacji (patrz "activate" niżej) nigdy
 // przypadkiem nie skasowało obrazu, zanim strona zdąży go odebrać.
-const SHARE_TARGET_CACHE = 'pragma-share-target-v1';
+const SHARE_TARGET_CACHE = 'gakori-share-target-v1';
 const ASSETS = [
   './',
   './index.html',
@@ -20,7 +20,7 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Pragma: Cache-owanie zasobów');
+      console.log('Gakori: Cache-owanie zasobów');
       return cache.addAll(ASSETS);
     })
   );
@@ -39,7 +39,7 @@ self.addEventListener('activate', (event) => {
 });
 
 // Przechwycenie udostępnienia z innej aplikacji (np. "Udostępnij" na zrzucie
-// ekranu → wybór Pragmy z listy) — patrz manifest.json "share_target".
+// ekranu → wybór Gakori z listy) — patrz manifest.json "share_target".
 // Telefon wysyła to jako POST z plikiem w środku, bo GitHub Pages jest
 // stroną statyczną i nie ma jak inaczej "przyjąć" przesłanego pliku — musimy
 // sami wyjąć z tego obraz (i ewentualny tekst/link, jeśli to było
@@ -70,7 +70,7 @@ async function handleShareTarget(request) {
     const query = redirectParams.toString();
     return Response.redirect('./index.html' + (query ? '?' + query : ''), 303);
   } catch (err) {
-    console.error('Pragma: błąd odbioru udostępnionej treści', err);
+    console.error('Gakori: błąd odbioru udostępnionej treści', err);
     return Response.redirect('./index.html', 303);
   }
 }
@@ -95,7 +95,7 @@ self.addEventListener('fetch', (event) => {
   if (needsFreshContent) {
     // NETWORK-FIRST: HTML, manifest i style muszą zawsze być świeże, inaczej
     // zmiany wgrane na serwer nigdy nie dotrą do telefonu (tak jak stary
-    // style.css utknął w cache'u aż do wersji pragma-v7). WAŻNE:
+    // style.css utknął w cache'u aż do wersji gakori-v7). WAŻNE:
     // `cache: 'reload'` jest tu konieczne — zwykłe `fetch()` samo w sobie
     // wciąż może dostać odpowiedź z wewnętrznej pamięci podręcznej
     // przeglądarki (HTTP cache, niezależnej od Cache Storage Service

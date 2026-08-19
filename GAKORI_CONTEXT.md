@@ -1,4 +1,4 @@
-# Pragma — kontekst projektu
+# Gakori — kontekst projektu
 
 Ten plik jest **jedynym trwałym źródłem prawdy** o projekcie, niezależnym od
 jakiejkolwiek pojedynczej rozmowy z Claude. Rozmowy się kończą albo się
@@ -9,7 +9,7 @@ tym samym PR-ze co reszta zmian.
 Jeśli zaczynasz nową rozmowę z Claude o tym projekcie — zacznij od
 przeczytania tego pliku w całości, zanim zaczniesz cokolwiek zmieniać.
 
-## Komenda: „zaktualizuj PRAGMA_CONTEXT.md”
+## Komenda: „zaktualizuj GAKORI_CONTEXT.md”
 
 Gdy użytkownik napisze tę frazę (np. widząc, że pasek kontekstu rozmowy
 się zapełnia, albo po prostu chcąc zrobić checkpoint) — to sygnał do
@@ -34,7 +34,7 @@ współpracy" niżej. Komenda jest na wypadek, gdy użytkownik chce
 świadomego checkpointu w dowolnym momencie, niezależnie od tego, czy coś
 większego właśnie się skończyło.
 
-## Co to jest Pragma
+## Co to jest Gakori
 
 PWA (aplikacja webowa instalowalna jak apka), która analizuje tekst, link
 albo (docelowo) obraz i mówi użytkownikowi, prostym językiem, czy ktoś
@@ -207,7 +207,7 @@ zanim założysz, że działa.
     pomniejszoną miniaturę (`makeImagePreview()` — canvas, maks. 1000px, JPEG
     ~0,72 jakości, żeby zmieściły się w limicie `sessionStorage`) i zapisuje
     całą listę miniatur (jako JSON, `imagePreviewDataUrls`) na chwilę pod
-    kluczem `pragma_scan_image_<id>` w `sessionStorage` (dane w pamięci JS nie
+    kluczem `gakori_scan_image_<id>` w `sessionStorage` (dane w pamięci JS nie
     przetrwałyby pełnej nawigacji na inną stronę). `scan.html` odczytuje ją
     pod tym samym kluczem, renderuje jedną miniaturę na obraz w
     `#scanImageList` (siatka, `.scan-image-list` w `style.css`) +
@@ -242,7 +242,7 @@ zanim założysz, że działa.
       schowku żadnych danych obrazu — tylko sam tekst (`clipboardData.types`
       pokazywało wyłącznie `text/plain`). Strona internetowa nie ma jak
       pokazać obrazu, którego naprawdę nie ma w schowku — to ograniczenie
-      aplikacji/systemu kopiującego, nie błąd w kodzie Pragmy. Kod sprawdza
+      aplikacji/systemu kopiującego, nie błąd w kodzie Gakori. Kod sprawdza
       zarówno `clipboardData.files`, jak i `.items` (różne przeglądarki
       wypełniają różne z tych pól), więc jeśli w schowku FAKTYCZNIE jest
       obraz, zostanie złapany. Komunikat błędu (`alert_paste_not_image` w
@@ -618,7 +618,7 @@ zanim założysz, że działa.
        (złączenie PostgREST do `scans` po nazwę/wynik), z linkiem do
        `scan.html?id=...` dla każdej. Link do niej dodany w `account.html`
        ("Twoje analizy PDF →"). Dodana do `sw.js` (`ASSETS`, `CACHE_NAME`
-       podbite do `pragma-v23`).
+       podbite do `gakori-v23`).
     - **SQL migracji** (wklejony i uruchomiony ręcznie w Supabase SQL
       Editor — repo nie ma lokalnego Supabase CLI, patrz "Proces
       wdrażania"):
@@ -685,7 +685,7 @@ zanim założysz, że działa.
   zostaną przeliczone, brak `pattern_type` traktowany jako `manipulation`,
   brak `tip` po prostu nie pokazuje tej sekcji).
   - `pattern_type`: `"manipulation"` (wzorzec manipulacji/błąd poznawczy) albo
-    `"reasoning"` (trafny, wartościowy sposób rozumowania — Pragma ma
+    `"reasoning"` (trafny, wartościowy sposób rozumowania — Gakori ma
     aktywnie szukać OBU typów, nie tylko manipulacji, patrz sekcja o 100
     modelach mentalnych wyżej). Wartość NIE jest tłumaczona (zawsze
     angielskie słowo), frontend mapuje ją na etykietę przez i18n
@@ -694,7 +694,7 @@ zanim założysz, że działa.
   - `tip`: krótka, PRAKTYCZNA podpowiedź "co teraz zrobić" (sprawdź,
     poszukaj, odczekaj) — **świadomie NIGDY oceniająca** ("ufaj"/"nie
     ufaj"/"dobre"/"złe"/"wiarygodne"). To ważna, przemyślana granica: gdyby
-    Pragma zaczęła wydawać takie werdykty (nawet przy `pattern_type:
+    Gakori zaczęła wydawać takie werdykty (nawet przy `pattern_type:
     "reasoning"`), sama stałaby się tym, przed czym ostrzega (Argument z
     Autorytetu — "wierz, bo brzmi rzetelnie"). Zasada ustalona z
     użytkownikiem wprost: **nie zaspokajamy ludzkiej potrzeby "łatwego
@@ -711,7 +711,7 @@ zanim założysz, że działa.
     samego wzorca (osobna, podpisana sekcja, nie gołe zdanie wtopione w
     resztę tekstu).
 - **Styl wizualny "Rzeźba" (od 2026-08-18, zastąpił "Retro plakat")**:
-  miękka, matowa, organiczna estetyka inspirowana wprost logo Pragmy
+  miękka, matowa, organiczna estetyka inspirowana wprost logo Gakori
   (abstrakcyjna, biomorficzna rzeźba — użytkownik przesłał opis/inspirację
   z Google, "gra światła i cienia po zaokrąglonej powierzchni", "wrażenie
   lekkości mimo twardego materiału"). Świadomie **zastąpiła**, nie
@@ -752,13 +752,13 @@ zanim założysz, że działa.
     "opcja 1" przed wdrożeniem — nie zostało to explicite potwierdzone dla
     "opcji 2" (głębsza zmiana), więc jeśli użytkownik kiedyś zapyta, czemu
     odznaki wyniku nadal są kolorowe, to jest odpowiedź.
-  - Mały, powtarzalny znak marki: `.pragma-mark` — inline SVG "kropla"
+  - Mały, powtarzalny znak marki: `.gakori-mark` — inline SVG "kropla"
     (`M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z`,
-    obrócona o -18°, gradient szaro-taupe) obok nagłówka `<h1>Pragma</h1>`
+    obrócona o -18°, gradient szaro-taupe) obok nagłówka `<h1>Gakori</h1>`
     w `index.html` — jedyne miejsce z widocznym tekstowym nagłówkiem
-    "Pragma" w treści strony (na `account.html`/`scan.html` "Pragma"
+    "Gakori" w treści strony (na `account.html`/`scan.html` "Gakori"
     występuje tylko w `<title>`, nie w treści, więc tam znaku nie dodano).
-  - `sw.js`: `CACHE_NAME` podbite do `pragma-v10` (zmiana `style.css` —
+  - `sw.js`: `CACHE_NAME` podbite do `gakori-v10` (zmiana `style.css` —
     zasób cache'owany, patrz pułapka "Service Worker cache" niżej).
     `theme-color` w `<meta>` na wszystkich 3 stronach HTML zaktualizowany
     do nowego `--ink` (`#2b2a27`, wcześniej `#241f18`).
@@ -782,14 +782,14 @@ zanim założysz, że działa.
     3. `--sculpt-shadow`/`--sculpt-shadow-sm` dostały dodatkową warstwę
        `inset 0 1px 0 var(--highlight-edge)` — jasna obwódka u góry karty,
        razem z gradientem daje wrażenie uniesionej, oświetlonej bryły.
-    4. Nowy, duży, mocno rozmyty kształt `.pragma-backdrop` (ten sam SVG
-       "kropli" co `.pragma-mark`, tylko w dużej skali, `position: fixed`,
+    4. Nowy, duży, mocno rozmyty kształt `.gakori-backdrop` (ten sam SVG
+       "kropli" co `.gakori-mark`, tylko w dużej skali, `position: fixed`,
        `opacity: 0.16`/`0.22` w ciemnym, `filter: blur(38px)`, `z-index: 0`
        — karty mają `z-index: 1`, żeby były nad nim) w tle strony startowej
        — bezpośrednia odpowiedź na "logo pokazuje inny świat niż aplikacja
        w środku": teraz kształt loga jest widoczny w tle całej aplikacji,
        nie tylko jako mały znaczek przy nagłówku.
-    `sw.js` `CACHE_NAME` podbite dalej do `pragma-v11` (kolejna zmiana
+    `sw.js` `CACHE_NAME` podbite dalej do `gakori-v11` (kolejna zmiana
     `style.css`).
   - **POPRAWKA 2026-08-18(d)**: strona konta (`account.html`) sprawiała
     wrażenie "niedokończonej" względem reszty aplikacji — przyczyna:
@@ -807,11 +807,11 @@ zanim założysz, że działa.
     inline `style="color:...`/`background:...` w HTML nie może używać
     gołego kodu hex — zawsze `var(--coś)` z palety w `style.css`, inaczej
     element po cichu wypada z motywu przy następnej zmianie kolorów.
-  - Ten sam duży, rozmyty kształt tła (`.pragma-backdrop`) dodany też na
+  - Ten sam duży, rozmyty kształt tła (`.gakori-backdrop`) dodany też na
     `account.html` i `scan.html` (wcześniej był tylko na stronie
     startowej) — żeby "świat" aplikacji był spójny na każdej podstronie,
     nie tylko na pierwszym ekranie.
-    `sw.js` `CACHE_NAME` podbite do `pragma-v13`.
+    `sw.js` `CACHE_NAME` podbite do `gakori-v13`.
   - **POPRAWKA 2026-08-18(e) — runda 3**: użytkownik po zobaczeniu rundy 2
     na żywo ocenił, że apka "wygląda jakby nie miała energii", a gry
     świateł dalej za mało. Przyczyna: same reguły (gradient, `inset`
@@ -825,7 +825,7 @@ zanim założysz, że działa.
     `--highlight-edge`, bardziej nasycone `--accent`/`--primary`, wyraźniej
     widoczne (ale wciąż cienkie) `--card-border`, szerszy rozstaw gradientu
     na przyciskach/odznakach (`color-mix` z 82% do 90% bieli na jasnym
-    końcu), mocniejsza opacity `.pragma-backdrop` (0.16→0.22 jasny,
+    końcu), mocniejsza opacity `.gakori-backdrop` (0.16→0.22 jasny,
     0.22→0.3 ciemny). Kontrast sprawdzony ponownie po zmianie — wyszedł
     RÓWNIEŻ lepszy niż w rundzie 2 (np. `--ink-soft` na `--paper`: było ok.
     5:1, jest ok. 4,9-8,4:1 zależnie od motywu), więc silniejszy wygląd nie
@@ -857,7 +857,7 @@ zanim założysz, że działa.
        główny. To jednym ruchem naprawiło zarówno "przyciski nie są
        spójne", jak i "panel konta nie dorównuje głównej" — obie strony
        współdzielą tę samą klasę.
-    `sw.js` `CACHE_NAME` podbite do `pragma-v15`.
+    `sw.js` `CACHE_NAME` podbite do `gakori-v15`.
   - **POPRAWKA 2026-08-18(g) — runda 5**: użytkownik dalej zgłosił, że
     panel konta "nigdy nie dociąga spójności z głównym menu". Prawdziwa
     przyczyna, przeoczona w rundzie 4: `account.html` i `scan.html` w
@@ -887,7 +887,7 @@ zanim założysz, że działa.
     dziedziczą kolor tekstu przycisku, więc też się odwracają z motywem)
     — platformowe emoji (różne na różnych telefonach, kolorowe wbrew
     reszcie stonowanej palety) nie pasowały do konceptu prestiżu z logo.
-    `sw.js` `CACHE_NAME` podbite do `pragma-v16`.
+    `sw.js` `CACHE_NAME` podbite do `gakori-v16`.
   - **POPRAWKA 2026-08-18(h) — runda 6**: użytkownik ocenił, że tryb ciemny
     ma już właściwą "grę świateł"/prestiż, ale jasnemu jej brakuje.
     Znaleziona PRAWDZIWA przyczyna (nie kwestia mocy efektu, tylko
@@ -912,7 +912,7 @@ zanim założysz, że działa.
     kolejność jasności `--card-2` > `--card` > `--paper` — sam ten sam
     wzór CSS w obu motywach nie gwarantuje tego samego efektu wizualnego,
     jeśli kolejność wartości zmiennych się nie zgadza.
-    `sw.js` `CACHE_NAME` podbite do `pragma-v17`.
+    `sw.js` `CACHE_NAME` podbite do `gakori-v17`.
   - **POPRAWKA 2026-08-18(i)**: blok "Co teraz zrobić" pod każdym wzorcem
     (`.pattern-tip` w `scan.html`) wyglądał na telefonie na ściśnięty —
     etykieta i tekst były obok siebie w jednym wierszu (`display:flex`),
@@ -925,7 +925,7 @@ zanim założysz, że działa.
     dodanie `flex:1` przy tak wąskiej etykiecie na mobile. `pattern-tip-text`
     to nowa, dedykowana klasa na `<span>` z tekstem rady (wcześniej był bez
     klasy, więc nie dało się go ostylować osobno).
-    `sw.js` `CACHE_NAME` podbite do `pragma-v18`.
+    `sw.js` `CACHE_NAME` podbite do `gakori-v18`.
   - **POPRAWKA 2026-08-18(j) — runda 7**: użytkownik wskazał DWIE konkretne
     referencje ze zrzutów ekranu: (1) jasny motyw, aktywna zakładka/przycisk
     "Analizuj" — lite, czarne wypełnienie z wyraźną grą światła — to
@@ -955,7 +955,7 @@ zanim założysz, że działa.
     `[data-theme] jakiś-selektor-ogólny`, zawsze sprawdzić, czy nie ma w
     kodzie bardziej wyspecjalizowanych elementów tego samego typu, które
     trzeba jawnie wykluczyć przez `:not()`.
-    `sw.js` `CACHE_NAME` podbite do `pragma-v19`.
+    `sw.js` `CACHE_NAME` podbite do `gakori-v19`.
   - **POPRAWKA 2026-08-18(k) — runda 8**: użytkownik zgłosił, że wynik
     analizy dalej nie pasuje do reszty aplikacji. Doprecyzowane (pytanie
     wielokrotnego wyboru) na trzy konkretne rzeczy: (1) odznaka wyniku
@@ -977,14 +977,14 @@ zanim założysz, że działa.
     zamienione na minimalistyczne ikony liniowe (inline SVG,
     `stroke="currentColor"`) — ta sama konwencja co ikony zakładek z rundy
     5, automatycznie dziedziczą kolor tekstu i odwracają się z motywem.
-    `sw.js` `CACHE_NAME` podbite do `pragma-v20`.
+    `sw.js` `CACHE_NAME` podbite do `gakori-v20`.
   - Jedna czcionka na całej stronie — 'Inter' (wcześniej nagłówki miały
     ozdobny szeryf 'Lora', usunięty na wcześniejszą prośbę użytkownika).
     Wszystkie kolory/rozmiary jako zmienne CSS w `:root` na górze
     `style.css` — zmieniaj tam, nie w poszczególnych regułach.
 - **Motyw jasny/ciemny**: przełącznik w ustawieniach konta
   (`account.html`, selektor obok języka), ten sam wzorzec zapisu co język —
-  `localStorage` (`pragma_theme`, działa też dla niezalogowanych) + kolumna
+  `localStorage` (`gakori_theme`, działa też dla niezalogowanych) + kolumna
   `profiles.theme` dla zalogowanych (synchronizacja między urządzeniami).
   Funkcje w `i18n.js`: `getCurrentTheme()`, `applyTheme()`, `setTheme()`,
   `syncThemeFromProfile()` — analogiczne do `getCurrentLanguage()` itd.
@@ -1158,7 +1158,7 @@ zanim założysz, że działa.
   - Ton/format wszystkich maili: krótkie, ciepłe, bez żargonu, zawsze z
     bezpośrednim zwróceniem się po nazwie użytkownika, kończą się
     odpowiednikiem "Dziękujemy, że jesteś z nami od samego początku.
-    Zespół Pragma" w danym języku. Treść każdego z 3 typów × 10 języków
+    Zespół Gakori" w danym języku. Treść każdego z 3 typów × 10 języków
     jest zapisana wprost w kodzie funkcji (`EMAIL_CONTENT`) — jeśli trzeba
     poprawić tekst maila, edytuje się ten plik, nie panel Supabase (panel
     już nie ma wpływu na treść tych maili, dopóki hook jest włączony).
@@ -1191,7 +1191,7 @@ zanim założysz, że działa.
     to nie działać.
   - **Pułapka — nazwa nadawcy (`sender.name` w Brevo) musi być
     tłumaczona razem z resztą maila.** Pierwsza wersja miała jedną,
-    globalną nazwę (`BREVO_SENDER_NAME`, po polsku "Zespół Pragma") dla
+    globalną nazwę (`BREVO_SENDER_NAME`, po polsku "Zespół Gakori") dla
     WSZYSTKICH języków — w efekcie np. niemiecki mail miał poprawnie
     przetłumaczoną treść, ale w polu "Od" nadawca i tak podpisywał się
     po polsku, co wygląda na pomyłkę/niespójność. Naprawione przez
@@ -1231,10 +1231,10 @@ zanim założysz, że działa.
   (nie przez dashboardowy UI "Cron Jobs" — w tym projekcie taka strona nie
   istnieje w menu Database, mimo że rozszerzenie `pg_cron` jest włączone;
   harmonogram ustawiony poleceniem SQL w SQL Editor: `select
-  cron.schedule('pragma-daily-report', '0 14 * * *', $$ select
+  cron.schedule('gakori-daily-report', '0 14 * * *', $$ select
   net.http_post(url:='.../functions/v1/daily-report', headers:=jsonb_build_object('x-cron-secret','...'),
   body:='{}'::jsonb) $$)`; podgląd/zmiana: `select * from cron.job;`,
-  `select cron.unschedule('pragma-daily-report');`), z nagłówkiem
+  `select cron.unschedule('gakori-daily-report');`), z nagłówkiem
   `x-cron-secret` z wartością sekretu `CRON_REPORT_SECRET` — żeby nikt
   obcy nie mógł wywoływać funkcji na żądanie i generować niepotrzebnego
   ruchu/kosztów. Podobnie jak `send-auth-email`, ma wyłączoną domyślną
@@ -1254,7 +1254,7 @@ zanim założysz, że działa.
     jeszcze działającego przepływu zakupu w aplikacji) — gdy powstanie,
     dopisać sekcję z sumą przychodu/liczbą transakcji dziennie.
   - **Zgłaszanie błędów przez użytkowników** — taki system w ogóle
-    jeszcze nie istnieje w Pragmie (ani frontend, ani tabela w bazie) —
+    jeszcze nie istnieje w Gakori (ani frontend, ani tabela w bazie) —
     gdy powstanie, dopisać do raportu liczbę zgłoszeń dziennie.
 - **Przeglądarka publicznych analiz**: lista klikalnych wierszy (ikona
   typu źródła + odznaka wyniku + skrócony cytat), wyszukiwanie po słowach
@@ -1365,7 +1365,7 @@ zanim założysz, że działa.
   wymyślać własne, przypadkowe określenia albo trzymać się tylko kilku
   najbardziej oczywistych (Dowód Społeczny, Fałszywa Pilność...). Celowo
   **cała biblioteka 100 modeli**, nie tylko podzbiór "manipulacyjny" —
-  świadoma decyzja użytkownika: Pragma ma nazywać też trafne, wartościowe
+  świadoma decyzja użytkownika: Gakori ma nazywać też trafne, wartościowe
   wzorce rozumowania w tekście, nie tylko manipulacje.
   - Pełna wersja "dla ludzi" (z przykładami, pogrupowana w 15 kategorii)
     żyje w `MODELE_MENTALNE.md` w katalogu głównym repo. **Te dwa miejsca
@@ -1827,7 +1827,7 @@ bez żadnego przychodu.
   — tylko ikony zostały na cache-first.
   **POPRAWKA 2026-08-18(c)**: samo "network-first" nie wystarczyło — po
   wdrożeniu rundy 2 stylu "Rzeźba" część telefonów dalej pokazywała stary
-  `style.css` (brakującą regułę `.pragma-backdrop` widać było jako
+  `style.css` (brakującą regułę `.gakori-backdrop` widać było jako
   ogromny, nierozmyty, nieprzezroczysty kształt zamiast delikatnej poświaty
   w tle). Przyczyna: zwykłe `fetch(event.request)` w Service Workerze
   respektuje **wewnętrzną pamięć podręczną przeglądarki (HTTP cache)** —
@@ -1973,9 +1973,9 @@ zupełnie inna liczba, i to ta druga jest poprawna.
   podejmowania decyzji.
 - Zawsze podawaj **całą** zaktualizowaną zawartość plików wymagających
   ręcznego wdrożenia (backend, migracje SQL) — nie fragmenty/diffy.
-- Po każdej większej zmianie: zaktualizuj ten plik (`PRAGMA_CONTEXT.md`)
+- Po każdej większej zmianie: zaktualizuj ten plik (`GAKORI_CONTEXT.md`)
   w tym samym PR-ze, żeby nie stał się nieaktualny.
-- **Pragma to przede wszystkim aplikacja mobilna (PWA)** — przy KAŻDEJ
+- **Gakori to przede wszystkim aplikacja mobilna (PWA)** — przy KAŻDEJ
   zmianie wizualnej/UI pilnuj responsywności na telefonach, nie tylko na
   desktopie/tablecie (użytkownik świadomie o to poprosił). W praktyce:
   `style.css` na razie nie ma żadnych `@media` (celowo — układ jest

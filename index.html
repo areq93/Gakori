@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pragma_theme') || 'light');</script>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('gakori_theme') || 'light');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pragma - Analiza</title>
+    <title>Gakori - Analiza</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="shortcut icon" href="icon-192.png">
@@ -18,14 +18,14 @@
 </head>
 <body>
 
-    <svg class="pragma-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
+    <svg class="gakori-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
         <defs>
-            <linearGradient id="pragmaBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+            <linearGradient id="gakoriBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
                 <stop offset="0%" stop-color="#9a9184"/>
                 <stop offset="100%" stop-color="#3f3c35"/>
             </linearGradient>
         </defs>
-        <path transform="rotate(-18 50 50)" fill="url(#pragmaBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
+        <path transform="rotate(-18 50 50)" fill="url(#gakoriBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
     </svg>
 
     <a id="userMenuBtn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
@@ -39,16 +39,16 @@
 
     <div class="card" id="authCard" style="display:none;">
         <h1 style="margin-top:0">
-            <svg class="pragma-mark" width="34" height="34" viewBox="0 0 100 100" aria-hidden="true">
+            <svg class="gakori-mark" width="34" height="34" viewBox="0 0 100 100" aria-hidden="true">
                 <defs>
-                    <linearGradient id="pragmaMarkGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+                    <linearGradient id="gakoriMarkGrad" x1="15%" y1="0%" x2="85%" y2="100%">
                         <stop offset="0%" stop-color="#9a9184"/>
                         <stop offset="100%" stop-color="#3f3c35"/>
                     </linearGradient>
                 </defs>
-                <path transform="rotate(-18 50 50)" fill="url(#pragmaMarkGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
+                <path transform="rotate(-18 50 50)" fill="url(#gakoriMarkGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
             </svg>
-            Pragma
+            Gakori
         </h1>
         <p class="tagline" data-i18n="tagline">Wklej tekst, a my pokażemy Ci, czy ktoś próbuje Tobą manipulować.</p>
 
@@ -366,7 +366,7 @@
             // nie daje innym użytkownikom żadnego kontekstu, co właściwie było
             // analizowane (dla PDF-a to nawet mocniejsze: użytkownik wprost
             // poprosił, żeby PDF-y w ogóle nie trafiały do tego mechanizmu
-            // odkrywalności — patrz PRAGMA_CONTEXT.md). Bezpośredni link do
+            // odkrywalności — patrz GAKORI_CONTEXT.md). Bezpośredni link do
             // takiej analizy (scan.html?id=...) nadal działa dla osoby, która
             // go ma — po prostu nie jest "odkrywalny".
             let request = sb.from('scans').select('id, content_hash, input_type, result, created_at').eq('language', currentLang).not('input_type', 'in', '(image,pdf)');
@@ -699,7 +699,7 @@
         });
 
         // 2b. Przechwytywanie udostępnionego OBRAZU (np. "Udostępnij" na zrzucie
-        // ekranu → wybór Pragmy z listy). Service Worker (sw.js,
+        // ekranu → wybór Gakori z listy). Service Worker (sw.js,
         // handleShareTarget) już wyjął go z przesłanej "paczki" i przytrzymał
         // chwilowo we własnym, tymczasowym miejscu — tu go odbieramy, wstawiamy
         // jako wybrany obraz (dokładnie tak, jakby użytkownik sam wybrał plik
@@ -710,7 +710,7 @@
             if (params.get('shared_image') !== '1' || !('caches' in window)) return;
             window.history.replaceState({}, '', window.location.pathname);
             try {
-                const cache = await caches.open('pragma-share-target-v1');
+                const cache = await caches.open('gakori-share-target-v1');
                 const res = await cache.match('/shared-image');
                 if (!res) return;
                 await cache.delete('/shared-image');
@@ -721,7 +721,7 @@
                 setMode('image');
                 addSelectedImageFiles([file]);
             } catch (err) {
-                console.error('Pragma: nie udało się odebrać udostępnionego obrazu', err);
+                console.error('Gakori: nie udało się odebrać udostępnionego obrazu', err);
             }
         }
 
@@ -1184,7 +1184,7 @@
                     // po prostu nie pokażą się obrazy — reszta wyniku działa normalnie.
                     if (currentMode === 'image' && imagePreviewDataUrls && imagePreviewDataUrls.some(Boolean)) {
                         try {
-                            sessionStorage.setItem('pragma_scan_image_' + data.id, JSON.stringify(imagePreviewDataUrls));
+                            sessionStorage.setItem('gakori_scan_image_' + data.id, JSON.stringify(imagePreviewDataUrls));
                         } catch {
                             // limit miejsca w sessionStorage — pomijamy podgląd, nie blokujemy przejścia
                         }
@@ -1293,7 +1293,7 @@
             } else if (currentMode === 'pdf') {
                 if (!selectedPdfFile) return alert(t('alert_choose_pdf_file'));
                 // Ten sam limit co po stronie backendu (10 MB — świadomie
-                // ostrożny start, patrz PRAGMA_CONTEXT.md/analyze/index.ts)
+                // ostrożny start, patrz GAKORI_CONTEXT.md/analyze/index.ts)
                 // — tylko szybka informacja zwrotna, backend i tak sprawdza
                 // to sam niezależnie.
                 if (selectedPdfFile.size > 10 * 1024 * 1024) return alert(t('alert_pdf_too_large'));

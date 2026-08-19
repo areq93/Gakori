@@ -1,4 +1,4 @@
-// Pragma — słownik tłumaczeń interfejsu i mechanizm przełączania języka.
+// Gakori — słownik tłumaczeń interfejsu i mechanizm przełączania języka.
 // Pole "quote" w wynikach analizy AI NIE jest tłumaczone przez ten plik —
 // to dosłowny cytat, który backend (analyze/index.ts) świadomie zostawia
 // w oryginalnym języku analizowanego tekstu. Reszta wyniku AI (name,
@@ -48,7 +48,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Potwierdź adres e-mail — sprawdź skrzynkę i kliknij link, który wysłaliśmy.",
         err_invalid_email_format: "Nieprawidłowy format adresu e-mail.",
         err_captcha_generic: "Potwierdź, że nie jesteś robotem (zaznacz pole powyżej) i spróbuj ponownie.",
-        account_aria_label: "Twoje konto", credit_balance_label: "Stan kredytów", account_back: "← Wróć do Pragmy", account_title: "Twoje konto",
+        account_aria_label: "Twoje konto", credit_balance_label: "Stan kredytów", account_back: "← Wróć do Gakori", account_title: "Twoje konto",
         loading: "Ładowanie...", account_logged_in_as: "Zalogowano jako:",
         btn_logout: "Wyloguj", link_change_password: "Zmień hasło", btn_save_password: "Zapisz nowe hasło",
         password_changed: "Hasło zmienione.",
@@ -85,7 +85,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} min", retry_hours: "{hours} godz.", retry_days: "{days} dni",
         rate_limit_expired: "Możesz już spróbować ponownie.",
         err_invalid_image: "To nie jest rozpoznawalny plik obrazu (JPEG/PNG/GIF/WEBP).",
-        err_unsafe_content: "Ten obraz przedstawia treści niedozwolone w Pragmie (np. nagość, przemoc, drastyczne obrazy) i nie może zostać przeanalizowany. Zgodnie z zasadami ta próba została policzona jak zwykła analiza.",
+        err_unsafe_content: "Ten obraz przedstawia treści niedozwolone w Gakori (np. nagość, przemoc, drastyczne obrazy) i nie może zostać przeanalizowany. Zgodnie z zasadami ta próba została policzona jak zwykła analiza.",
         err_too_many_images: "Można analizować maksymalnie {max} obrazów naraz.",
         label_images_selected: "Wybrano {count}/{max} obrazów",
         alert_max_images: "Możesz dodać maksymalnie {max} obrazów naraz.",
@@ -126,7 +126,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Confirm your email — check your inbox and click the link we sent.",
         err_invalid_email_format: "Invalid email format.",
         err_captcha_generic: "Confirm you're not a robot (check the box above) and try again.",
-        account_aria_label: "Your account", credit_balance_label: "Credit balance", account_back: "← Back to Pragma", account_title: "Your account",
+        account_aria_label: "Your account", credit_balance_label: "Credit balance", account_back: "← Back to Gakori", account_title: "Your account",
         loading: "Loading...", account_logged_in_as: "Logged in as:",
         btn_logout: "Log out", link_change_password: "Change password", btn_save_password: "Save new password",
         password_changed: "Password changed.",
@@ -163,7 +163,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} min", retry_hours: "{hours} h", retry_days: "{days} days",
         rate_limit_expired: "You can try again now.",
         err_invalid_image: "This isn't a recognizable image file (JPEG/PNG/GIF/WEBP).",
-        err_unsafe_content: "This image shows content that isn't allowed on Pragma (e.g. nudity, violence, graphic imagery) and can't be analyzed. Per our rules, this attempt was still charged like a normal analysis.",
+        err_unsafe_content: "This image shows content that isn't allowed on Gakori (e.g. nudity, violence, graphic imagery) and can't be analyzed. Per our rules, this attempt was still charged like a normal analysis.",
         err_too_many_images: "You can analyze up to {max} images at once.",
         label_images_selected: "{count}/{max} images selected",
         alert_max_images: "You can add up to {max} images at once.",
@@ -204,7 +204,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Confirma tu correo electrónico: revisa tu bandeja de entrada y haz clic en el enlace que enviamos.",
         err_invalid_email_format: "Formato de correo electrónico no válido.",
         err_captcha_generic: "Confirma que no eres un robot (marca la casilla de arriba) e inténtalo de nuevo.",
-        account_aria_label: "Tu cuenta", credit_balance_label: "Créditos disponibles", account_back: "← Volver a Pragma", account_title: "Tu cuenta",
+        account_aria_label: "Tu cuenta", credit_balance_label: "Créditos disponibles", account_back: "← Volver a Gakori", account_title: "Tu cuenta",
         loading: "Cargando...", account_logged_in_as: "Sesión iniciada como:",
         btn_logout: "Cerrar sesión", link_change_password: "Cambiar contraseña", btn_save_password: "Guardar nueva contraseña",
         password_changed: "Contraseña cambiada.",
@@ -241,7 +241,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} min", retry_hours: "{hours} h", retry_days: "{days} días",
         rate_limit_expired: "Ya puedes volver a intentarlo.",
         err_invalid_image: "Esto no es un archivo de imagen reconocible (JPEG/PNG/GIF/WEBP).",
-        err_unsafe_content: "Esta imagen muestra contenido no permitido en Pragma (por ejemplo, desnudez, violencia, imágenes explícitas) y no se puede analizar. Según nuestras normas, este intento se ha cobrado igualmente como un análisis normal.",
+        err_unsafe_content: "Esta imagen muestra contenido no permitido en Gakori (por ejemplo, desnudez, violencia, imágenes explícitas) y no se puede analizar. Según nuestras normas, este intento se ha cobrado igualmente como un análisis normal.",
         err_too_many_images: "Puedes analizar un máximo de {max} imágenes a la vez.",
         label_images_selected: "{count}/{max} imágenes seleccionadas",
         alert_max_images: "Puedes añadir un máximo de {max} imágenes a la vez.",
@@ -282,7 +282,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Bitte bestätige deine E-Mail — prüfe dein Postfach und klicke auf den gesendeten Link.",
         err_invalid_email_format: "Ungültiges E-Mail-Format.",
         err_captcha_generic: "Bitte bestätige, dass du kein Roboter bist (Kästchen oben anklicken) und versuche es erneut.",
-        account_aria_label: "Dein Konto", credit_balance_label: "Guthaben", account_back: "← Zurück zu Pragma", account_title: "Dein Konto",
+        account_aria_label: "Dein Konto", credit_balance_label: "Guthaben", account_back: "← Zurück zu Gakori", account_title: "Dein Konto",
         loading: "Wird geladen...", account_logged_in_as: "Angemeldet als:",
         btn_logout: "Abmelden", link_change_password: "Passwort ändern", btn_save_password: "Neues Passwort speichern",
         password_changed: "Passwort geändert.",
@@ -319,7 +319,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} Min.", retry_hours: "{hours} Std.", retry_days: "{days} Tagen",
         rate_limit_expired: "Du kannst es jetzt erneut versuchen.",
         err_invalid_image: "Das ist keine erkennbare Bilddatei (JPEG/PNG/GIF/WEBP).",
-        err_unsafe_content: "Dieses Bild zeigt Inhalte, die bei Pragma nicht erlaubt sind (z. B. Nacktheit, Gewalt, drastische Darstellungen), und kann nicht analysiert werden. Gemäß unseren Regeln wurde dieser Versuch trotzdem wie eine normale Analyse berechnet.",
+        err_unsafe_content: "Dieses Bild zeigt Inhalte, die bei Gakori nicht erlaubt sind (z. B. Nacktheit, Gewalt, drastische Darstellungen), und kann nicht analysiert werden. Gemäß unseren Regeln wurde dieser Versuch trotzdem wie eine normale Analyse berechnet.",
         err_too_many_images: "Du kannst maximal {max} Bilder auf einmal analysieren.",
         label_images_selected: "{count}/{max} Bilder ausgewählt",
         alert_max_images: "Du kannst maximal {max} Bilder auf einmal hinzufügen.",
@@ -360,7 +360,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Confirmez votre e-mail — consultez votre boîte de réception et cliquez sur le lien envoyé.",
         err_invalid_email_format: "Format d'e-mail invalide.",
         err_captcha_generic: "Confirmez que vous n'êtes pas un robot (cochez la case ci-dessus) et réessayez.",
-        account_aria_label: "Votre compte", credit_balance_label: "Solde de crédits", account_back: "← Retour à Pragma", account_title: "Votre compte",
+        account_aria_label: "Votre compte", credit_balance_label: "Solde de crédits", account_back: "← Retour à Gakori", account_title: "Votre compte",
         loading: "Chargement...", account_logged_in_as: "Connecté en tant que :",
         btn_logout: "Se déconnecter", link_change_password: "Changer le mot de passe", btn_save_password: "Enregistrer le nouveau mot de passe",
         password_changed: "Mot de passe modifié.",
@@ -397,7 +397,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} min", retry_hours: "{hours} h", retry_days: "{days} jours",
         rate_limit_expired: "Vous pouvez réessayer maintenant.",
         err_invalid_image: "Ce n'est pas un fichier image reconnaissable (JPEG/PNG/GIF/WEBP).",
-        err_unsafe_content: "Cette image montre un contenu non autorisé sur Pragma (nudité, violence, images choquantes, etc.) et ne peut pas être analysée. Conformément à nos règles, cette tentative a tout de même été facturée comme une analyse normale.",
+        err_unsafe_content: "Cette image montre un contenu non autorisé sur Gakori (nudité, violence, images choquantes, etc.) et ne peut pas être analysée. Conformément à nos règles, cette tentative a tout de même été facturée comme une analyse normale.",
         err_too_many_images: "Vous pouvez analyser au maximum {max} images à la fois.",
         label_images_selected: "{count}/{max} images sélectionnées",
         alert_max_images: "Vous pouvez ajouter au maximum {max} images à la fois.",
@@ -438,7 +438,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "Подтвердите e-mail — проверьте почту и перейдите по отправленной ссылке.",
         err_invalid_email_format: "Неверный формат e-mail.",
         err_captcha_generic: "Подтвердите, что вы не робот (отметьте галочку выше), и попробуйте снова.",
-        account_aria_label: "Ваш аккаунт", credit_balance_label: "Баланс кредитов", account_back: "← Назад в Pragma", account_title: "Ваш аккаунт",
+        account_aria_label: "Ваш аккаунт", credit_balance_label: "Баланс кредитов", account_back: "← Назад в Gakori", account_title: "Ваш аккаунт",
         loading: "Загрузка...", account_logged_in_as: "Вы вошли как:",
         btn_logout: "Выйти", link_change_password: "Изменить пароль", btn_save_password: "Сохранить новый пароль",
         password_changed: "Пароль изменён.",
@@ -475,7 +475,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} мин", retry_hours: "{hours} ч", retry_days: "{days} дн.",
         rate_limit_expired: "Теперь можно попробовать снова.",
         err_invalid_image: "Это не распознаваемый файл изображения (JPEG/PNG/GIF/WEBP).",
-        err_unsafe_content: "Это изображение содержит контент, запрещённый в Pragma (например, наготу, насилие, шокирующие сцены), и не может быть проанализировано. Согласно правилам, эта попытка всё равно была списана как обычный анализ.",
+        err_unsafe_content: "Это изображение содержит контент, запрещённый в Gakori (например, наготу, насилие, шокирующие сцены), и не может быть проанализировано. Согласно правилам, эта попытка всё равно была списана как обычный анализ.",
         err_too_many_images: "Можно анализировать не более {max} изображений за раз.",
         label_images_selected: "Выбрано {count}/{max} изображений",
         alert_max_images: "Можно добавить не более {max} изображений за раз.",
@@ -516,7 +516,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "请确认您的邮箱——查收邮件并点击我们发送的链接。",
         err_invalid_email_format: "邮箱格式无效。",
         err_captcha_generic: "请确认您不是机器人（勾选上方方框）并重试。",
-        account_aria_label: "您的账户", credit_balance_label: "积分余额", account_back: "← 返回 Pragma", account_title: "您的账户",
+        account_aria_label: "您的账户", credit_balance_label: "积分余额", account_back: "← 返回 Gakori", account_title: "您的账户",
         loading: "加载中…", account_logged_in_as: "已登录为：",
         btn_logout: "退出登录", link_change_password: "修改密码", btn_save_password: "保存新密码",
         password_changed: "密码已修改。",
@@ -553,7 +553,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} 分钟", retry_hours: "{hours} 小时", retry_days: "{days} 天",
         rate_limit_expired: "现在可以重试了。",
         err_invalid_image: "这不是可识别的图片文件（JPEG/PNG/GIF/WEBP）。",
-        err_unsafe_content: "这张图片包含 Pragma 不允许的内容（例如裸露、暴力、令人不适的画面），无法进行分析。根据规则，本次尝试仍将按正常分析扣费。",
+        err_unsafe_content: "这张图片包含 Gakori 不允许的内容（例如裸露、暴力、令人不适的画面），无法进行分析。根据规则，本次尝试仍将按正常分析扣费。",
         err_too_many_images: "一次最多可以分析 {max} 张图片。",
         label_images_selected: "已选择 {count}/{max} 张图片",
         alert_max_images: "一次最多可以添加 {max} 张图片。",
@@ -594,7 +594,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "メールアドレスを確認してください — 受信トレイを確認し、送信されたリンクをクリックしてください。",
         err_invalid_email_format: "メールアドレスの形式が正しくありません。",
         err_captcha_generic: "ロボットではないことを確認し（上のチェックボックスをクリック）、もう一度お試しください。",
-        account_aria_label: "アカウント", credit_balance_label: "クレジット残高", account_back: "← Pragmaに戻る", account_title: "アカウント",
+        account_aria_label: "アカウント", credit_balance_label: "クレジット残高", account_back: "← Gakoriに戻る", account_title: "アカウント",
         loading: "読み込み中…", account_logged_in_as: "ログイン中：",
         btn_logout: "ログアウト", link_change_password: "パスワードを変更", btn_save_password: "新しいパスワードを保存",
         password_changed: "パスワードを変更しました。",
@@ -631,7 +631,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes}分", retry_hours: "{hours}時間", retry_days: "{days}日",
         rate_limit_expired: "もう一度お試しいただけます。",
         err_invalid_image: "これは認識できる画像ファイル（JPEG/PNG/GIF/WEBP）ではありません。",
-        err_unsafe_content: "この画像にはPragmaで許可されていない内容（ヌード、暴力、ショッキングな描写など）が含まれているため、分析できません。規約に基づき、この試行にも通常の分析と同じ料金が発生しています。",
+        err_unsafe_content: "この画像にはGakoriで許可されていない内容（ヌード、暴力、ショッキングな描写など）が含まれているため、分析できません。規約に基づき、この試行にも通常の分析と同じ料金が発生しています。",
         err_too_many_images: "一度に分析できる画像は最大{max}枚です。",
         label_images_selected: "{count}/{max}枚の画像を選択済み",
         alert_max_images: "一度に追加できる画像は最大{max}枚です。",
@@ -672,7 +672,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "अपना ईमेल सत्यापित करें — इनबॉक्स जांचें और भेजे गए लिंक पर क्लिक करें।",
         err_invalid_email_format: "अमान्य ईमेल फॉर्मेट।",
         err_captcha_generic: "पुष्टि करें कि आप रोबोट नहीं हैं (ऊपर चेकबॉक्स चुनें) और फिर से प्रयास करें।",
-        account_aria_label: "आपका खाता", credit_balance_label: "क्रेडिट बैलेंस", account_back: "← Pragma पर वापस जाएं", account_title: "आपका खाता",
+        account_aria_label: "आपका खाता", credit_balance_label: "क्रेडिट बैलेंस", account_back: "← Gakori पर वापस जाएं", account_title: "आपका खाता",
         loading: "लोड हो रहा है...", account_logged_in_as: "इस रूप में लॉग इन:",
         btn_logout: "लॉग आउट करें", link_change_password: "पासवर्ड बदलें", btn_save_password: "नया पासवर्ड सहेजें",
         password_changed: "पासवर्ड बदल दिया गया।",
@@ -709,7 +709,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} मिनट", retry_hours: "{hours} घंटे", retry_days: "{days} दिन",
         rate_limit_expired: "अब आप फिर से कोशिश कर सकते हैं।",
         err_invalid_image: "यह एक पहचानने योग्य छवि फ़ाइल (JPEG/PNG/GIF/WEBP) नहीं है।",
-        err_unsafe_content: "इस छवि में ऐसी सामग्री है जो Pragma पर अनुमति नहीं है (जैसे नग्नता, हिंसा, भयावह दृश्य), इसलिए इसका विश्लेषण नहीं किया जा सकता। हमारे नियमों के अनुसार, इस प्रयास के लिए भी सामान्य विश्लेषण जितना ही शुल्क लिया गया है।",
+        err_unsafe_content: "इस छवि में ऐसी सामग्री है जो Gakori पर अनुमति नहीं है (जैसे नग्नता, हिंसा, भयावह दृश्य), इसलिए इसका विश्लेषण नहीं किया जा सकता। हमारे नियमों के अनुसार, इस प्रयास के लिए भी सामान्य विश्लेषण जितना ही शुल्क लिया गया है।",
         err_too_many_images: "एक बार में अधिकतम {max} छवियों का विश्लेषण किया जा सकता है।",
         label_images_selected: "{count}/{max} छवियां चुनी गईं",
         alert_max_images: "आप एक बार में अधिकतम {max} छवियां जोड़ सकते हैं।",
@@ -750,7 +750,7 @@ const TRANSLATIONS = {
         err_email_not_confirmed: "قم بتأكيد بريدك الإلكتروني — تحقق من صندوق الوارد وانقر على الرابط الذي أرسلناه.",
         err_invalid_email_format: "صيغة بريد إلكتروني غير صالحة.",
         err_captcha_generic: "أكّد أنك لست روبوتًا (حدد المربع أعلاه) وحاول مرة أخرى.",
-        account_aria_label: "حسابك", credit_balance_label: "رصيد الأرصدة", account_back: "← العودة إلى Pragma", account_title: "حسابك",
+        account_aria_label: "حسابك", credit_balance_label: "رصيد الأرصدة", account_back: "← العودة إلى Gakori", account_title: "حسابك",
         loading: "جارٍ التحميل...", account_logged_in_as: "تم تسجيل الدخول باسم:",
         btn_logout: "تسجيل الخروج", link_change_password: "تغيير كلمة المرور", btn_save_password: "حفظ كلمة المرور الجديدة",
         password_changed: "تم تغيير كلمة المرور.",
@@ -787,7 +787,7 @@ const TRANSLATIONS = {
         retry_minutes: "{minutes} دقيقة", retry_hours: "{hours} ساعة", retry_days: "{days} يوم",
         rate_limit_expired: "يمكنك المحاولة مرة أخرى الآن.",
         err_invalid_image: "هذا ليس ملف صورة معروفًا (JPEG/PNG/GIF/WEBP).",
-        err_unsafe_content: "تحتوي هذه الصورة على محتوى غير مسموح به في Pragma (مثل العُري، أو العنف، أو المشاهد الصادمة) ولا يمكن تحليلها. وفقًا لقواعدنا، تم احتساب تكلفة هذه المحاولة كأنها تحليل عادي.",
+        err_unsafe_content: "تحتوي هذه الصورة على محتوى غير مسموح به في Gakori (مثل العُري، أو العنف، أو المشاهد الصادمة) ولا يمكن تحليلها. وفقًا لقواعدنا، تم احتساب تكلفة هذه المحاولة كأنها تحليل عادي.",
         err_too_many_images: "يمكنك تحليل {max} صور كحد أقصى في المرة الواحدة.",
         label_images_selected: "تم اختيار {count}/{max} صور",
         alert_max_images: "يمكنك إضافة {max} صور كحد أقصى في المرة الواحدة.",
@@ -808,7 +808,7 @@ const TRANSLATIONS = {
 };
 
 function getCurrentLanguage() {
-    return localStorage.getItem('pragma_lang') || 'en';
+    return localStorage.getItem('gakori_lang') || 'en';
 }
 
 function t(key, vars) {
@@ -852,7 +852,7 @@ function applyTranslations() {
 // profilu — żeby ustawienie synchronizowało się między urządzeniami.
 function setLanguage(lang, sb, userId) {
     if (!TRANSLATIONS[lang]) return;
-    localStorage.setItem('pragma_lang', lang);
+    localStorage.setItem('gakori_lang', lang);
     applyTranslations();
     if (sb && userId) {
         // Jeśli ten zapis się nie uda (np. brak reguły RLS pozwalającej na
@@ -875,7 +875,7 @@ function syncLanguageFromProfile(sb, userId) {
     if (!sb || !userId) return Promise.resolve();
     return sb.from('profiles').select('language').eq('id', userId).single().then(({ data }) => {
         if (data && data.language && data.language !== getCurrentLanguage()) {
-            localStorage.setItem('pragma_lang', data.language);
+            localStorage.setItem('gakori_lang', data.language);
             applyTranslations();
         }
     });
@@ -889,7 +889,7 @@ function syncLanguageFromProfile(sb, userId) {
 // [data-theme="dark"] — więc te funkcje tylko go PODTRZYMUJĄ/ZMIENIAJĄ po
 // starcie strony, nie odpowiadają za pierwsze ustawienie przy ładowaniu.
 function getCurrentTheme() {
-    return localStorage.getItem('pragma_theme') || 'light';
+    return localStorage.getItem('gakori_theme') || 'light';
 }
 
 function applyTheme() {
@@ -898,7 +898,7 @@ function applyTheme() {
 
 function setTheme(theme, sb, userId) {
     if (theme !== 'light' && theme !== 'dark') return;
-    localStorage.setItem('pragma_theme', theme);
+    localStorage.setItem('gakori_theme', theme);
     applyTheme();
     if (sb && userId) {
         sb.from('profiles').update({ theme: theme }).eq('id', userId).then(({ error }) => {
@@ -911,7 +911,7 @@ function syncThemeFromProfile(sb, userId) {
     if (!sb || !userId) return Promise.resolve();
     return sb.from('profiles').select('theme').eq('id', userId).single().then(({ data }) => {
         if (data && data.theme && data.theme !== getCurrentTheme()) {
-            localStorage.setItem('pragma_theme', data.theme);
+            localStorage.setItem('gakori_theme', data.theme);
             applyTheme();
         }
     });
@@ -1022,7 +1022,7 @@ function refreshCreditBalance(sb, userId) {
 // wywoływaniu tego przy KAŻDYM logowaniu, backfill dla starych kont dzieje
 // się sam, bez osobnej migracji dla każdego konta z osobna (choć jest też
 // jednorazowe zapytanie SQL wypełniające to od razu dla wszystkich, patrz
-// PRAGMA_CONTEXT.md — to i tak nie zaszkodzi, zapytanie tu jest no-opem dla
+// GAKORI_CONTEXT.md — to i tak nie zaszkodzi, zapytanie tu jest no-opem dla
 // kont, które już mają nazwę ustawioną).
 // Podstawowa lista zakazanych słów (silne wulgaryzmy + najbardziej
 // rozpoznawalne obelgi, PL + EN), dopasowywana jako podciąg w małych
@@ -1030,14 +1030,14 @@ function refreshCreditBalance(sb, userId) {
 // z czasem rozszerzać, jeśli coś się prześlizgnie (zgłoszenie od
 // użytkowników). Ta sama lista jest (przede wszystkim, jako prawdziwe
 // zabezpieczenie) powielona w wyzwalaczu bazy danych — patrz
-// PRAGMA_CONTEXT.md. Jeśli dodajesz/usuwasz słowo, zrób to w OBU miejscach.
+// GAKORI_CONTEXT.md. Jeśli dodajesz/usuwasz słowo, zrób to w OBU miejscach.
 // Uporządkowane wg języka (kody jak w SUPPORTED_LANGUAGES) — łatwiej
 // rozszerzać/poprawiać pojedynczy język, niż grzebać w jednej wielkiej
 // nieposegregowanej liście. Dla języków spoza alfabetu łacińskiego (ru, zh,
 // ja, hi, ar) lista jest solidną podstawą, ale nie była sprawdzona przez
 // osobę mówiącą danym językiem natywnie — jeśli coś jest nietrafione albo
 // czegoś brakuje, popraw/dopisz tutaj (i w tej samej liście w wyzwalaczu
-// bazy danych, patrz PRAGMA_CONTEXT.md).
+// bazy danych, patrz GAKORI_CONTEXT.md).
 const USERNAME_BLOCKLIST_BY_LANG = {
     pl: ['kurw', 'chuj', 'huj', 'jeban', 'jebac', 'jebał', 'jebie', 'pierdol', 'pizd', 'cipa', 'cipo', 'skurwysyn', 'skurwiel', 'dziwka', 'szmata', 'spierdalaj', 'pedał', 'ciota'],
     en: ['fuck', 'shit', 'bitch', 'cunt', 'asshole', 'bastard', 'whore', 'slut', 'nigger', 'nigga', 'faggot', 'retard'],

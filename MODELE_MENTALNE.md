@@ -1,6 +1,6 @@
-# Encyklopedia 100 Modeli Mentalnych Pragma
+# Encyklopedia 100 Modeli Mentalnych Gakori
 
-Pełna lista 100 modeli mentalnych używanych przez silnik analizy Pragma
+Pełna lista 100 modeli mentalnych używanych przez silnik analizy Gakori
 (`supabase/functions/analyze/index.ts`) do nazywania i wyjaśniania wzorców
 wykrytych w analizowanej treści — nie tylko manipulacji, ale też trafnych,
 wartościowych obserwacji (np. tekst poprawnie stosujący Brzytwę Ockhama).

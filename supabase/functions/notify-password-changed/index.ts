@@ -1,4 +1,4 @@
-// PRAGMA — Edge Function "notify-password-changed"
+// GAKORI — Edge Function "notify-password-changed"
 // Wdrożenie: Supabase Dashboard → Edge Functions → Deploy a new function → Via Editor
 // Wywoływana z account.html od razu po udanej zmianie hasła w panelu
 // zalogowanego użytkownika (sb.auth.updateUser({ password })). Wysyła
@@ -13,7 +13,7 @@
 // - BREVO_API_KEY — z Brevo: ikona koła zębatego → SMTP & API → API Keys
 // - BREVO_SENDER_EMAIL — zweryfikowany w Brevo adres nadawcy
 // - BREVO_SENDER_NAME — nazwa nadawcy widoczna w skrzynce odbiorcy (opcjonalnie,
-//   domyślnie "Zespół Pragma")
+//   domyślnie "Zespół Gakori")
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
 
     const brevoKey = Deno.env.get('BREVO_API_KEY')
     const senderEmail = Deno.env.get('BREVO_SENDER_EMAIL')
-    const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Zespół Pragma'
+    const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Zespół Gakori'
 
     if (!brevoKey || !senderEmail) {
       return new Response(
@@ -64,14 +64,14 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Ten sam ton i format co pozostałe maile Pragmy (potwierdzenie
+    // Ten sam ton i format co pozostałe maile Gakori (potwierdzenie
     // rejestracji, odzyskiwanie hasła) — bezpośrednie zwrócenie się po
     // nazwie użytkownika, krótko, ciepło, bez żargonu.
     const htmlContent = `<p>Cześć, ${username}!</p>
-<p>Dajemy Ci znać, że hasło do Twojego konta w Pragmie zostało właśnie zmienione.</p>
+<p>Dajemy Ci znać, że hasło do Twojego konta w Gakori zostało właśnie zmienione.</p>
 <p>Jeśli to Twoja zmiana — świetnie, nie musisz nic robić.</p>
-<p>Jeśli to NIE Twoja zmiana, jak najszybciej zaloguj się do Pragmy i skorzystaj z opcji "Zapomniałeś hasła?", żeby odzyskać dostęp do konta.</p>
-<p>Dziękujemy, że jesteś z nami od samego początku.<br>Zespół Pragma</p>`
+<p>Jeśli to NIE Twoja zmiana, jak najszybciej zaloguj się do Gakori i skorzystaj z opcji "Zapomniałeś hasła?", żeby odzyskać dostęp do konta.</p>
+<p>Dziękujemy, że jesteś z nami od samego początku.<br>Zespół Gakori</p>`
 
     const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         sender: { email: senderEmail, name: senderName },
         to: [{ email: user.email, name: username }],
-        subject: 'Twoje hasło w Pragmie zostało zmienione',
+        subject: 'Twoje hasło w Gakori zostało zmienione',
         htmlContent,
       }),
     })

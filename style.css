@@ -1,5 +1,5 @@
 /* Styl "Rzeźba" — miękka, matowa, organiczna estetyka inspirowana
-   abstrakcyjną rzeźbą współczesną (patrz logo Pragmy): płynne, biomorficzne
+   abstrakcyjną rzeźbą współczesną (patrz logo Gakori): płynne, biomorficzne
    formy bez twardych krawędzi, delikatne gradienty naśladujące światło
    rozlewające się po zaokrąglonej powierzchni, stonowana, ziemista paleta.
    Zastąpiła poprzedni styl "Retro plakat" (2026-08-18). POPRAWKA
@@ -14,7 +14,7 @@
    "sprzedają" wrażenie światła padającego na zaokrągloną powierzchnię;
    (3) cień ma teraz też delikatne, jasne obwiedzenie u góry (`inset`),
    które razem z gradientem daje wrażenie uniesionej, oświetlonej bryły;
-   (4) duży, rozmyty kształt rzeźby w tle karty startowej (`.pragma-backdrop`
+   (4) duży, rozmyty kształt rzeźby w tle karty startowej (`.gakori-backdrop`
    w index.html) — nie tylko mały znaczek przy nagłówku — żeby "świat" loga
    i świat aplikacji wewnątrz faktycznie się zgadzały.
    POPRAWKA 2026-08-18(e) — runda 3: mimo powyższego, całość dalej
@@ -154,21 +154,21 @@ h2 {
 .tagline { margin: 0 0 20px 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.45; text-align: center; }
 
 /* Mały, powtarzalny znak marki — ta sama, opływowa "kropla" co w logo
-   aplikacji, obok nagłówka "Pragma" (patrz <h1> w index.html). Gradient
+   aplikacji, obok nagłówka "Gakori" (patrz <h1> w index.html). Gradient
    naśladuje miękkie przejście światła po zaokrąglonej powierzchni rzeźby. */
-.pragma-mark { flex-shrink: 0; filter: drop-shadow(0 3px 6px var(--shadow-color-soft)); }
+.gakori-mark { flex-shrink: 0; filter: drop-shadow(0 3px 6px var(--shadow-color-soft)); }
 
 /* Duży, mocno rozmyty odpowiednik znaku marki, ustawiony ZA kartą startową
    (patrz index.html) — bez tego cała reszta ekranu wyglądała jak zupełnie
    inny, niepowiązany świat niż samo logo. Position:fixed + niska
    nieprzezroczystość + blur = ambientowa poświata w tle, nie kolejna
    ikonka do czytania. */
-.pragma-backdrop {
+.gakori-backdrop {
     position: fixed; top: -8%; left: 50%; transform: translateX(-50%);
     width: 640px; height: 640px; max-width: 160vw;
     opacity: 0.22; filter: blur(34px); pointer-events: none; z-index: 0;
 }
-:root[data-theme="dark"] .pragma-backdrop { opacity: 0.3; }
+:root[data-theme="dark"] .gakori-backdrop { opacity: 0.3; }
 
 .card {
     background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 45%, var(--card) 100%);

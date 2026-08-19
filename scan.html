@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pragma_theme') || 'light');</script>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('gakori_theme') || 'light');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pragma - Analiza</title>
+    <title>Gakori - Analiza</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="shortcut icon" href="icon-192.png">
@@ -18,14 +18,14 @@
 </head>
 <body>
 
-    <svg class="pragma-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
+    <svg class="gakori-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
         <defs>
-            <linearGradient id="pragmaBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+            <linearGradient id="gakoriBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
                 <stop offset="0%" stop-color="#9a9184"/>
                 <stop offset="100%" stop-color="#3f3c35"/>
             </linearGradient>
         </defs>
-        <path transform="rotate(-18 50 50)" fill="url(#pragmaBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
+        <path transform="rotate(-18 50 50)" fill="url(#gakoriBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
     </svg>
 
     <!-- Ten sam górny pasek co index.html/account.html — TYLKO gdy ktoś jest
@@ -38,7 +38,7 @@
     </div>
 
     <div class="card" style="max-width:400px; width:100%;">
-        <a href="index.html" class="back-link" data-i18n="account_back">← Wróć do Pragmy</a>
+        <a href="index.html" class="back-link" data-i18n="account_back">← Wróć do Gakori</a>
 
         <div id="scanLoading">
             <p style="color:var(--ink-soft); margin:0;" data-i18n="loading">Ładowanie...</p>
@@ -290,7 +290,7 @@
                         // ich zobaczyć ponownie (np. po odświeżeniu strony albo z innego
                         // urządzenia/karty).
                         if (data.input_type === 'image') {
-                            const previewKey = 'pragma_scan_image_' + scanId;
+                            const previewKey = 'gakori_scan_image_' + scanId;
                             const preview = sessionStorage.getItem(previewKey);
                             if (preview) {
                                 sessionStorage.removeItem(previewKey);

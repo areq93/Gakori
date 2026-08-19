@@ -1,4 +1,4 @@
-// PRAGMA — Edge Function "analyze"
+// GAKORI — Edge Function "analyze"
 // Wdrożenie: Supabase Dashboard → Edge Functions → Deploy a new function → Via Editor
 // Po wdrożeniu dostępna pod: https://<PROJECT_ID>.supabase.co/functions/v1/analyze
 
@@ -43,7 +43,7 @@ const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024 // 20 MB łącznie
 
 // --- PDF (FAZA 2) ---
 // Strona PDF-a liczona identycznie jak obraz kosztowo — ustalone wcześniej
-// w PRAGMA_CONTEXT.md ("jedna strona PDF-a ≈ jeden obraz kosztowo").
+// w GAKORI_CONTEXT.md ("jedna strona PDF-a ≈ jeden obraz kosztowo").
 const PDF_PAGE_COST = IMAGE_SCAN_COST
 // Do tej liczby stron analiza rusza od razu, bez pytania o zgodę (tak jak
 // tekst/obraz/link). Powyżej: trzeba WPROST potwierdzić koszt (patrz sekcja
@@ -62,7 +62,7 @@ const PDF_AUTO_ANALYZE_MAX_PAGES = 20
 // komputerze deweloperskim — dla dużego, złożonego pliku mogłoby to realnie
 // zbliżyć się do tego limitu. Zaczynamy więc od bezpieczniejszego pułapu i
 // PODNOSIMY go dopiero po zebraniu realnych danych z produkcji (patrz
-// PRAGMA_CONTEXT.md) — łatwiej podnieść limit później niż odkryć na żywo,
+// GAKORI_CONTEXT.md) — łatwiej podnieść limit później niż odkryć na żywo,
 // że coś się wywala.
 const PDF_HARD_MAX_PAGES = 80
 const MAX_PDF_BYTES = 10 * 1024 * 1024 // 10 MB (świadomie mniej niż 20 MB limit obrazów — patrz wyżej)
@@ -91,7 +91,7 @@ const PDF_GEMINI_TIMEOUT_MS = 60000 // 60s
 // (nie np. 20-30) — mniejszy fragment daje Gemini dużo mniej tekstu do
 // "zgubienia" w jednym wywołaniu, kosztem większej liczby zapytań (a
 // więc i realnego kosztu Gemini — patrz zadanie "przeliczyć cashflow z
-// nowymi scenariuszami" w PRAGMA_CONTEXT.md, które to jeszcze bardziej
+// nowymi scenariuszami" w GAKORI_CONTEXT.md, które to jeszcze bardziej
 // uzasadnia). Części lecą RÓWNOLEGLE (Promise.all), więc łączny czas
 // odpowiedzi rośnie nieznacznie (ograniczony najwolniejszą częścią, nie
 // sumą wszystkich) — wciąż bezpiecznie mieści się w limicie 400s.
@@ -209,7 +209,7 @@ ${contentPrompt}`
 // Rozpoznaje PRAWDZIWY typ obrazu po pierwszych bajtach pliku (tzw.
 // "magiczne bajty") — nigdy nie ufamy temu, co przeglądarka deklaruje jako
 // typ pliku, bo to tylko etykieta, którą łatwo podać fałszywie (ten sam
-// mechanizm co zero zaufania do user_id z body — patrz PRAGMA_CONTEXT.md).
+// mechanizm co zero zaufania do user_id z body — patrz GAKORI_CONTEXT.md).
 // Zwraca prawdziwy mime_type albo null, jeśli to w ogóle nie jest jeden z
 // obsługiwanych formatów obrazu (wtedy traktujemy to jako nieprawidłowy plik,
 // niezależnie od rozszerzenia w nazwie).
@@ -281,9 +281,9 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 // przez użytkownika w ustawieniach aplikacji (parametr "language" z body).
 function buildSystemPrompt(langCode: string, mentalModelsLibrary: string): string {
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
-  return `Jesteś Pragma — algorytmiczny analityk treści najwyższej jakości. Twoim celem jest, żeby odbiorca poczuł realny wzrost kontroli nad tym, co czyta — precyzyjne, konkretne nazwanie mechanizmu, nie ogólnikowe wrażenie. Nie oceniasz intencji autora, tylko obecność konkretnych wzorców w tekście — zarówno wzorców manipulacji i błędów poznawczych, jak i trafnych, wartościowych sposobów rozumowania. Aktywnie szukaj OBU typów, nie tylko manipulacji — jeśli tekst poprawnie stosuje jakiś model mentalny (np. rzetelnie odróżnia korelację od przyczynowości, stosuje Brzytwę Ockhama, uczciwie przyznaje niepewność), to też jest wart nazwania.
+  return `Jesteś Gakori — algorytmiczny analityk treści najwyższej jakości. Twoim celem jest, żeby odbiorca poczuł realny wzrost kontroli nad tym, co czyta — precyzyjne, konkretne nazwanie mechanizmu, nie ogólnikowe wrażenie. Nie oceniasz intencji autora, tylko obecność konkretnych wzorców w tekście — zarówno wzorców manipulacji i błędów poznawczych, jak i trafnych, wartościowych sposobów rozumowania. Aktywnie szukaj OBU typów, nie tylko manipulacji — jeśli tekst poprawnie stosuje jakiś model mentalny (np. rzetelnie odróżnia korelację od przyczynowości, stosuje Brzytwę Ockhama, uczciwie przyznaje niepewność), to też jest wart nazwania.
 
-NEUTRALNOŚĆ (KRYTYCZNIE WAŻNE): Pragma nigdy nie wydaje wyroków w stylu "to jest dobre", "możesz temu ufać", "to wiarygodne źródło" — nawet przy wzorcach typu "reasoning". Robiąc to, sami staniemy się dokładnie tym, przed czym ostrzegamy (Argument z Autorytetu — "wierz, bo brzmi to naukowo/rzetelnie"). Zawsze WYŁĄCZNIE opisujemy mechanizm ("ten fragment robi X"), nigdy nie oceniamy wiarygodności całości tekstu ani nie zachęcamy do zaufania. Jeden trafny fragment rozumowania nie oznacza, że reszta tekstu jest bez manipulacji — i odwrotnie.
+NEUTRALNOŚĆ (KRYTYCZNIE WAŻNE): Gakori nigdy nie wydaje wyroków w stylu "to jest dobre", "możesz temu ufać", "to wiarygodne źródło" — nawet przy wzorcach typu "reasoning". Robiąc to, sami staniemy się dokładnie tym, przed czym ostrzegamy (Argument z Autorytetu — "wierz, bo brzmi to naukowo/rzetelnie"). Zawsze WYŁĄCZNIE opisujemy mechanizm ("ten fragment robi X"), nigdy nie oceniamy wiarygodności całości tekstu ani nie zachęcamy do zaufania. Jeden trafny fragment rozumowania nie oznacza, że reszta tekstu jest bez manipulacji — i odwrotnie.
 
 BIBLIOTEKA MODELI MENTALNYCH: Masz do dyspozycji poniższą bibliotekę nazwanych modeli mentalnych z wielu dziedzin (wstępnie już zawężoną do kategorii najtrafniejszych dla tej treści). Dla KAŻDEGO wykrytego wzorca wybierz z niej najtrafniej pasujący model i użyj jego nazwy (przetłumaczonej na język ${langName}) jako pola "name" — zamiast wymyślać własne, przypadkowe określenie. Jeśli naprawdę żaden model z biblioteki nie pasuje trafnie, możesz nazwać wzorzec inaczej, ale to powinien być rzadki wyjątek, nie reguła. Nie ograniczaj się do kilku najpopularniejszych modeli (jak Dowód Społeczny czy Fałszywa Pilność) — czytaj tekst uważnie i sięgaj też po mniej oczywiste, trafniejsze modele z biblioteki, gdy lepiej opisują to, co faktycznie dzieje się w tekście.
 
@@ -751,7 +751,7 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
   }
 }
 
-// --- Ochrona cashflow przed nadużyciem (patrz PRAGMA_CONTEXT.md) ---
+// --- Ochrona cashflow przed nadużyciem (patrz GAKORI_CONTEXT.md) ---
 // Nieudana analiza (np. link, którego nie da się pobrać) kosztuje nas
 // zapytania do Gemini, ale nic nie zarabiamy — kredyty ściągamy dopiero po
 // sukcesie (sekcja 7 niżej). Bez ograniczenia ktoś mógłby (przez pomyłkę
@@ -843,7 +843,7 @@ Deno.serve(async (req: Request) => {
         .eq('id', existing.id)
 
       // PDF: w przeciwieństwie do reszty trybów, wynik NIE jest publicznie
-      // czytelny (patrz RLS na `scans` w PRAGMA_CONTEXT.md) — dostęp mają
+      // czytelny (patrz RLS na `scans` w GAKORI_CONTEXT.md) — dostęp mają
       // WYŁĄCZNIE osoby z wpisem w `scan_access`. Jeśli dwie różne osoby
       // prześlą DOKŁADNIE ten sam plik (to samo `content_hash`) w tym samym
       // języku, druga też musi dostać własny wpis (z WŁASNĄ nazwą pliku,
@@ -1362,7 +1362,7 @@ Deno.serve(async (req: Request) => {
         // duplikaty, poprawia słabe uzasadnienia) i pisze jedno wspólne
         // podsumowanie. Przy maks. MAX_IMAGES_PER_SCAN (6) wynikach do
         // scalenia nie potrzeba osobnego trzeciego etapu jak przy PDF-ie
-        // (który mógł mieć nawet 20 kawałków) — patrz PRAGMA_CONTEXT.md.
+        // (który mógł mieć nawet 20 kawałków) — patrz GAKORI_CONTEXT.md.
         // q_score liczony jako zwykła średnia z Etapu 1 (nie z listy po
         // Etapie 2) — ocena rzetelności nie zależy od tego, ile duplikatów
         // akurat usunęliśmy.

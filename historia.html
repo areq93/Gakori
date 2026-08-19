@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pragma_theme') || 'light');</script>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('gakori_theme') || 'light');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pragma - Twoje analizy PDF</title>
+    <title>Gakori - Twoje analizy PDF</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="shortcut icon" href="icon-192.png">
@@ -18,14 +18,14 @@
 </head>
 <body>
 
-    <svg class="pragma-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
+    <svg class="gakori-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
         <defs>
-            <linearGradient id="pragmaBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+            <linearGradient id="gakoriBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
                 <stop offset="0%" stop-color="#9a9184"/>
                 <stop offset="100%" stop-color="#3f3c35"/>
             </linearGradient>
         </defs>
-        <path transform="rotate(-18 50 50)" fill="url(#pragmaBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
+        <path transform="rotate(-18 50 50)" fill="url(#gakoriBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
     </svg>
 
     <!-- Ten sam górny pasek co account.html — ta strona ZAWSZE wymaga
@@ -86,7 +86,7 @@
                 refreshCreditBalance(sb, session.user.id);
 
                 // `scan_access` (widoczne tylko dla właściciela, patrz RLS w
-                // PRAGMA_CONTEXT.md) trzyma nazwę pliku i moment ostatniego
+                // GAKORI_CONTEXT.md) trzyma nazwę pliku i moment ostatniego
                 // dostępu; dociągamy powiązany wynik (`scans`) przez wbudowane
                 // złączenie PostgREST — RLS na `scans` i tak pozwoli tu tylko
                 // na wiersze, do których ten użytkownik ma wpis w scan_access,

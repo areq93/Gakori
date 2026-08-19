@@ -1,8 +1,8 @@
-// PRAGMA — Edge Function "daily-report"
+// GAKORI — Edge Function "daily-report"
 // Wdrożenie: Supabase Dashboard → Edge Functions → Deploy a new function → Via Editor
 //
 // Wysyła RAZ DZIENNIE (wywoływana z zewnątrz przez Supabase pg_cron, patrz
-// PRAGMA_CONTEXT.md — sekcja "Funkcja daily-report") krótki, koleżeński
+// GAKORI_CONTEXT.md — sekcja "Funkcja daily-report") krótki, koleżeński
 // mail z najważniejszymi statystykami rozwoju MVP — TYLKO na adres
 // właściciela projektu (REPORT_RECIPIENT_EMAIL), nie do zwykłych
 // użytkowników.
@@ -25,7 +25,7 @@
 // Świadomie NIE ma tu (na razie): statystyk cashflow/kupionych pakietów
 // (system płatności jeszcze nie istnieje) ani liczby zgłoszonych błędów
 // (system zgłaszania błędów przez użytkowników jeszcze nie istnieje) —
-// gdy oba powstaną, dopisać je tutaj. Patrz PRAGMA_CONTEXT.md.
+// gdy oba powstaną, dopisać je tutaj. Patrz GAKORI_CONTEXT.md.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -252,7 +252,7 @@ Deno.serve(async (req: Request) => {
 
   const topCard = card('Najpopularniejsze analizy (top 5 na język)', topHtml)
 
-  const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto Twój dzienny przegląd Pragmy — ${dateStr}.</p>
+  const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto Twój dzienny przegląd Gakori — ${dateStr}.</p>
 ${registrationsCard}
 ${scansCard}
 ${creditsCard}
@@ -261,7 +261,7 @@ ${topCard}
 <p style="color:#9ca3af;font-size:12px;margin-top:20px;">Ten raport wysyła się automatycznie raz dziennie. Wygenerowała go funkcja daily-report.</p>`
 
   const senderEmail = Deno.env.get('BREVO_SENDER_EMAIL')
-  const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Pragma — raport'
+  const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Gakori — raport'
   const recipient = Deno.env.get('REPORT_RECIPIENT_EMAIL')
 
   if (!brevoKey || !senderEmail || !recipient) {
@@ -280,7 +280,7 @@ ${topCard}
     body: JSON.stringify({
       sender: { email: senderEmail, name: senderName },
       to: [{ email: recipient }],
-      subject: `Pragma — raport dzienny (${dateStr})`,
+      subject: `Gakori — raport dzienny (${dateStr})`,
       htmlContent,
     }),
   })
