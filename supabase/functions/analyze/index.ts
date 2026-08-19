@@ -3,6 +3,11 @@
 // Po wdrożeniu dostępna pod: https://<PROJECT_ID>.supabase.co/functions/v1/analyze
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+// Tylko do liczenia stron PDF-a (PDFDocument.load + getPageCount) — nie
+// renderujemy ani nie wyciągamy tekstu tą biblioteką, to robi sam Gemini
+// (patrz sekcja PDF w Deno.serve niżej). Czysty JS, działa w Deno bez
+// natywnych zależności.
+import { PDFDocument } from 'npm:pdf-lib@1.17.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +40,29 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // 8 MB
 // w praktyce zrzuty ekranu są dużo mniejsze niż 8 MB, więc rzadko się o nią otrze.
 const MAX_IMAGES_PER_SCAN = 6
 const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024 // 20 MB łącznie
+
+// --- PDF (FAZA 2) ---
+// Strona PDF-a liczona identycznie jak obraz kosztowo — ustalone wcześniej
+// w PRAGMA_CONTEXT.md ("jedna strona PDF-a ≈ jeden obraz kosztowo").
+const PDF_PAGE_COST = IMAGE_SCAN_COST
+// Do tej liczby stron analiza rusza od razu, bez pytania o zgodę (tak jak
+// tekst/obraz/link). Powyżej: trzeba WPROST potwierdzić koszt (patrz sekcja
+// PDF w Deno.serve niżej) — kredytów może być sporo, a wybranie pliku samo
+// w sobie nie jest jeszcze świadomą zgodą na konkretny koszt.
+const PDF_AUTO_ANALYZE_MAX_PAGES = 20
+// Bezwzględny sufit — NIE do ominięcia nawet po potwierdzeniu kosztu przez
+// użytkownika. Chroni przed absurdalnie dużym plikiem (czas przetwarzania,
+// limit tokenów pojedynczego zapytania do Gemini, ryzyko operacyjne).
+const PDF_HARD_MAX_PAGES = 150
+const MAX_PDF_BYTES = 20 * 1024 * 1024 // 20 MB — tyle samo co łączny limit obrazów
+// PDF-y (zwłaszcza bliżej PDF_HARD_MAX_PAGES) bywają zauważalnie dłuższe do
+// przetworzenia dla Gemini niż zwykły tekst/obraz — osobny, dłuższy limit
+// czasu TYLKO na to jedno zapytanie (reszta zapytań w tej funkcji nadal
+// używa GEMINI_TIMEOUT_MS). Musi być SKOŃCZONY — system nigdy nie może
+// czekać w nieskończoność — ale wystarczająco długi, żeby duży, ale wciąż
+// dozwolony plik (≤150 stron) miał realną szansę się doliczyć, zamiast
+// ucinać się w połowie.
+const PDF_GEMINI_TIMEOUT_MS = 60000 // 60s
 
 // Nazwy języków (po polsku, w formie "w języku X") używane do parametryzacji
 // instrukcji językowej promptu — patrz buildSystemPrompt(). Klucze muszą się
@@ -173,6 +201,29 @@ function detectImageMimeType(bytes: Uint8Array): string | null {
   return null
 }
 
+// PDF zawsze zaczyna się bajtami "%PDF-" — ten sam "nigdy nie ufaj
+// rozszerzeniu/mime_type z przeglądarki" wzorzec co przy obrazach wyżej.
+function isPdfFile(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 5 &&
+    bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2d
+  )
+}
+
+// Liczy strony PDF-a LOKALNIE (pdf-lib), bez angażowania Gemini — musi być
+// tanie/darmowe, bo wywołujemy to PRZED ewentualnym ekranem potwierdzenia
+// kosztu (patrz PDF_AUTO_ANALYZE_MAX_PAGES w Deno.serve niżej): użytkownik
+// nie zapłacił jeszcze za nic, więc nie możemy jeszcze nic wydać na Gemini.
+// null = plik uszkodzony/nie do odczytania jako PDF.
+async function countPdfPages(bytes: Uint8Array): Promise<number | null> {
+  try {
+    const doc = await PDFDocument.load(bytes, { updateMetadata: false, ignoreEncryption: true })
+    return doc.getPageCount()
+  } catch {
+    return null
+  }
+}
+
 // Instrukcje dla Gemini są napisane po polsku (to nie ma znaczenia — model
 // rozumie polecenia w dowolnym języku), ale WYNIK ma być w języku wybranym
 // przez użytkownika w ustawieniach aplikacji (parametr "language" z body).
@@ -304,7 +355,11 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
 // pobraniu linku). Trzymanie tego w jednym miejscu gwarantuje, że wszystkie
 // wywołania biją w ten sam model i ten sam adres.
 // deno-lint-ignore no-explicit-any
-async function callGemini(requestBody: Record<string, unknown>, geminiKey: string): Promise<any> {
+async function callGemini(
+  requestBody: Record<string, unknown>,
+  geminiKey: string,
+  timeoutMs: number = GEMINI_TIMEOUT_MS
+): Promise<any> {
   try {
     const res = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
@@ -313,7 +368,7 @@ async function callGemini(requestBody: Record<string, unknown>, geminiKey: strin
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       },
-      GEMINI_TIMEOUT_MS
+      timeoutMs
     )
     return await res.json()
   } catch {
@@ -486,11 +541,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json()
-    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64 } = body
+    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, confirmed } = body
     const outputLanguage = typeof language === 'string' && LANGUAGE_NAMES[language] ? language : DEFAULT_LANGUAGE
 
-    // PDF wraca w kolejnym kroku — na razie tekst, link i obraz.
-    if (input_type !== 'text' && input_type !== 'url' && input_type !== 'image') {
+    if (input_type !== 'text' && input_type !== 'url' && input_type !== 'image' && input_type !== 'pdf') {
       return new Response(
         JSON.stringify({
           error: 'not_implemented',
@@ -613,6 +667,7 @@ Deno.serve(async (req: Request) => {
     let cost: number
     let imageBytesList: Uint8Array[] = []
     let imageMimeTypes: string[] = []
+    let pdfPageCount = 0
     if (input_type === 'image') {
       // Tak jak link — obraz zawsze wymaga konta (płaska, wyższa stawka niż
       // darmowy limit anonimowy dla krótkiego tekstu).
@@ -682,6 +737,76 @@ Deno.serve(async (req: Request) => {
         )
       }
       cost = URL_SCAN_COST
+    } else if (input_type === 'pdf') {
+      // Tak jak link i obraz — PDF zawsze wymaga konta, nie ma darmowego
+      // limitu anonimowego (nie znamy kosztu z góry, zanim policzymy strony).
+      if (!user_id) {
+        return new Response(
+          JSON.stringify({ error: 'signup_required', message: 'Załóż konto, aby analizować pliki PDF.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      if (typeof pdf_base64 !== 'string' || !pdf_base64) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_pdf', message: 'Brak danych pliku PDF w zapytaniu.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      let pdfBytes: Uint8Array
+      try {
+        pdfBytes = Uint8Array.from(atob(pdf_base64), (c) => c.charCodeAt(0))
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'invalid_pdf', message: 'Nie udało się odczytać przesłanego pliku.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      if (pdfBytes.length > MAX_PDF_BYTES) {
+        return new Response(
+          JSON.stringify({ error: 'file_too_large', message: 'Plik PDF jest za duży (limit 20 MB).' }),
+          { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      // NIGDY nie ufamy rozszerzeniu/mime_type podanemu przez przeglądarkę —
+      // patrz isPdfFile() (ten sam wzorzec co detectImageMimeType() dla obrazów).
+      if (!isPdfFile(pdfBytes)) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_pdf', message: 'Przesłany plik to nie prawdziwy PDF.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      const pageCount = await countPdfPages(pdfBytes)
+      if (pageCount === null) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_pdf', message: 'Nie udało się odczytać liczby stron PDF-a — plik może być uszkodzony.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      // Bezwzględny sufit — nie do ominięcia nawet przez confirmed:true.
+      if (pageCount > PDF_HARD_MAX_PAGES) {
+        return new Response(
+          JSON.stringify({
+            error: 'pdf_too_long',
+            message: `Ten PDF ma ${pageCount} stron — maksymalnie obsługujemy ${PDF_HARD_MAX_PAGES}.`,
+            page_count: pageCount,
+            max_pages: PDF_HARD_MAX_PAGES,
+          }),
+          { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      pdfPageCount = pageCount
+      cost = PDF_PAGE_COST * pageCount
+      // Powyżej PDF_AUTO_ANALYZE_MAX_PAGES trzeba WPROST potwierdzić koszt —
+      // zwracamy BEZ wywoływania Gemini i BEZ obciążania konta (żadnych
+      // kredytów jeszcze nie ruszamy). Frontend pokazuje ekran zgody z
+      // page_count/estimated_cost i wysyła TO SAMO zapytanie ponownie z
+      // confirmed:true, dopiero wtedy lecimy dalej do analizy.
+      if (pageCount > PDF_AUTO_ANALYZE_MAX_PAGES && confirmed !== true) {
+        return new Response(
+          JSON.stringify({ needs_confirmation: true, page_count: pageCount, estimated_cost: cost }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
     } else {
       const blocks = Math.ceil(char_count / 1000)
       cost = FIXED_FEE + blocks * MULTIPLIER_PER_1000_CHARS
@@ -913,6 +1038,37 @@ Deno.serve(async (req: Request) => {
         if (blockReason || imageFinishReason === 'SAFETY') {
           return await respondUnsafeContent('blocked_by_provider')
         }
+      } else if (input_type === 'pdf') {
+        // Bez taniego etapu kategoryzacji z góry (tak jak przy obrazie) —
+        // nie mamy z góry żadnego wyciągniętego tekstu, po którym dałoby się
+        // zgrubnie dobrać kategorie; sam PDF czyta dopiero Gemini niżej.
+        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+        // Obrazy WEWNĄTRZ PDF-a mają być pomijane, nie analizowane (ustalone
+        // wcześniej z użytkownikiem) — Gemini fizycznie "widzi" całą stronę
+        // PDF-a (tekst i ewentualne obrazy razem), więc jedyny sposób to
+        // wprost mu tego zabronić w instrukcji.
+        const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF (${pdfPageCount} ${pdfPageCount === 1 ? 'strona' : 'stron'}) — potraktuj go dokładnie tak samo jak tekst do analizy. Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst.`
+        // Dłuższy limit czasu niż zwykłe zapytania (patrz PDF_GEMINI_TIMEOUT_MS) —
+        // duży, ale wciąż dozwolony PDF (bliżej PDF_HARD_MAX_PAGES) potrzebuje
+        // więcej czasu niż 20s, jakie starcza reszcie zapytań w tej funkcji.
+        geminiData = await callGemini(
+          {
+            contents: [
+              {
+                parts: [
+                  { text: `${systemPrompt}\n\n${pdfInstruction}` },
+                  { inlineData: { mimeType: 'application/pdf', data: pdf_base64 } },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: RESPONSE_SCHEMA,
+            },
+          },
+          geminiKey!,
+          PDF_GEMINI_TIMEOUT_MS
+        )
       } else {
         // ETAP 1 (tani) + ETAP 2 — patrz komentarz w gałęzi "url" wyżej.
         const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!)

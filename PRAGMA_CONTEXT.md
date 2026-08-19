@@ -283,11 +283,77 @@ zanim założysz, że działa.
        wyżej), więc reszta analizy (limit 8 MB, sprawdzenie prawdziwego typu
        pliku po zawartości na backendzie, moderacja) działa identycznie,
        bez żadnych wyjątków dla tego trzeciego źródła.
-  - PDF: jeszcze nie zaimplementowany (`input_type: "pdf"` zwróciłby
-    `501 not_implemented`, gdyby frontend w ogóle wysyłał taki typ — na
-    razie nie ma dla PDF żadnego pola w interfejsie). Moderacja opisana
-    wyżej ma docelowo obejmować też obrazy WEWNĄTRZ analizowanych PDF-ów
-    (pominięte, nie analizowane) — patrz "Świadomie odłożone na później".
+  - **PDF (`input_type: "pdf"`, wdrożone 2026-08-19)** — jeden plik na raz
+    (w przeciwieństwie do obrazów, gdzie można kilka naraz — PDF-y bywają
+    duże/wielostronicowe, wiele naraz to zbyt duże ryzyko kosztowe na
+    start). Backend liczy strony LOKALNIE (`npm:pdf-lib`,
+    `countPdfPages()`), BEZ angażowania Gemini — to musi być darmowe, bo
+    dzieje się PRZED ewentualną zgodą użytkownika na koszt:
+    - **≤ `PDF_AUTO_ANALYZE_MAX_PAGES` (20) stron**: analiza rusza od razu,
+      bez pytania — tak jak tekst/obraz/link.
+    - **21-`PDF_HARD_MAX_PAGES` (150) stron**: backend NIE wywołuje
+      Gemini i NIC nie obciąża — zwraca `{ needs_confirmation: true,
+      page_count, estimated_cost }`. Frontend pokazuje ekran zgody
+      (`#pdfConfirmOverlay` w `index.html`) z liczbą stron, kosztem w
+      kredytach i porównaniem "ile to jest w kawach/herbatach" (patrz
+      niżej), użytkownik klika "Tak, analizuj" → frontend wysyła TO SAMO
+      zapytanie ponownie z `confirmed: true`, dopiero wtedy leci dalej do
+      Gemini i faktycznego obciążenia.
+    - **> 150 stron**: zawsze odrzucone (`pdf_too_long`), NIE do ominięcia
+      nawet przez `confirmed: true` — bezwzględny sufit ustalony wprost z
+      użytkownikiem (chroni przed absurdalnie dużym plikiem: czas
+      przetwarzania, limit tokenów pojedynczego zapytania, ryzyko
+      operacyjne).
+    - **Koszt**: `PDF_PAGE_COST = IMAGE_SCAN_COST` (8 kredytów/stronę) —
+      "jedna strona PDF-a ≈ jeden obraz kosztowo", patrz uzasadnienie w
+      sekcji "Cennik" niżej (Google faktycznie liczy PDF wg tej samej
+      stawki tokenów co obraz).
+    - **Obrazy WEWNĄTRZ PDF-a są pomijane, nie analizowane** — Gemini
+      fizycznie "widzi" całą stronę PDF-a naraz (tekst + ewentualne
+      obrazy razem, jako `inlineData` z `mimeType: 'application/pdf'`),
+      więc jedyny sposób to wprost mu zakazać w instrukcji promptu
+      (`pdfInstruction` w `analyze/index.ts`) — nie ma osobnego
+      mechanizmu technicznego, który by to wymuszał.
+    - **Analizy PDF-ów NIGDY nie są publiczne** — wykluczone z
+      przeglądarki publicznych analiz (`index.html`, zapytanie
+      `.not('input_type', 'in', '(image,pdf)')`) SILNIEJ niż obrazy:
+      użytkownik wprost poprosił, żeby PDF-y w ogóle nie trafiały do tego
+      mechanizmu odkrywalności, nie tylko "nie pokazuj podglądu". Zwykły
+      link do konkretnej analizy (`scan.html?id=...`) nadal działa dla
+      osoby, która go ma.
+    - **Limit czasu zapytania do Gemini**: PDF-y (zwłaszcza bliżej
+      górnego limitu stron) potrafią potrzebować więcej niż standardowe
+      20s reszty zapytań w tej funkcji — `callGemini()` przyjmuje teraz
+      opcjonalny parametr `timeoutMs` (domyślnie `GEMINI_TIMEOUT_MS`),
+      dla PDF-a wywoływany z osobnym, dłuższym `PDF_GEMINI_TIMEOUT_MS`
+      (60s). Musi być SKOŃCZONY (system nigdy nie może czekać w
+      nieskończoność — wyraźna prośba użytkownika), ale wystarczająco
+      długi, żeby duży, wciąż dozwolony plik miał realną szansę się
+      doliczyć zamiast ucinać się w połowie.
+    - **Porównanie kosztu "w kawach"** (`costComparisonText()` w
+      `i18n.js`) — użytkownik wprost poprosił, żeby zamiast suchej liczby
+      kredytów (albo prawdziwej kwoty w walucie) pokazywać porównanie do
+      codziennej, taniej przyjemności ("mała kawa" itp.). Dwie ważne
+      decyzje projektowe, żeby się nie pomylić przy poprawkach:
+      1. To NIE jest przelicznik po realnym kursie waluty — realna cena
+         kawy w Indiach/Egipcie przeliczona 1:1 dałaby absurdalne "21
+         herbat" zamiast wrażenia "tyle co drobna przyjemność". Zamiast
+         tego: JEDNA, STAŁA liczba kredytów = "1 sztuka" wszędzie na
+         świecie (450 kr. w najniższym progu, oparta o realny punkt
+         odniesienia użytkownika: mała kawa w Polsce, 16-20 zł) —
+         zmienia się TYLKO nazwa/rozmiar przedmiotu wraz z progiem
+         kredytów (< 1000 → mała, 450 kr./szt.; 1000-3000 → średnia, 900
+         kr./szt.; > 3000 → duża, 1800 kr./szt. — patrz stałe
+         `COST_COMPARISON_UNIT_PRICE_*` w `i18n.js`), nigdy kurs waluty.
+      2. Wynik formatowany jako "N × przedmiot" (jak paragon), NIE przez
+         odmianę rzeczownika przez liczbę — w kilku obsługiwanych
+         językach (polski, rosyjski, arabski) poprawna odmiana
+         wymagałaby osobnej gramatyki dla 1/2-4/5+, a zapis "N ×" brzmi
+         naturalnie wszędzie bez żadnej odmiany.
+      Powyżej `COST_COMPARISON_CAP_UNITS` (4) "sztuk" porównanie
+      przestaje być pomocne — funkcja zwraca `null`, frontend wtedy
+      pokazuje samą liczbę kredytów bez tej linijki. Rodzaj napoju (2
+      opcje na język, np. kawa/herbata) losowany przy każdym wywołaniu.
   - **Awaryjne pobranie strony (`fetchUrlAsText()`)**: niektóre strony
     (np. duże portale newsowe typu onet.pl) odrzucają robota Google z
     ogólnym kodem `URL_RETRIEVAL_STATUS_ERROR` — bez podania konkretnego
@@ -1473,17 +1539,6 @@ bez żadnego przychodu.
 - Własna domena (naprawiłoby to markowanie Google OAuth pokazujące surową
   domenę Supabase, i brzydki adres nadawcy Brevo przy odbiciach) —
   użytkownik: "jeszcze nie".
-- Analiza PDF (obraz już DZIAŁA — patrz sekcja "Cennik" i
-  `supabase/functions/analyze/index.ts` — PDF to jedyna część tego punktu
-  wciąż odłożona na później, zaplanowana jako osobny, dwuetapowy flow z
-  ekranem potwierdzenia kosztu przed właściwą analizą; szczegóły planu
-  trzymane w liście zadań sesji, nie tutaj, żeby nie duplikować). Dwa
-  dodatkowe wymagania ustalone dla tej fazy: 1) obrazy WEWNĄTRZ
-  analizowanego PDF-a mają być pomijane, nie analizowane (tylko sam
-  tekst); 2) analizy PDF-ów NIE mają być udostępniane publicznie w
-  przeglądarce analiz — tak jak obrazy (patrz "Przeglądarka publicznych
-  analiz" wyżej), tylko mocniej: użytkownik poprosił, żeby PDF-y w ogóle
-  nie trafiały do tego mechanizmu odkrywalności.
 - Ekran intencji zakupowej (Fake Door test).
 - Obniżanie darmowego bonusu powitalnego / limity rejestracji po IP w
   Supabase — świadomie odłożone (zasada Lean Startup: nie buduj obrony
