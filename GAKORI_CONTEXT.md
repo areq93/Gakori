@@ -1602,6 +1602,21 @@ zanim założysz, że działa.
       Zero zmian w schemacie/strukturze wyniku — to wyłącznie tekst
       promptu, WYŁĄCZNIE backend (`analyze/index.ts`), zero zmian
       frontendowych.
+    - **POPRAWKA 2026-08-21(a) — grupowanie powtarzających się modeli w
+      "foldery" (`scan.html` + `style.css`), frontend.** Zgłoszenie
+      właściciela na żywym przykładzie (40-stronicowy PDF): ten sam model
+      (np. "Zasady Pierwsze") bywa wykryty wiele razy na różnych stronach
+      długiego dokumentu — płaska lista z powtarzającą się nazwą wyglądała
+      jak "śmietnik". Wzorce o TEJ SAMEJ nazwie (`p.name`) są teraz
+      grupowane w JEDNĄ, zwijaną kartę-"folder" z odznaką liczby wystąpień
+      (`×N`, celowo bez tłumaczenia — czytelne w każdym z 10 języków bez
+      dodawania kluczy i18n) — w środku, po rozwinięciu, wszystkie
+      wystąpienia jedno pod drugim (własny cytat/wyjaśnienie/podpowiedź/
+      numer strony każde), oddzielone cienką kreską, ale BEZ własnego,
+      zagnieżdżonego zwijania (folder już porządkuje listę — podwójny
+      akordeon byłby przesadą). Nazwa występująca tylko raz zostaje zwykłą,
+      pojedynczą kartą jak dotąd. Zero zmian backendowych — wyłącznie
+      sposób wyświetlania już istniejących danych.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
@@ -2152,6 +2167,17 @@ zupełnie inna liczba, i to ta druga jest poprawna.
 
 ## Zasady współpracy w tym projekcie
 
+- **GAKORI TO PRESTIŻOWA MARKA (ustalone wprost 2026-08-20): aplikacja ma
+  oferować jakość WIELOKROTNIE większą niż to, czego odbiorca się
+  spodziewa i ile płaci za analizę.** To nie jest tanie, masowe narzędzie
+  do odhaczenia — każda decyzja produktowa (jakość promptu, wygląd wyniku,
+  ton komunikacji z użytkownikiem, sposób prezentowania wzorców) ma być
+  oceniana przez pryzmat: "czy to buduje wrażenie prestiżu i realnej
+  wartości, wyraźnie przewyższającej cenę?". To jest bezpośrednie
+  uzasadnienie dla "NADRZĘDNY, STAŁY CEL" niżej (jakość analiz stale
+  rośnie) i dla wszystkich POPRAWEK dotyczących jakości/tonu podpowiedzi —
+  nie są to kosmetyczne poprawki, tylko realizacja tej samej, nadrzędnej
+  zasady marki.
 - **NADRZĘDNY, STAŁY CEL (ustalone wprost 2026-08-20): jakość wyników analizy
   ma być stale podnoszona — zawsze, bez końca, nie tylko "do pierwszej
   wystarczającej wersji".** Właściciel świadomie chce, żeby wykrywanie

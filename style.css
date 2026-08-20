@@ -423,6 +423,15 @@ a { color: var(--accent); }
 .pattern-item.collapsed .pattern-chevron { transform: rotate(-90deg); }
 .pattern-body { display: block; }
 .pattern-item.collapsed .pattern-body { display: none; }
+
+/* POPRAWKA 2026-08-21(a) — "folder" dla modelu wykrytego wiele razy (patrz
+   scan.html) — każde wystąpienie oddzielone subtelną kreską, żeby dało się
+   je odróżnić od siebie, ale bez ciężaru osobnej karty na każde. */
+.pattern-count { font-weight: 700; }
+.pattern-instance {
+    padding-top: 12px; margin-top: 12px; border-top: 1px dashed var(--card-border);
+}
+.pattern-instance:first-child { padding-top: 0; margin-top: 0; border-top: none; }
 .pattern-tag {
     font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
     padding: 3px 9px; border-radius: 999px; white-space: nowrap;
