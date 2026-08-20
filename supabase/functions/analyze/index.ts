@@ -468,10 +468,11 @@ const FALLBACK_FETCH_TIMEOUT_MS = 10000 // 10s na awaryjne, bezpośrednie pobran
 // linku) potrafiło trzymać całą analizę w nieskończoność, bez żadnego
 // komunikatu dla użytkownika (zgłoszone na żywo: ponad 2 minuty czekania
 // zanim w ogóle pojawił się błąd). Analiza linku robi do 3 kolejnych
-// zapytań sieciowych w najgorszym razie (właściwa analiza → awaryjne
-// pobranie strony → druga właściwa analiza, patrz POPRAWKA 2026-08-19(f) —
-// dawniej do 5, z osobną kategoryzacją i sitem) — z tymi limitami czasu
-// górna granica całości to ok. 50s zamiast "bez ograniczeń".
+// zapytań sieciowych w najgorszym razie — ścieżka główna (patrz POPRAWKA
+// 2026-08-20): własne pobranie strony → tania kategoryzacja → właściwa
+// analiza. Ścieżka awaryjna (gdy własne pobranie zawiedzie) to tylko 2:
+// własne pobranie (nieudane) → właściwa analiza przez wbudowane narzędzie
+// Gemini. Z tymi limitami czasu górna granica całości to nadal ok. 50s.
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -1186,70 +1187,80 @@ Deno.serve(async (req: Request) => {
       let geminiData: any = null
 
       if (input_type === 'url') {
-        // POPRAWKA 2026-08-19(f) — ograniczenie ścieżki awaryjnej (dawniej do
-        // 4 zapytań do Gemini w najgorszym przypadku: kategoryzacja →
-        // właściwa analiza → sito → druga właściwa analiza). Usunięty etap
-        // kategoryzacji dla LINKU (zostaje dla tekstu, patrz gałąź "text"
-        // niżej) — przy linku ten etap i tak kazał Gemini SAMEMU pobierać
-        // stronę przez narzędzie "URL context", czyli DWA razy w NAJLEPSZYM
-        // przypadku (raz do kategoryzacji, raz do właściwej analizy), zanim
-        // jeszcze cokolwiek zawiodło. Pełna biblioteka 100 modeli od razu —
-        // ten sam kompromis co przy obrazie/PDF-ie (koszt biblioteki to
-        // grosze, korzyść to mniej zapytań i mniej miejsc do awarii). Nowy
-        // najgorszy przypadek: 2 zapytania do Gemini zamiast 4.
-        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+        // POPRAWKA 2026-08-20 — odzyskanie zawężania kategorii dla linku,
+        // bez powrotu do podwójnego pobierania strony (patrz POPRAWKA
+        // 2026-08-19(f) niżej — jej uzasadnienie usunięcia kategoryzacji
+        // dalej jest prawdziwe DLA NARZĘDZIA GEMINI, tylko zmienia się jego
+        // rola). Zamiast pozwalać Gemini pobierać stronę jako pierwszy
+        // wybór, NAJPIERW próbujemy WŁASNEGO, prostego pobrania
+        // (fetchUrlAsText — ta sama funkcja co dawna ścieżka awaryjna,
+        // zero kosztu Gemini). Jeśli się uda (normalna strona, nie
+        // wymagająca JavaScriptu do pokazania treści — fetchUrlAsText sama
+        // odróżnia to po długości wyciągniętego tekstu, próg 200 znaków),
+        // mamy tekst od razu w ręku i robimy dokładnie taką samą, tanią
+        // kategoryzację jak przy zwykłym tekście (pickRelevantCategories) —
+        // bez ŻADNEGO dodatkowego pobierania strony. Dopiero jeśli WŁASNE
+        // pobranie zawiedzie (podejrzenie JavaScriptu), sięgamy po
+        // wbudowane narzędzie Gemini "URL context" jako "cięższą
+        // artylerię" — pełna biblioteka, bez zawężania, dokładnie tak jak
+        // działało to w POPRAWKA 2026-08-19(f). Najgorszy przypadek to
+        // nadal maks. 2 zapytania do Gemini — nie gorzej niż wcześniej, ale
+        // w najczęstszym przypadku (zwykła strona) te 2 zapytania dają
+        // wyższą jakość (zawężone kategorie) zamiast pełnej biblioteki.
+        const rawTextNotice = `\n\nUWAGA: poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Skup się WYŁĄCZNIE na rzeczywistej treści artykułu/strony, ten szum wokół niej całkowicie zignoruj.`
+        const preFetchedText = await fetchUrlAsText(source_url)
 
-        // Próba 1: wbudowane narzędzie Gemini "URL context" — samo pobiera i
-        // czyta treść strony, nie potrzebujemy własnego scrapera.
-        geminiData = await callGemini(
-          {
-            contents: [
-              { parts: [{ text: `${systemPrompt}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}` }] },
-            ],
-            tools: [{ urlContext: {} }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              responseSchema: RESPONSE_SCHEMA,
-            },
-          },
-          geminiKey!
-        )
-
-        const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
-        if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
-          // Próba 2 (awaryjna): czasem blokowany jest tylko robot Google, a
-          // zwykłe pobranie strony (jak przez przeglądarkę) się uda — patrz
-          // fetchUrlAsText(). Jeśli to też zawiedzie, dopiero wtedy poddajemy
-          // się i zwracamy błąd (z prawdziwym powodem w "details" — widocznym
-          // tylko w panelu debugowania ?debug=1, nie dla zwykłego użytkownika).
-          const fallbackText = await fetchUrlAsText(source_url)
-          if (fallbackText) {
-            // POPRAWKA 2026-08-19(f): usunięty osobny etap "sito" — surowy,
-            // zdarty z HTML tekst (menu/stopka wymieszane z artykułem, patrz
-            // model GIGO w bibliotece) leci od razu do właściwej analizy, z
-            // dopiskiem wprost każącym Gemini zignorować ten szum — jedno
-            // zapytanie mniej niż osobne czyszczenie, bo model i tak musi
-            // "przeczytać całość, żeby cokolwiek ocenić".
-            const rawTextNotice = `\n\nUWAGA: poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Skup się WYŁĄCZNIE na rzeczywistej treści artykułu/strony, ten szum wokół niej całkowicie zignoruj.`
-            geminiData = await callGemini(
-              {
-                contents: [
-                  {
-                    parts: [
-                      {
-                        text: `${systemPrompt}${rawTextNotice}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony):\n${fallbackText}`,
-                      },
-                    ],
-                  },
-                ],
-                generationConfig: {
-                  responseMimeType: 'application/json',
-                  responseSchema: RESPONSE_SCHEMA,
+        if (preFetchedText) {
+          // Ścieżka główna (zdecydowana większość stron): mamy już tekst,
+          // więc dokładnie ten sam dwuetapowy wzorzec co przy zwykłym
+          // tekście — patrz gałąź "text" niżej.
+          const categories = await pickRelevantCategories(
+            `${rawTextNotice}\n\nTEKST DO ANALIZY:\n${preFetchedText}`,
+            false,
+            geminiKey!
+          )
+          const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
+          geminiData = await callGemini(
+            {
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `${systemPrompt}${rawTextNotice}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony):\n${preFetchedText}`,
+                    },
+                  ],
                 },
+              ],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: RESPONSE_SCHEMA,
               },
-              geminiKey!
-            )
-          } else {
+            },
+            geminiKey!
+          )
+        } else {
+          // Ścieżka awaryjna (podejrzenie strony wymagającej JavaScriptu do
+          // pokazania treści) — pełna biblioteka, Gemini samo próbuje
+          // pobrać stronę swoim narzędziem "URL context". Jeśli i to
+          // zawiedzie, poddajemy się i zwracamy błąd (z prawdziwym powodem
+          // w "details" — widocznym tylko w panelu debugowania ?debug=1).
+          const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+          geminiData = await callGemini(
+            {
+              contents: [
+                { parts: [{ text: `${systemPrompt}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}` }] },
+              ],
+              tools: [{ urlContext: {} }],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: RESPONSE_SCHEMA,
+              },
+            },
+            geminiKey!
+          )
+
+          const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
+          if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
             await logFailedAttempt()
             return new Response(
               JSON.stringify({
