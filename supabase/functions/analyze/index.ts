@@ -557,6 +557,76 @@ ${JSON.stringify(result)}`
   }
 }
 
+const ADDITIONAL_PATTERNS_SCHEMA = {
+  type: 'object',
+  properties: {
+    patterns: RESPONSE_SCHEMA.properties.patterns,
+  },
+  required: ['patterns'],
+}
+
+// ETAP 3 (NOWY, POPRAWKA 2026-08-20(b)) — "druga runda szukania", TYLKO dla
+// trybu tekstowego i linku (gałąź "url" z już pobranym tekstem, patrz
+// POPRAWKA 2026-08-20 wyżej — w gałęzi awaryjnej linku, gdzie tekstu nie
+// mamy sami, ten etap jest pomijany, żeby nie wracać do podwójnego
+// pobierania strony). Powód: pojedyncze zapytanie Etapu 2 ma tendencję do
+// "zadowolenia się" pierwszymi kilkoma oczywistymi wzorcami zamiast
+// systematycznie przeczesać cały tekst — sama instrukcja słowna
+// (DOKŁADNOŚĆ I RÓŻNORODNOŚĆ w buildSystemPrompt) nie zawsze wystarcza,
+// zaobserwowane na żywo 2026-08-20 (właściciel: artykuł z wyraźnie
+// pominiętym wzorcem dostał tylko 2 wzorce). Ta funkcja pokazuje modelowi
+// oryginalny tekst RAZ JESZCZE, razem z listą już znalezionych wzorców, i
+// każe mu szukać WYŁĄCZNIE dodatkowego materiału, którego zabrakło — ten
+// sam mechanizm "druga para oczu", co verifyAndRefinePdfPatterns() niżej,
+// tylko nastawiony na ZWIĘKSZENIE pokrycia, nie na czyszczenie duplikatów.
+// Fail-open: błąd/timeout zwraca ORYGINALNĄ listę bez zmian — to
+// wzbogacenie jakości, nigdy nie może pogorszyć/przerwać analizy.
+// Świadomie NIE ma tu wymuszonego minimum liczby wzorców (ta sama zasada co
+// w verifyAndRefinePdfPatterns) — jeśli naprawdę nic więcej nie ma, model ma
+// zwrócić pustą listę, nie wymyślać na siłę.
+async function findAdditionalPatterns(
+  originalContent: string,
+  existingPatterns: Array<Record<string, unknown>>,
+  systemPrompt: string,
+  geminiKey: string
+): Promise<Array<Record<string, unknown>>> {
+  const compactExisting =
+    existingPatterns.length > 0
+      ? existingPatterns
+          .map((p) => `- [${p.pattern_type}] ${p.name}: "${p.quote}"`)
+          .join('\n')
+      : '(na razie nic nie znaleziono)'
+  const prompt = `${systemPrompt}
+
+DRUGA RUNDA SZUKANIA (KRYTYCZNIE WAŻNE): Poniżej jest ten sam tekst, który już raz przeanalizowałeś, oraz lista wzorców, które już znalazłeś. Przeczytaj tekst PONOWNIE, od nowa, świeżym okiem, akapit po akapicie — Twoje jedyne zadanie teraz to znaleźć DODATKOWE wzorce, których zabrakło na tej liście, szczególnie w twierdzeniach/fragmentach, które nie mają jeszcze przypisanego cytatu. NIE powtarzaj wzorców już znalezionych (patrz lista niżej, porównaj cytaty). Jeśli po uważnym sprawdzeniu naprawdę nic więcej nie ma — zwróć pustą listę, nie wymyślaj na siłę słabych/naciąganych wzorców.
+
+JUŻ ZNALEZIONE WZORCE (nie powtarzaj):
+${compactExisting}
+
+TEKST DO ANALIZY:
+${originalContent}`
+
+  const data = await callGemini(
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: ADDITIONAL_PATTERNS_SCHEMA,
+      },
+    },
+    geminiKey
+  )
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) return existingPatterns
+  try {
+    const parsed = JSON.parse(text)
+    const additional = Array.isArray(parsed.patterns) ? parsed.patterns : []
+    return [...existingPatterns, ...additional]
+  } catch {
+    return existingPatterns
+  }
+}
+
 // ETAP 2 (złożone zadanie — weryfikacja i scalanie) analizy PDF-a, między
 // ETAPEM 1 (analyzePdfChunk — podstawowe: znajdź wzorce w JEDNEJ części) a
 // ETAPEM 3 (composePdfSummary niżej — analiza: napisz spójne podsumowanie
@@ -1185,6 +1255,14 @@ Deno.serve(async (req: Request) => {
     if (!result) {
       // deno-lint-ignore no-explicit-any
       let geminiData: any = null
+      // Ustawiane TYLKO w gałęzi "url" (ścieżka główna, z już pobranym
+      // tekstem) i "text" niżej — pozwala Etapowi 3 (findAdditionalPatterns,
+      // patrz wyżej) zrobić "drugą rundę szukania" po sparsowaniu wyniku.
+      // Zostaje `null` dla gałęzi awaryjnej linku (nie mamy tam własnego
+      // tekstu — patrz POPRAWKA 2026-08-20) i dla obrazu/PDF-a (mają już
+      // własne, osobne etapy weryfikacji).
+      let secondPassText: string | null = null
+      let secondPassSystemPrompt: string | null = null
 
       if (input_type === 'url') {
         // POPRAWKA 2026-08-20 — odzyskanie zawężania kategorii dla linku,
@@ -1238,6 +1316,11 @@ Deno.serve(async (req: Request) => {
             },
             geminiKey!
           )
+          // Etap 3 (findAdditionalPatterns) dostanie dokładnie ten sam
+          // tekst i instrukcje co Etap 2 wyżej (systemPrompt + dopisek o
+          // szumie) — patrz obsługa niżej, po sparsowaniu geminiData.
+          secondPassText = preFetchedText
+          secondPassSystemPrompt = `${systemPrompt}${rawTextNotice}`
         } else {
           // Ścieżka awaryjna (podejrzenie strony wymagającej JavaScriptu do
           // pokazania treści) — pełna biblioteka, Gemini samo próbuje
@@ -1545,6 +1628,10 @@ Deno.serve(async (req: Request) => {
           },
           geminiKey!
         )
+        // Etap 3 (findAdditionalPatterns) — patrz obsługa niżej, po
+        // sparsowaniu geminiData.
+        secondPassText = text_content
+        secondPassSystemPrompt = systemPrompt
       }
 
       // Gałęzie "image" i "pdf" wyżej ustawiają `result` SAMODZIELNIE (własna
@@ -1563,6 +1650,22 @@ Deno.serve(async (req: Request) => {
         }
 
         result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
+
+        // ETAP 3 (POPRAWKA 2026-08-20(b)) — "druga runda szukania", tylko
+        // gdy gałąź wyżej ustawiła secondPassText (tekst i link ze ścieżki
+        // głównej, patrz komentarz przy findAdditionalPatterns()). Fail-open
+        // wbudowany w samą funkcję — błąd nigdy nie psuje już posiadanego
+        // wyniku Etapu 2.
+        if (secondPassText && secondPassSystemPrompt && Array.isArray((result as { patterns?: unknown }).patterns)) {
+          const initialPatterns = (result as { patterns: Array<Record<string, unknown>> }).patterns
+          const finalPatterns = await findAdditionalPatterns(
+            secondPassText,
+            initialPatterns,
+            secondPassSystemPrompt,
+            geminiKey!
+          )
+          result = { ...(result as Record<string, unknown>), patterns: finalPatterns }
+        }
       }
     }
 
