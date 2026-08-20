@@ -1533,6 +1533,35 @@ zanim założysz, że działa.
       dodatkowych zapytań do Gemini (dzieje się w tym samym, już
       istniejącym zapytaniu) — tylko odrobinę więcej tokenów
       wyjściowych/dłuższy czas jednego zapytania.
+    - **POPRAWKA 2026-08-20(d) — pole `"tip"` musi być mikro-krokiem, nie
+      zadaniem.** Zgłoszenie właściciela: podpowiedzi "co teraz zrobić"
+      bywały sformułowane jak wieloetapowa praca ("zweryfikuj wiarygodność
+      źródła i porównaj z innymi doniesieniami") zamiast jednej, malutkiej
+      czynności — czytelnik nie może poczuć, że wynik analizy zostawia go z
+      trudnym zadaniem. Dodana nowa, nadrzędna sekcja promptu "MIKRO-KROK"
+      (z konkretnymi dobrymi/złymi przykładami, i testem: podpowiedź
+      zawierająca więcej niż jedno polecenie połączone "i"/"oraz"/przecinkiem
+      jest za duża) — pole `"tip"` w liście zasad odwołuje się teraz do niej
+      wprost. Przy okazji doprecyzowana też sekcja "PROSTOTA": jawny limit
+      jednej myśli/jednego spójnika na zdanie w `"explanation"`/`"summary"`,
+      z konkretną instrukcją rozbijania zdań złożonych na dwa krótsze. Zero
+      zmian w schemacie/strukturze wyniku — to wyłącznie tekst promptu.
+    - **POPRAWKA 2026-08-20(e) — karty wzorców rozwijane/zwijane
+      niezależnie (`scan.html` + `style.css`), frontend.** Ten sam
+      zgłoszony problem co (d) z innej strony: wynik z wieloma wzorcami
+      wyglądał jak "ściana tekstu", zniechęcająca do czytania. Każda karta
+      (`.pattern-item`) ma teraz klikalny nagłówek (`.pattern-header`,
+      `role="button"`, obsługa też klawiatury: Enter/Spacja), który
+      chowa/pokazuje resztę karty (`.pattern-body` — cytat, wyjaśnienie,
+      podpowiedź) przez klasę `.collapsed` na karcie. Świadomie NIE jest to
+      akordeon (otwarcie jednej karty nie zamyka pozostałych) — każda karta
+      trzyma swój stan niezależnie, JS ustawia to przy renderowaniu przez
+      domknięcie `setExpanded()` per-karta. Domyślny stan przy wejściu na
+      stronę: pierwsza karta rozwinięta (`index === 0`), reszta zwinięta —
+      to pierwsze wrażenie ma pokazać treść od razu, a resztę listy jako coś
+      krótkiego do przewinięcia wzrokiem, nie ścianę. Zmiana jest WYŁĄCZNIE
+      w plikach frontendu (`scan.html`, `style.css`) — wdraża się sama przez
+      GitHub Pages po pushu do `main`, bez ręcznego kroku w Supabase.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
