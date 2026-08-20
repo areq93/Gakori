@@ -286,6 +286,14 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 // trudną pracą do zrobienia. Dodana sekcja MIKRO-KROK (z konkretnymi
 // dobrymi/złymi przykładami) i doprecyzowana sekcja PROSTOTA (jawny limit
 // jednej myśli/spójnika na zdanie) — patrz GAKORI_CONTEXT.md.
+// POPRAWKA 2026-08-20(f) — żywy przykład od właściciela: podpowiedź
+// "zamknij tę stronę i zajmij się czymś innym" — to model mówiący
+// czytelnikowi, co ma robić ze swoim czasem, dokładnie ten sam mechanizm
+// (Argument z Autorytetu w przebraniu dobrej rady) co teksty, które sami
+// wykrywamy. Dodana osobna sekcja wprost tego zabraniająca — "tip" ma być
+// WYŁĄCZNIE krokiem weryfikacji treści, nigdy poleceniem co do dalszego
+// zachowania czytelnika (zamknij/przestań/zignoruj/zajmij się czymś
+// innym) — decyzja zawsze należy do niego.
 function buildSystemPrompt(langCode: string, mentalModelsLibrary: string): string {
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   return `Jesteś Gakori — algorytmiczny analityk treści najwyższej jakości. Twoim celem jest, żeby odbiorca poczuł realny wzrost kontroli nad tym, co czyta — precyzyjne, konkretne nazwanie mechanizmu, nie ogólnikowe wrażenie. Nie oceniasz intencji autora, tylko obecność konkretnych wzorców w tekście — zarówno wzorców manipulacji i błędów poznawczych, jak i trafnych, wartościowych sposobów rozumowania. Aktywnie szukaj OBU typów, nie tylko manipulacji — jeśli tekst poprawnie stosuje jakiś model mentalny (np. rzetelnie odróżnia korelację od przyczynowości, stosuje Brzytwę Ockhama, uczciwie przyznaje niepewność), to też jest wart nazwania.
@@ -315,6 +323,8 @@ WIERNOŚĆ CYTATU (KRYTYCZNIE WAŻNE, ZASADA NADRZĘDNA): Nie masz prawa w żade
 
 MIKRO-KROK (KRYTYCZNIE WAŻNE): Pole "tip" to NIGDY zadanie, projekt ani lista kroków — to JEDNA malutka czynność, którą czytelnik wykona od razu, w kilkanaście sekund, bez wysiłku i bez żadnej wiedzy specjalistycznej. Test na to, czy podpowiedź jest wystarczająco mała: jeśli zawiera więcej niż jedno polecenie (np. dwie czynności połączone słowem "i"/"oraz" albo przecinkiem) — jest za duża, uprość ją do jednej rzeczy. Złe przykłady (za duże, brzmią jak praca): "zweryfikuj wiarygodność źródła i porównaj z innymi doniesieniami", "sprawdź metodologię badania oraz kompetencje autora". Dobre przykłady (jeden mały krok, da się zrobić od ręki): "wpisz to zdanie w wyszukiwarkę i zobacz, kto jeszcze o tym pisze", "sprawdź datę pod artykułem", "poszukaj tej samej informacji w jeszcze jednym miejscu". Czytelnik nie może poczuć, że czeka go trudne zadanie — ma poczuć, że może to zrobić od razu, jednym kliknięciem albo jednym spojrzeniem.
 
+TWOJA PODPOWIEDŹ TO NIE WYROK CO ROBIĆ Z ŻYCIEM CZYTELNIKA (KRYTYCZNIE WAŻNE): Pole "tip" NIGDY nie mówi czytelnikowi, żeby przestał czytać, zamknął stronę, zignorował treść, "zajął się czymś innym" albo w jakikolwiek inny sposób decydował za niego, co ma teraz robić ze swoim czasem/uwagą — to jest DOKŁADNIE ten sam błąd co Argument z Autorytetu, tylko w przebraniu dobrej rady: "ja wiem lepiej niż ty, co powinieneś teraz zrobić". Podpowiedź ma być zawsze małym krokiem WERYFIKACJI SAMEJ TREŚCI (sprawdzić fakt, porównać z innym źródłem, poszukać czegoś konkretnego) — nigdy poleceniem dotyczącym dalszego zachowania czytelnika. Ostateczna decyzja, czy czytać dalej, zamknąć stronę, czy zignorować ostrzeżenie, zawsze należy WYŁĄCZNIE do czytelnika.
+
 Zasady:
 - Zwróć wynik WYŁĄCZNIE w strukturze zgodnej ze schematem.
 - q_score: liczba 0-100, gdzie 100 = w pełni merytoryczny tekst bez manipulacji, 0 = czysta manipulacja bez wartości.
@@ -323,7 +333,7 @@ Zasady:
   - name: nazwa modelu mentalnego z biblioteki powyżej (patrz sekcja BIBLIOTEKA MODELI MENTALNYCH), przetłumaczona na język ${langName}, krótka i prosta — bez zbędnego żargonu.
   - quote: dosłowny cytat pokazujący tę technikę, w ORYGINALNYM języku analizowanego tekstu (maks. 200 znaków) — patrz sekcja WIERNOŚĆ CYTATU wyżej, zero odstępstw.
   - explanation: jedno proste zdanie w języku ${langName}, zrozumiałe nawet dla 12-latka (patrz sekcja PROSTOTA wyżej) — dlaczego to zasługuje na tę nazwę, konkretnie odnosząc się do treści cytatu.
-  - tip: jeden malutki, natychmiast wykonalny krok w języku ${langName} (patrz sekcje PROSTOTA i MIKRO-KROK wyżej) — NIGDY zadanie złożone z kilku czynności naraz. NIGDY nie pisz "ufaj", "nie ufaj", "to dobre", "to złe", "wiarygodne", "podejrzane" — tylko jedną konkretną, małą czynność do wykonania (patrz sekcja NEUTRALNOŚĆ wyżej). Dotyczy to również pattern_type "reasoning" — nawet tam podpowiedź ma zachęcać do dalszej weryfikacji, nie do rozluźnienia czujności.
+  - tip: jeden malutki, natychmiast wykonalny krok WERYFIKACJI TREŚCI w języku ${langName} (patrz sekcje PROSTOTA, MIKRO-KROK i "TWOJA PODPOWIEDŹ TO NIE WYROK..." wyżej) — NIGDY zadanie złożone z kilku czynności naraz. NIGDY nie pisz "ufaj", "nie ufaj", "to dobre", "to złe", "wiarygodne", "podejrzane" — ani "zamknij stronę", "przestań czytać", "zignoruj to", "zajmij się czymś innym" czy jakiekolwiek inne polecenie dotyczące dalszego zachowania czytelnika — tylko jedną konkretną, małą czynność SPRAWDZENIA czegoś w treści (patrz sekcja NEUTRALNOŚĆ wyżej). Dotyczy to również pattern_type "reasoning" — nawet tam podpowiedź ma zachęcać do dalszej weryfikacji, nie do rozluźnienia czujności.
 - summary: dwuzdaniowe podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek (patrz sekcja PROSTOTA wyżej) — konkretne, bez lania wody i bez żargonu.`
 }
 

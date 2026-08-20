@@ -1562,6 +1562,25 @@ zanim założysz, że działa.
       krótkiego do przewinięcia wzrokiem, nie ścianę. Zmiana jest WYŁĄCZNIE
       w plikach frontendu (`scan.html`, `style.css`) — wdraża się sama przez
       GitHub Pages po pushu do `main`, bez ręcznego kroku w Supabase.
+      **Incydent przy wdrożeniu tej zmiany, patrz "KOMPLETNOŚĆ WDROŻENIA"
+      w sekcji "Zasady współpracy" niżej: kod trafił tylko na roboczą
+      gałąź, nie na `main`, więc mimo komunikatu "wdroży się samo" u
+      właściciela nic się nie pojawiło.**
+    - **POPRAWKA 2026-08-20(f) — "tip" nie może mówić czytelnikowi, co ma
+      robić ze swoim czasem.** Żywy przykład od właściciela: analiza
+      artykułu z pudelek.pl wygenerowała podpowiedź "zamknij tę stronę i
+      zajmij się czymś innym" — to model decydujący za czytelnika,
+      dokładnie ten sam mechanizm (Argument z Autorytetu w przebraniu
+      dobrej rady — "ja wiem lepiej niż ty") co wzorce, które sami mamy
+      wykrywać. Dodana nowa, nadrzędna sekcja promptu "TWOJA PODPOWIEDŹ TO
+      NIE WYROK CO ROBIĆ Z ŻYCIEM CZYTELNIKA" — `"tip"` ma być WYŁĄCZNIE
+      krokiem weryfikacji TREŚCI (sprawdzić fakt, porównać źródło,
+      poszukać czegoś konkretnego), nigdy poleceniem dotyczącym dalszego
+      zachowania czytelnika (zamknij/przestań czytać/zignoruj/zajmij się
+      czymś innym) — ostateczna decyzja zawsze należy do niego. Pole
+      `"tip"` w liście zasad odwołuje się teraz też do tej sekcji wprost, z
+      jawną listą zabronionych sformułowań. Zero zmian w
+      schemacie/strukturze wyniku — to wyłącznie tekst promptu.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
@@ -2142,6 +2161,24 @@ zupełnie inna liczba, i to ta druga jest poprawna.
   (zasoby/przepływy, sprzężenia zwrotne wzmacniające i równoważące,
   "zawory bezpieczeństwa") — użytkownik świadomie przyjął tę ramę do
   podejmowania decyzji.
+- **KOMPLETNOŚĆ WDROŻENIA (ustalone wprost 2026-08-20, po realnym
+  incydencie): żadna zmiana nie jest "zrobiona", dopóki NIE działa na
+  żywo u właściciela.** Właściciel nie ma jak sam sprawdzić, czy coś
+  wymaga jeszcze wdrożenia, czy już działa — nie jest programistą i nie
+  śledzi stanu gałęzi/repo. Incydent: frontend (`scan.html`/`style.css`,
+  zwijane karty wzorców) trafił tylko na roboczą gałąź, NIE na `main`
+  (z którego serwuje się gakori.app), więc mimo komunikatu "zmiana wdroży
+  się sama" — nic się nie pojawiło, a właściciel nie miał jak tego
+  wykryć. Wniosek, zasada na zawsze: (1) kończąc pracę nad czymkolwiek,
+  co ma być widoczne u właściciela, doprowadzić WSZYSTKIE niezbędne kroki
+  do końca w tej samej turze — łącznie z scaleniem do `main`, jeśli to
+  gałąź, z której serwuje się produkcja — a nie tylko przygotować kod i
+  założyć, że "wdroży się samo"; (2) jeśli mimo to zostaje jakiś krok,
+  którego assystent NIE MOŻE wykonać sam (typowo: ręczne wklejenie do
+  Supabase Dashboard, bo nie ma tu CLI/dostępu), podsumować to jako jasną,
+  kompletną listę "co już działa" / "co jeszcze wymaga Twojej ręcznej
+  akcji, i dokładnie jakiej" — nigdy nie zostawiać milczącego założenia,
+  że coś "powinno" zadziałać.
 - Zawsze podawaj **całą** zaktualizowaną zawartość plików wymagających
   ręcznego wdrożenia (backend, migracje SQL) — nie fragmenty/diffy.
 - Po każdej większej zmianie: zaktualizuj ten plik (`GAKORI_CONTEXT.md`)
