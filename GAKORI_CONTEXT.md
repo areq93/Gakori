@@ -1376,8 +1376,10 @@ zanim założysz, że działa.
     `translateResult()` jej nie używa). Przy stawce $0,30/milion tokenów
     wejścia to ułamek grosza na analizę — świadomie zaakceptowany koszt w
     zamian za wyraźnie wyższą trafność i różnorodność nazw wzorców.
-  - **Kaskada dwuetapowa (kategoria → szczegół), TYLKO tryb tekstowy** (patrz
-    POPRAWKA 2026-08-19(f) niżej — dla linku ten etap został usunięty):
+  - **Kaskada dwuetapowa (kategoria → szczegół)** — tryb tekstowy zawsze, tryb
+    linku w WIĘKSZOŚCI przypadków (patrz POPRAWKA 2026-08-19(f) i POPRAWKA
+    2026-08-20 niżej — historia tego, jak i dlaczego to się zmieniało dla
+    linku):
     modele językowe mają
     naturalną skłonność wybierać częściej te modele mentalne, które są
     "popularniejsze"/lepiej znane (Dowód Społeczny, Efekt Halo...), nawet
@@ -1463,6 +1465,29 @@ zanim założysz, że działa.
       pobranie strony → druga właściwa analiza, patrz POPRAWKA
       2026-08-19(f) wyżej — dawniej 5) — z tymi limitami górna granica
       całości to ok. 50s (dawniej ok. 90s), nie "bez ograniczeń".
+    - **POPRAWKA 2026-08-20 — odzyskanie kaskady dwuetapowej dla linku, bez
+      powrotu do podwójnego pobierania strony.** Użytkownik trafnie
+      zauważył: usunięcie kategoryzacji w POPRAWKA 2026-08-19(f) oznaczało,
+      że link (w przeciwieństwie do tekstu) dostawał ZAWSZE pełną,
+      niezawężoną bibliotekę 15 kategorii — realny koszt jakości, nie tylko
+      teoretyczny (modele językowe gorzej radzą sobie, gdy mają wybierać z
+      dużej, w większości nietrafionej puli). Rozwiązanie: odwrócona
+      kolejność prób. Zamiast Gemini jako PIERWSZY wybór do pobrania strony
+      (co wymuszało kategoryzację = podwójne pobieranie, stąd usunięcie w
+      08-19(f)) — teraz NAJPIERW własne, proste pobranie (`fetchUrlAsText`,
+      zero kosztu Gemini, ta sama funkcja co dawna ścieżka awaryjna). Jeśli
+      się uda (zdecydowana większość zwykłych stron, fetchUrlAsText sama
+      wykrywa niepowodzenie po progu 200 znaków — strony wymagające
+      JavaScriptu do pokazania treści dają wtedy pustą "skorupkę"):
+      `pickRelevantCategories()` na już pobranym tekście (zero dodatkowego
+      pobierania) → właściwa analiza z zawężoną biblioteką — dokładnie ten
+      sam wzorzec co tekst. Dopiero jeśli własne pobranie zawiedzie
+      (podejrzenie JavaScriptu) — wbudowane narzędzie Gemini "URL context"
+      jako "cięższa artyleria", pełna biblioteka, tak jak działało to od
+      08-19(f). Efekt: najgorszy przypadek dalej to maks. 2 zapytania do
+      Gemini (bez pogorszenia), ale w najczęstszym przypadku (zwykła
+      strona) te 2 zapytania dają wyższą jakość (zawężone kategorie)
+      zamiast pełnej biblioteki — nic nie stracono, jakość odzyskana.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
