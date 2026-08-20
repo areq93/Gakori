@@ -94,6 +94,8 @@
         <div class="mode-panel" id="panel-text">
             <p data-i18n="label_paste_text">Wklej tekst do analizy:</p>
             <textarea id="textInput" data-i18n-placeholder="placeholder_text_content" placeholder="Wklej treść, którą chcesz przeanalizować..."></textarea>
+            <p data-i18n="label_text_source_url_optional">Opcjonalnie: link do źródła (doda się do wyniku):</p>
+            <input type="url" id="textSourceUrlInput" data-i18n-placeholder="placeholder_url" placeholder="https://...">
         </div>
 
         <div class="mode-panel" id="panel-image">
@@ -1256,6 +1258,14 @@
                 if (!text) return alert(t('alert_paste_text'));
                 const hash = await sha256Hex(new TextEncoder().encode(text));
                 payload = { input_type: 'text', content_hash: hash, char_count: text.length, text_content: text, language: getCurrentLanguage() };
+                // Opcjonalny link do źródła — NIE wchodzi do content_hash (hash
+                // liczymy tylko z samej treści, żeby dwie osoby wklejające ten
+                // sam tekst nadal trafiały w ten sam współdzielony wynik,
+                // niezależnie od tego, czy podały link). Backend i tak waliduje
+                // to jeszcze raz (patrz analyze/index.ts) — to tylko szybka,
+                // wygodna informacja zwrotna.
+                const textSourceUrl = document.getElementById('textSourceUrlInput').value.trim();
+                if (textSourceUrl && /^https?:\/\//i.test(textSourceUrl)) payload.source_url = textSourceUrl;
 
             } else if (currentMode === 'image') {
                 const files = selectedImageFiles;

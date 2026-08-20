@@ -324,10 +324,15 @@
                         if (score >= 70) { badgeClass = 'badge-green'; label = t('badge_clean', { score: score }); }
                         else if (score >= 40) { badgeClass = 'badge-yellow'; label = t('badge_partial', { score: score }); }
 
-                        const icon = data.input_type === 'url' ? '🔗' : data.input_type === 'image' ? '🖼️' : data.input_type === 'pdf' ? '📄' : '📝';
                         // Pokazujemy link tylko, gdy to naprawdę http(s) - chroni przed
                         // wstrzyknięciem np. "javascript:" jako "źródła" przez złośliwe dane.
                         const isSafeUrl = data.source_url && /^https?:\/\//i.test(data.source_url);
+                        // POPRAWKA 2026-08-21(c) — tryb "Tekst" z opcjonalnie
+                        // podpiętym linkiem źródła (patrz analyze/index.ts) ma
+                        // wyglądać TAK SAMO jak zwykły tryb "Link" — stąd 🔗
+                        // zawsze, gdy jest bezpieczny link źródła, niezależnie
+                        // od faktycznego input_type.
+                        const icon = isSafeUrl ? '🔗' : data.input_type === 'image' ? '🖼️' : data.input_type === 'pdf' ? '📄' : '📝';
                         if (isSafeUrl) {
                             const sourceEl = document.getElementById('scanSource');
                             sourceEl.style.display = 'block';

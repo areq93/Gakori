@@ -1645,6 +1645,44 @@ zanim założysz, że działa.
          `i18n.js`) wprost podpowiada wklejenie tekstu artykułu w trybie
          "Tekst" jako obejście — użytkownik nigdy nie zostaje bez wyjścia,
          nawet gdy pobranie linku się nie uda.
+    - **POPRAWKA 2026-08-21(c) — "ratunkowy" cache po `source_url`: obejście
+      dla stron, których automatyka nigdy nie pobierze, rozszerzone o
+      efekt sieciowy.** Właściciel wpadł na to sam, w reakcji na (b):
+      skoro użytkownik i tak może wkleić treść ręcznie w trybie "Tekst",
+      niech przy okazji będzie mógł podać też link źródłowy (żeby wynik
+      wyglądał identycznie jak zwykła analiza linku, z odnośnikiem u
+      góry) — a wtedy TEN SAM link "ratuje" automatycznie WSZYSTKIE
+      przyszłe próby analizy tego adresu w trybie "Link", nawet jeśli
+      automatyczne pobranie nigdy by się nie udało. Zmiany:
+      - **Frontend** (`index.html`, panel "Tekst"): nowe, opcjonalne pole
+        `#textSourceUrlInput` — walidowane (musi zaczynać się od
+        http/https), NIE wchodzi do `content_hash` (hash liczony tylko z
+        treści, żeby dwie osoby wklejające ten sam tekst nadal trafiały w
+        ten sam wpis w cache'u niezależnie od podania linku), dopisywane
+        do payloadu jako `source_url` tylko gdy wypełnione.
+      - **Backend** (`analyze/index.ts`): nowa stała `textSourceUrl` —
+        walidacja identyczna jak w trybie "Link" (http/https), zapisywana
+        do kolumny `scans.source_url` dla `input_type === 'text'` (wcześniej
+        ta kolumna była zerowana dla wszystkiego poza `'url'`). W gałęzi
+        "url", DOKŁADNIE w momencie, gdy własne pobranie strony zawiodło
+        (`preFetchedText` puste) — PRZED sięgnięciem po (płatną) ścieżkę
+        awaryjną przez Gemini — nowe zapytanie: `SELECT * FROM scans WHERE
+        source_url = <ten adres>`. Trafienie w dokładnie ten sam język →
+        zwracamy ten wynik od razu, za darmo (`cached: true, cost: 0`),
+        zupełnie pomijając Gemini. Trafienie w inny język (ale prawdziwy
+        oryginał, `is_translation = false`) → tanie tłumaczenie przez
+        istniejący `translateResult()`, ten sam wzorzec co "5a" wyżej.
+        Dopiero brak trafienia wraca do dotychczasowej ścieżki awaryjnej
+        (Gemini "URL context").
+      - **Frontend** (`scan.html`): ikona źródła (`🔗`/`📄`/`🖼️`/`📝`) teraz
+        zależy od TEGO, czy jest bezpieczny link źródła (`isSafeUrl`), a
+        nie od `input_type` — analiza z ręcznie wklejonym tekstem +
+        linkiem wygląda dokładnie tak samo jak zwykła analiza linku,
+        zgodnie z prośbą właściciela.
+      - **Uczciwe ograniczenie** (to samo co przy (b)): wymaga DOKŁADNIE
+        tego samego adresu URL (litera w literę) i nie wykrywa, czy treść
+        strony zdążyła się zmienić od czasu ręcznego wklejenia — ten sam
+        kompromis, jaki już akceptujemy w całym współdzielonym cache'u.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):

@@ -967,6 +967,19 @@ Deno.serve(async (req: Request) => {
     // prywatnej historii użytkownika (patrz `scan_access` niżej), nigdy nie
     // wpływa na cenę ani analizę. Ucinamy do rozsądnej długości.
     const pdfFilename = typeof pdf_filename === 'string' && pdf_filename ? pdf_filename.slice(0, 255) : null
+    // POPRAWKA 2026-08-21(c) — opcjonalny link do źródła przy trybie
+    // "Tekst" (użytkownik wkleił treść ręcznie, np. bo automatyczne
+    // pobranie linku zawiodło, ale chce zachować odnośnik do oryginału w
+    // wyniku — patrz opcjonalne pole w panelu tekstowym `index.html`).
+    // Walidowane tak samo jak w trybie "Link" (musi zaczynać się od
+    // http/https) — nigdy nie ufamy temu bez sprawdzenia, mimo że to
+    // "tylko" cytat, nie treść do analizy (ten sam wzorzec co
+    // detectImageMimeType/isPdfFile wyżej). Ten sam link ratuje też
+    // przyszłe analizy linkowe tej samej strony — patrz gałąź "url" niżej.
+    const textSourceUrl =
+      input_type === 'text' && typeof source_url === 'string' && /^https?:\/\//i.test(source_url)
+        ? source_url
+        : null
 
     if (input_type !== 'text' && input_type !== 'url' && input_type !== 'image' && input_type !== 'pdf') {
       return new Response(
@@ -1430,43 +1443,102 @@ Deno.serve(async (req: Request) => {
           secondPassText = preFetchedText
           secondPassSystemPrompt = `${systemPrompt}${rawTextNotice}`
         } else {
-          // Ścieżka awaryjna (podejrzenie strony wymagającej JavaScriptu do
-          // pokazania treści) — pełna biblioteka, Gemini samo próbuje
-          // pobrać stronę swoim narzędziem "URL context". Jeśli i to
-          // zawiedzie, poddajemy się i zwracamy błąd (z prawdziwym powodem
-          // w "details" — widocznym tylko w panelu debugowania ?debug=1).
-          const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
-          geminiData = await callGemini(
-            {
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}`,
-                    },
-                  ],
-                },
-              ],
-              tools: [{ urlContext: {} }],
-              generationConfig: {
-                responseMimeType: 'application/json',
-                responseSchema: DETECTION_RESPONSE_SCHEMA,
-              },
-            },
-            geminiKey!
+          // POPRAWKA 2026-08-21(c) — zanim w ogóle sięgniemy po (płatną)
+          // próbę pobrania przez Gemini "URL context", sprawdzamy coś
+          // zupełnie innego, darmowego: czy ktoś inny nie przeanalizował
+          // już DOKŁADNIE tej samej strony w trybie "Tekst" (ręcznie
+          // wklejając jej treść razem z TYM SAMYM linkiem jako źródło —
+          // patrz opcjonalne pole linku w panelu tekstowym `index.html`,
+          // bo np. jemu też nie udało się automatyczne pobranie). Jeśli
+          // tak — oddajemy ten gotowy wynik od razu, za darmo (to
+          // realnie trafienie w cache, tylko po `source_url` zamiast po
+          // `content_hash` — te dwa nie są tym samym wierszem, bo tryb
+          // linku hashuje SAM ADRES, a tryb tekstu hashuje WKLEJONĄ
+          // TREŚĆ). To naturalne rozszerzenie efektu skali
+          // współdzielonego cache'u (patrz GAKORI_CONTEXT.md) na strony,
+          // których nasza automatyka fizycznie nie potrafi pobrać — jedna
+          // osoba "ratuje" analizę dla wszystkich kolejnych. Uczciwe
+          // ograniczenie: wymaga DOKŁADNIE tego samego adresu (litera w
+          // literę) i nie wykrywa, czy treść strony zdążyła się od tamtej
+          // pory zmienić — ten sam kompromis, jaki już akceptujemy w
+          // całym cache'u.
+          const { data: rescueCandidates } = await supabase
+            .from('scans')
+            .select('*')
+            .eq('source_url', source_url)
+            .limit(5)
+          const rescueExact = (rescueCandidates || []).find(
+            (row: Record<string, unknown>) => row.language === outputLanguage
+          )
+          const rescueOriginal = (rescueCandidates || []).find(
+            (row: Record<string, unknown>) =>
+              row.is_translation === false &&
+              Array.isArray((row.result as { patterns?: unknown })?.patterns)
           )
 
-          const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
-          if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
-            await logFailedAttempt()
+          if (rescueExact) {
+            await supabase
+              .from('scans')
+              .update({ view_count: (rescueExact.view_count as number) + 1 })
+              .eq('id', rescueExact.id)
             return new Response(
-              JSON.stringify({
-                error: 'url_fetch_failed',
-                message: 'Nie udało się pobrać treści tej strony — sprawdź, czy link jest poprawny i publicznie dostępny.',
-                details: { retrievalStatus, fallback: 'failed' },
-              }),
-              { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              JSON.stringify({ cached: true, cost: 0, id: rescueExact.id, result: rescueExact.result }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
+          }
+          if (rescueOriginal) {
+            const translated = await translateResult(
+              rescueOriginal.result as Record<string, unknown>,
+              outputLanguage,
+              geminiKey!,
+              RESPONSE_SCHEMA
+            )
+            if (translated) {
+              result = translated
+              usedTranslation = true
+            }
+          }
+
+          // Ratunek się nie udał (nikt jeszcze nie wkleił tej strony
+          // ręcznie) — dopiero teraz ścieżka awaryjna sprzed tej poprawki:
+          // pełna biblioteka, Gemini samo próbuje pobrać stronę swoim
+          // narzędziem "URL context". Jeśli i to zawiedzie, poddajemy się
+          // i zwracamy błąd (z prawdziwym powodem w "details" — widocznym
+          // tylko w panelu debugowania ?debug=1).
+          if (!result) {
+            const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+            geminiData = await callGemini(
+              {
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}`,
+                      },
+                    ],
+                  },
+                ],
+                tools: [{ urlContext: {} }],
+                generationConfig: {
+                  responseMimeType: 'application/json',
+                  responseSchema: DETECTION_RESPONSE_SCHEMA,
+                },
+              },
+              geminiKey!
+            )
+
+            const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
+            if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
+              await logFailedAttempt()
+              return new Response(
+                JSON.stringify({
+                  error: 'url_fetch_failed',
+                  message: 'Nie udało się pobrać treści tej strony — sprawdź, czy link jest poprawny i publicznie dostępny.',
+                  details: { retrievalStatus, fallback: 'failed' },
+                }),
+                { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              )
+            }
           }
         }
       } else if (input_type === 'image') {
@@ -1797,7 +1869,7 @@ Deno.serve(async (req: Request) => {
         input_type,
         language: outputLanguage,
         is_translation: usedTranslation,
-        source_url: input_type === 'url' ? source_url : null,
+        source_url: input_type === 'url' ? source_url : textSourceUrl,
         text_content: input_type === 'text' ? text_content : null,
         char_count: input_type === 'text' ? char_count : 0,
         credits_charged: finalCost,
