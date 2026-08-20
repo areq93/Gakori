@@ -1581,6 +1581,27 @@ zanim założysz, że działa.
       `"tip"` w liście zasad odwołuje się teraz też do tej sekcji wprost, z
       jawną listą zabronionych sformułowań. Zero zmian w
       schemacie/strukturze wyniku — to wyłącznie tekst promptu.
+    - **POPRAWKA 2026-08-20(g) — "tip" nie może odsyłać czytelnika z
+      powrotem do TEGO SAMEGO tekstu.** Głębszy problem znaleziony przez
+      właściciela zaraz po (f): podpowiedzi typu "sprawdź w artykule,
+      jakie inne problemy mogą wpłynąć na tę inwestycję" albo "sprawdź w
+      tekście, kto dokładnie ponosi ryzyko finansowe" odsyłają czytelnika
+      z powrotem do analizowanego tekstu, który MY już przeczytaliśmy w
+      całości przez bibliotekę modeli mentalnych — to podważa sam sens
+      usługi: aplikacja ma przefiltrować tekst ZA czytelnika, a nie
+      zlecać mu doczytania czegoś, czego "nie zdążyła" znaleźć. Dodana
+      nowa, nadrzędna sekcja promptu "MY JUŻ PRZECZYTALIŚMY CAŁY TEKST ZA
+      CZYTELNIKA" — jeśli w tekście jest jeszcze coś istotnego, ma trafić
+      jako OSOBNY wzorzec na liście `"patterns"`, NIGDY jako podpowiedź;
+      podpowiedź kieruje odtąd WYŁĄCZNIE na zewnątrz analizowanego tekstu
+      (wyszukiwarka, inne, niezależne źródło, publicznie sprawdzalny
+      fakt) — czyli do czegoś, czego model fizycznie nie może sprawdzić
+      za czytelnika, bo wymaga to wyjścia poza już przeanalizowaną treść.
+      Pole `"tip"` w liście zasad odwołuje się teraz też do tej sekcji
+      wprost, z jawnym zakazem sformułowań "sprawdź w tekście/artykule...".
+      Zero zmian w schemacie/strukturze wyniku — to wyłącznie tekst
+      promptu, WYŁĄCZNIE backend (`analyze/index.ts`), zero zmian
+      frontendowych.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
