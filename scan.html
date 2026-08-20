@@ -393,7 +393,7 @@
                             // Najwyższy numer obrazu w całej liście — mówi nam, czy w ogóle
                             // był to zestaw WIELU obrazów naraz (patrz odznaka niżej).
                             const maxImageIndex = r.patterns.reduce((max, p) => typeof p.image_index === 'number' && p.image_index > max ? p.image_index : max, 0);
-                            r.patterns.forEach(p => {
+                            r.patterns.forEach((p, index) => {
                                 // Starsze, już zcache'owane analizy sprzed tej zmiany nie mają
                                 // pattern_type/tip — domyślnie traktujemy je jako "manipulation"
                                 // (tak było jedyne dostępne znaczenie przed wprowadzeniem drugiego typu).
@@ -401,8 +401,29 @@
                                 const item = document.createElement('div');
                                 item.className = 'pattern-item ' + (isReasoning ? 'pattern-reasoning' : 'pattern-manipulation');
 
+                                // Karty da się rozwijać/zwijać niezależnie od siebie (zgłoszone:
+                                // wynik z wieloma wzorcami wyglądał jak ściana tekstu) — WYŁĄCZNIE
+                                // pierwsza karta jest domyślnie rozwinięta, reszta czeka zwinięta,
+                                // każda kliknięta osobno, bez wpływu na pozostałe (nie akordeon,
+                                // który zamyka inne przy otwarciu nowej).
                                 const header = document.createElement('div');
                                 header.className = 'pattern-header';
+                                header.setAttribute('role', 'button');
+                                header.setAttribute('tabindex', '0');
+                                header.setAttribute('aria-expanded', index === 0 ? 'true' : 'false');
+                                const setExpanded = (expanded) => {
+                                    item.classList.toggle('collapsed', !expanded);
+                                    header.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                                };
+                                setExpanded(index === 0);
+                                header.addEventListener('click', () => setExpanded(item.classList.contains('collapsed')));
+                                header.addEventListener('keydown', (e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setExpanded(item.classList.contains('collapsed'));
+                                    }
+                                });
+
                                 const tag = document.createElement('span');
                                 tag.className = 'pattern-tag';
                                 tag.innerText = t(isReasoning ? 'pattern_tag_reasoning' : 'pattern_tag_manipulation');
@@ -433,17 +454,25 @@
                                     imageBadge.innerText = t('pattern_image_label', { index: p.image_index });
                                     header.appendChild(imageBadge);
                                 }
+                                const chevron = document.createElement('span');
+                                chevron.className = 'pattern-chevron';
+                                chevron.setAttribute('aria-hidden', 'true');
+                                chevron.innerText = '▾';
+                                header.appendChild(chevron);
                                 item.appendChild(header);
+
+                                const body = document.createElement('div');
+                                body.className = 'pattern-body';
 
                                 const quote = document.createElement('blockquote');
                                 quote.className = 'result-quote';
                                 quote.innerText = '„' + p.quote + '"';
-                                item.appendChild(quote);
+                                body.appendChild(quote);
                                 if (p.explanation) {
                                     const explanation = document.createElement('p');
                                     explanation.className = 'pattern-explanation';
                                     explanation.innerText = p.explanation;
-                                    item.appendChild(explanation);
+                                    body.appendChild(explanation);
                                 }
                                 if (p.tip) {
                                     const tip = document.createElement('div');
@@ -456,8 +485,9 @@
                                     tipText.className = 'pattern-tip-text';
                                     tipText.innerText = p.tip;
                                     tip.appendChild(tipText);
-                                    item.appendChild(tip);
+                                    body.appendChild(tip);
                                 }
+                                item.appendChild(body);
                                 patternsEl.appendChild(item);
                             });
                         } else if (r.source_quote) {

@@ -403,7 +403,26 @@ a { color: var(--accent); }
    z odznaki wyniku. */
 .pattern-item.pattern-reasoning { border-left-color: var(--ok-text); }
 
-.pattern-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+/* POPRAWKA 2026-08-20(e) — karty z wieloma wzorcami wyglądały jak ściana
+   tekstu ("czytelnik nie może czuć, że czeka go trudne zadanie"), więc
+   nagłówek jest teraz klikalny i chowa/pokazuje treść karty (.pattern-body
+   niżej) niezależnie od pozostałych kart — to NIE jest akordeon, otwarcie
+   jednej nie zamyka innych. Domyślny stan (pierwsza rozwinięta, reszta
+   zwinięta) ustawia JS przy renderowaniu (patrz scan.html). */
+.pattern-header {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
+    cursor: pointer; user-select: none; margin: -2px -2px 8px -2px; padding: 2px;
+    border-radius: var(--radius-sm);
+}
+.pattern-header:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.pattern-item.collapsed .pattern-header { margin-bottom: -2px; }
+.pattern-chevron {
+    margin-left: auto; font-size: 13px; line-height: 1; color: var(--ink-soft);
+    transition: transform 0.15s ease;
+}
+.pattern-item.collapsed .pattern-chevron { transform: rotate(-90deg); }
+.pattern-body { display: block; }
+.pattern-item.collapsed .pattern-body { display: none; }
 .pattern-tag {
     font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
     padding: 3px 9px; border-radius: 999px; white-space: nowrap;
