@@ -2038,6 +2038,16 @@ zupełnie inna liczba, i to ta druga jest poprawna.
 
 ## Zasady współpracy w tym projekcie
 
+- **NADRZĘDNY, STAŁY CEL (ustalone wprost 2026-08-20): jakość wyników analizy
+  ma być stale podnoszona — zawsze, bez końca, nie tylko "do pierwszej
+  wystarczającej wersji".** Właściciel świadomie chce, żeby wykrywanie
+  wzorców (liczba, trafność, różnorodność) było ciągle weryfikowane na
+  żywych przykładach i poprawiane, nawet gdy formalnie "działa" — to nie
+  jest jednorazowe zadanie z listy TODO, tylko stały priorytet przy każdej
+  pracy nad silnikiem analizy (`analyze/index.ts`, `buildSystemPrompt()`,
+  biblioteka modeli mentalnych). Konkretny, żywy przykład niedostatecznej
+  jakości i pierwsza poprawka: patrz "POPRAWKA 2026-08-20(b) — Etap 3,
+  druga runda szukania" w sekcji "Kaskada dwuetapowa" wyżej.
 - Właściciel nie jest programistą — tłumaczenia zawsze proste, po
   polsku, bez żargonu, z analogiami.
 - Rozmowa prowadzona jest po polsku — nawet gdy treść w kodzie/UI jest
