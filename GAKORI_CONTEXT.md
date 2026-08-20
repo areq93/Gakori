@@ -1753,9 +1753,27 @@ bez żadnego przychodu.
     (tekst, tani element) N razy zamiast raz — ten sam, już policzony
     wcześniej wzorzec kosztowy co przy PDF-owym Etapie 1 — realny wpływ na
     marżę jest pomijalny (grosze przy przychodzie liczonym w złotówkach).
-- **Wciąż nieustalone**: ile 1 kredyt ma być wart w złotówkach/dolarach.
-  Bez tego nie da się policzyć realnej marży w walucie, tylko w
-  procentach. Jak wypadnie ta rozmowa — dopisz tu ustaloną wartość.
+- **USTALONE (2026-08-20) — finalny cennik pakietów kredytów do kupienia.**
+  System płatności sam w sobie JESZCZE nie istnieje w kodzie (patrz niżej
+  "Do dopisania w przyszłości") — to jest ustalona TARGETOWA cena do
+  wdrożenia, gdy ten system powstanie, żeby się już nigdzie po drodze nie
+  zgubiła:
+
+  | Pakiet | Cena | Kredyty | Cena za 1 kredyt | Rabat vs pakiet Mały |
+  |---|---|---|---|---|
+  | Mały | 5 USD (~20 zł) | 500 | $0,01 (0,04 zł) | — (cena bazowa) |
+  | Średni | 19 USD (~76 zł) | 2 500 | $0,0076 (0,0304 zł) | -24% |
+  | Duży | 89 USD (~356 zł) | 16 000 | $0,00556 (0,0222 zł) | -44,4% |
+
+  Uzasadnienie strategiczne: niska cena wejścia + hojna liczba kredytów w
+  droższych pakietach ma usuwać "tarcie" przy decyzji o zakupie, żeby
+  ludzie analizowali częściej i bez wahania — to napędza pętlę wzrostu:
+  więcej analiz → szybciej rosnąca, publiczna baza treści (przewaga w
+  wynikach wyszukiwania) → więcej nowych użytkowników trafiających z
+  wyszukiwarki na już gotowe analizy → więcej kolejnych analiz. Przy
+  marży rzędu 91-95% (koszt Gemini per analiza to ułamek grosza, patrz
+  niżej) ta hojność nic realnie nie kosztuje, więc nie ma napięcia między
+  "szybko zbudować przewagę" a "być rentownym".
 - **Koszt API jest ułamkiem grosza względem jakiejkolwiek sensownej ceny
   za kredyt** — dla `gemini-3.5-flash-lite` ($0,30 / $2,50 za milion
   tokenów wejścia/wyjścia, zweryfikowane na żywo 17.08.2026 — potwierdzone
