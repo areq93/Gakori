@@ -1465,7 +1465,7 @@ zanim założysz, że działa.
       pobranie strony → druga właściwa analiza, patrz POPRAWKA
       2026-08-19(f) wyżej — dawniej 5) — z tymi limitami górna granica
       całości to ok. 50s (dawniej ok. 90s), nie "bez ograniczeń".
-    - **POPRAWKA 2026-08-20 — odzyskanie kaskady dwuetapowej dla linku, bez
+    - **POPRAWKA 2026-08-20(a) — odzyskanie kaskady dwuetapowej dla linku, bez
       powrotu do podwójnego pobierania strony.** Użytkownik trafnie
       zauważył: usunięcie kategoryzacji w POPRAWKA 2026-08-19(f) oznaczało,
       że link (w przeciwieństwie do tekstu) dostawał ZAWSZE pełną,
@@ -1488,6 +1488,51 @@ zanim założysz, że działa.
       Gemini (bez pogorszenia), ale w najczęstszym przypadku (zwykła
       strona) te 2 zapytania dają wyższą jakość (zawężone kategorie)
       zamiast pełnej biblioteki — nic nie stracono, jakość odzyskana.
+    - **POPRAWKA 2026-08-20(b) — Etap 3, "druga runda szukania"
+      (`findAdditionalPatterns()`), TYLKO tekst i link (ścieżka główna).**
+      Realny, żywy przykład (artykuł Wirtualnemedia.pl o sporze
+      Wieczorkiewicz/Stanowski) dostał tylko 2 wzorce mimo że wyraźnie
+      zasługiwał na więcej — model w jednym, pojedynczym zapytaniu Etapu 2
+      ma tendencję "zadowolić się" pierwszymi kilkoma oczywistymi
+      wzorcami, mimo istniejącej już instrukcji "DOKŁADNOŚĆ I
+      RÓŻNORODNOŚĆ" w `buildSystemPrompt()`. Naprawa: NOWY, dodatkowy Etap
+      3 — osobne zapytanie, które dostaje ten sam tekst PONOWNIE razem z
+      już znalezioną listą wzorców i każe szukać WYŁĄCZNIE tego, czego
+      zabrakło (bez powtarzania). Fail-open (błąd zwraca oryginalną listę
+      bez zmian). Zastosowane TYLKO tam, gdzie mamy własny tekst pod ręką
+      (tekst wklejony przez użytkownika, i link — ale WYŁĄCZNIE ścieżka
+      główna z `fetchUrlAsText`, nie ścieżka awaryjna przez `urlContext` —
+      tam nie mamy własnego tekstu bez ponownego, kosztownego pobierania
+      strony). Koszt: +1 zapytanie do Gemini w tych dwóch przypadkach.
+      Świadomie NIE ma tu wymuszonego minimum liczby wzorców (ta sama
+      zasada co przy PDF-owym `verifyAndRefinePdfPatterns()`) — pusta
+      lista w drugiej rundzie jest OK, chodzi o unikanie naciąganych
+      wzorców "na siłę".
+    - **POPRAWKA 2026-08-20(c) — "Chain of Thought" (`reasoning_steps`),
+      WSZYSTKIE tryby (tekst, link, obraz, PDF).** Pomysł właściciela: ta
+      sama zasada "najpierw rozpisz tok myślenia i ryzyka, dopiero potem
+      finalna propozycja", stosowana ogólnie w promptach do modeli
+      językowych, żeby wymusić systematyczne przejście przez treść zamiast
+      "strzelenia" gotową, krótką odpowiedzią. Technicznie: ustrukturyzowane
+      odpowiedzi Gemini (`responseSchema`) generują pola PO KOLEI, w
+      kolejności z definicji schematu — dopisane pole `"reasoning_steps"`
+      (typu string, "brudnopis" modelu) jest celowo PIERWSZE w kolejności
+      pól odpowiadających za samą analizę (po ewentualnych polach moderacji
+      obrazu, które muszą się rozstrzygnąć jeszcze wcześniej), więc model
+      MUSI je wypełnić, zanim w ogóle dotrze do wypełniania `"patterns"`.
+      Odrzucane zaraz po sparsowaniu odpowiedzi (`delete result.reasoning_steps`
+      w Deno.serve) — nigdy nie trafia do zapisanego wyniku ani do
+      użytkownika. Wymaga OSOBNYCH schematów od tych używanych też przez
+      `translateResult()` (tłumaczenie gotowego wyniku na inny język) —
+      `RESPONSE_SCHEMA`/`PDF_RESPONSE_SCHEMA` zostają nietknięte,
+      dodatkowe pole żyje tylko w nowych `DETECTION_RESPONSE_SCHEMA` (tekst
+      i link) i `PDF_DETECTION_RESPONSE_SCHEMA` (PDF) — bo tłumaczenie nie
+      powinno dostawać wymogu wypełnienia pola, którego w ogóle nie
+      dotyczy. Dla obrazu (`IMAGE_CHUNK_SCHEMA`) dopisane bezpiecznie
+      wprost — ten schemat nigdzie indziej się nie powtarza. Koszt: ZERO
+      dodatkowych zapytań do Gemini (dzieje się w tym samym, już
+      istniejącym zapytaniu) — tylko odrobinę więcej tokenów
+      wyjściowych/dłuższy czas jednego zapytania.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
@@ -2048,6 +2093,17 @@ zupełnie inna liczba, i to ta druga jest poprawna.
   biblioteka modeli mentalnych). Konkretny, żywy przykład niedostatecznej
   jakości i pierwsza poprawka: patrz "POPRAWKA 2026-08-20(b) — Etap 3,
   druga runda szukania" w sekcji "Kaskada dwuetapowa" wyżej.
+- **ZASADA PRACY WŁASNEJ (ustalone wprost 2026-08-20): "myślenie krok po
+  kroku, wypisanie ryzyk każdego podejścia, dopiero potem finalna
+  propozycja" — TA SAMA zasada, którą stosujemy w promptach dla Gemini
+  (patrz "Chain of Thought"/`reasoning_steps` w sekcji "Kaskada
+  dwuetapowa"), obowiązuje też w SAMEJ procedurze pracy nad tym projektem
+  między asystentem a właścicielem, nie tylko w promptach dla AI.**
+  Właściciel świadomie chce, żeby przed każdą nietrywialną propozycją
+  (zmiana architektury, decyzja produktowa, coś z realnym kosztem/ryzykiem)
+  asystent najpierw rozpisał tok rozumowania i możliwe ryzyka/kompromisy
+  różnych podejść, a dopiero na końcu zaproponował konkretne rozwiązanie —
+  nie odwrotnie.
 - Właściciel nie jest programistą — tłumaczenia zawsze proste, po
   polsku, bez żargonu, z analogiami.
 - Rozmowa prowadzona jest po polsku — nawet gdy treść w kodzie/UI jest

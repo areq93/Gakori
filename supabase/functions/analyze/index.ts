@@ -341,6 +341,35 @@ const RESPONSE_SCHEMA = {
   required: ['q_score', 'patterns', 'summary'],
 }
 
+// POPRAWKA 2026-08-20(c) — "Chain of Thought" (myślenie krok po kroku)
+// TYLKO dla wykrywania w tekście/linku (Etap 2, ścieżka główna) — osobny
+// schemat od RESPONSE_SCHEMA (nie modyfikujemy RESPONSE_SCHEMA wprost),
+// bo RESPONSE_SCHEMA jest też używany przez translateResult() do
+// TŁUMACZENIA gotowego wyniku — tam dodatkowe wymagane pole
+// "reasoning_steps" tylko przeszkadzałoby (prompt tłumaczenia go nie
+// dotyczy). Ustrukturyzowane odpowiedzi Gemini generują pola PO KOLEI, w
+// kolejności z definicji schematu — "reasoning_steps" celowo jest PIERWSZE,
+// żeby model musiał najpierw "rozpisać się" krok po kroku, zanim w ogóle
+// dotrze do wypełniania "patterns". To wymusza systematyczne przejście
+// przez tekst zamiast "strzelenia" od razu gotową, krótką listą — ten sam
+// mechanizm poprawy jakości co Etap 3 (findAdditionalPatterns), ale
+// DZIEJE SIĘ W TYM SAMYM zapytaniu, bez dodatkowego kosztu/czasu. Pole
+// "reasoning_steps" jest odrzucane zaraz po sparsowaniu odpowiedzi
+// (patrz Deno.serve niżej) — to wyłącznie "brudnopis" modelu, nigdy nie
+// trafia do zapisanego wyniku ani nie jest pokazywane użytkownikowi.
+const DETECTION_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    reasoning_steps: { type: 'string' },
+    q_score: { type: 'integer' },
+    patterns: RESPONSE_SCHEMA.properties.patterns,
+    summary: { type: 'string' },
+  },
+  required: ['reasoning_steps', 'q_score', 'patterns', 'summary'],
+}
+
+const CHAIN_OF_THOUGHT_INSTRUCTION = `\n\nMYŚLENIE KROK PO KROKU (CHAIN OF THOUGHT, KRYTYCZNIE WAŻNE): Zanim wypełnisz pole "patterns", NAJPIERW wypełnij pole "reasoning_steps" — rozpisz tam krótkimi notatkami, akapit po akapicie / twierdzenie po twierdzeniu, swój tok myślenia: co zauważasz w tym fragmencie, czy pasuje do jakiegoś modelu z biblioteki (do którego dokładnie), i czy to dopasowanie jest pewne czy wątpliwe (jakie jest ryzyko pomyłki/naciągania). Dopiero NA PODSTAWIE tego rozpisania wypełnij ostateczne pole "patterns" — tylko tymi wzorcami, które po tym namyśle uznajesz za trafne. Pole "reasoning_steps" to Twój wewnętrzny brudnopis, nikt go nie zobaczy — pisz w nim swobodnie, nie musi być "ładne", ma być systematyczne.`
+
 // Kategorie niedozwolonej treści na obrazie — patrz moderacja niżej
 // (Deno.serve, gałąź "image"). Trzymane jako lista stałych wartości (nie
 // dowolny tekst), żeby wynik był przewidywalny i łatwy do dalszego użycia
@@ -393,15 +422,23 @@ const IMAGE_RESPONSE_SCHEMA = {
 // nie ma sensu prosić go o numer, który już znamy). Wzorce w tym samym
 // kształcie co RESPONSE_SCHEMA (przez `.properties.patterns`, bez
 // duplikowania definicji).
+// POPRAWKA 2026-08-20(c) — "reasoning_steps" (Chain of Thought, patrz
+// DETECTION_RESPONSE_SCHEMA wyżej) dodane BEZPIECZNIE wprost do tego
+// schematu (w przeciwieństwie do RESPONSE_SCHEMA/PDF_RESPONSE_SCHEMA nie
+// ma potrzeby osobnej kopii — IMAGE_CHUNK_SCHEMA nie jest nigdzie
+// współdzielony z translateResult()). Celowo PO polach moderacji
+// (unsafe_content/unsafe_content_category) — moderacja ma się rozstrzygnąć
+// PIERWSZA, zanim model zacznie się rozpisywać o wzorcach.
 const IMAGE_CHUNK_SCHEMA = {
   type: 'object',
   properties: {
     unsafe_content: { type: 'boolean' },
     unsafe_content_category: { type: 'string' },
+    reasoning_steps: { type: 'string' },
     q_score: { type: 'integer' },
     patterns: RESPONSE_SCHEMA.properties.patterns,
   },
-  required: ['unsafe_content', 'unsafe_content_category', 'q_score', 'patterns'],
+  required: ['unsafe_content', 'unsafe_content_category', 'reasoning_steps', 'q_score', 'patterns'],
 }
 
 // Schemat dla ETAPU 2 obrazu (weryfikacja/scalanie, patrz
@@ -446,6 +483,23 @@ const PDF_RESPONSE_SCHEMA = {
     summary: { type: 'string' },
   },
   required: ['q_score', 'patterns', 'summary'],
+}
+
+// POPRAWKA 2026-08-20(c) — "reasoning_steps" (Chain of Thought, patrz
+// DETECTION_RESPONSE_SCHEMA wyżej) dla ETAPU 1 PDF-a (analyzePdfChunk()
+// niżej) — OSOBNY schemat od PDF_RESPONSE_SCHEMA z tego samego powodu co
+// DETECTION_RESPONSE_SCHEMA dla tekstu/linku: PDF_RESPONSE_SCHEMA jest
+// współdzielony z translateResult() (tłumaczenie gotowego wyniku PDF-a),
+// gdzie dodatkowe wymagane pole tylko by przeszkadzało.
+const PDF_DETECTION_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    reasoning_steps: { type: 'string' },
+    q_score: { type: 'integer' },
+    patterns: PDF_RESPONSE_SCHEMA.properties.patterns,
+    summary: { type: 'string' },
+  },
+  required: ['reasoning_steps', 'q_score', 'patterns', 'summary'],
 }
 
 // Schemat dla ETAPU 2 (weryfikacja/scalanie, patrz verifyAndRefinePdfPatterns()
@@ -1304,14 +1358,14 @@ Deno.serve(async (req: Request) => {
                 {
                   parts: [
                     {
-                      text: `${systemPrompt}${rawTextNotice}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony):\n${preFetchedText}`,
+                      text: `${systemPrompt}${rawTextNotice}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony):\n${preFetchedText}`,
                     },
                   ],
                 },
               ],
               generationConfig: {
                 responseMimeType: 'application/json',
-                responseSchema: RESPONSE_SCHEMA,
+                responseSchema: DETECTION_RESPONSE_SCHEMA,
               },
             },
             geminiKey!
@@ -1331,12 +1385,18 @@ Deno.serve(async (req: Request) => {
           geminiData = await callGemini(
             {
               contents: [
-                { parts: [{ text: `${systemPrompt}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}` }] },
+                {
+                  parts: [
+                    {
+                      text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}`,
+                    },
+                  ],
+                },
               ],
               tools: [{ urlContext: {} }],
               generationConfig: {
                 responseMimeType: 'application/json',
-                responseSchema: RESPONSE_SCHEMA,
+                responseSchema: DETECTION_RESPONSE_SCHEMA,
               },
             },
             geminiKey!
@@ -1383,7 +1443,7 @@ Deno.serve(async (req: Request) => {
           mimeType: string,
           base64Data: string
         ): Promise<{ unsafe: boolean; unsafeCategory: string; q_score: number; patterns: Array<Record<string, unknown>> } | null> {
-          const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy przesłany obraz przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "q_score" i "patterns" zostaw odpowiednio: 0, pusta lista. NIE opisuj ani nie analizuj dalej obrazu. Jeśli obraz NIE przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.`
+          const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy przesłany obraz przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "reasoning_steps", "q_score" i "patterns" zostaw odpowiednio: pusty tekst, 0, pusta lista. NIE opisuj ani nie analizuj dalej obrazu. Jeśli obraz NIE przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.${CHAIN_OF_THOUGHT_INSTRUCTION}`
           const geminiData = await callGemini(
             {
               contents: [
@@ -1533,7 +1593,7 @@ Deno.serve(async (req: Request) => {
           const rangeNote = isOnlyChunk
             ? ''
             : ` To jest FRAGMENT większego dokumentu — strony ${start + 1}-${end} z ${pdfPageCount}-stronicowego pliku. W polu "page" podawaj numer strony LICZĄC OD 1 W OBRĘBIE TEGO FRAGMENTU (nie oryginalnego dokumentu), czyli liczbę od 1 do ${chunkPageCount}.`
-          const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF — potraktuj go dokładnie tak samo jak tekst do analizy. Przeczytaj GO CAŁEGO, stronę po stronie, każdą stronę sprawdź tak samo uważnie jak pierwszą — nie ograniczaj się do najbardziej rzucających się w oczy fragmentów.${rangeNote} Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie szukać danego miejsca, sam cytat nie wystarczy.`
+          const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF — potraktuj go dokładnie tak samo jak tekst do analizy. Przeczytaj GO CAŁEGO, stronę po stronie, każdą stronę sprawdź tak samo uważnie jak pierwszą — nie ograniczaj się do najbardziej rzucających się w oczy fragmentów.${rangeNote} Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie szukać danego miejsca, sam cytat nie wystarczy.${CHAIN_OF_THOUGHT_INSTRUCTION}`
           const geminiData = await callGemini(
             {
               contents: [
@@ -1546,7 +1606,7 @@ Deno.serve(async (req: Request) => {
               ],
               generationConfig: {
                 responseMimeType: 'application/json',
-                responseSchema: PDF_RESPONSE_SCHEMA,
+                responseSchema: PDF_DETECTION_RESPONSE_SCHEMA,
               },
             },
             geminiKey!,
@@ -1620,10 +1680,10 @@ Deno.serve(async (req: Request) => {
         const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
         geminiData = await callGemini(
           {
-            contents: [{ parts: [{ text: `${systemPrompt}\n\nTEKST DO ANALIZY:\n${text_content}` }] }],
+            contents: [{ parts: [{ text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nTEKST DO ANALIZY:\n${text_content}` }] }],
             generationConfig: {
               responseMimeType: 'application/json',
-              responseSchema: RESPONSE_SCHEMA,
+              responseSchema: DETECTION_RESPONSE_SCHEMA,
             },
           },
           geminiKey!
@@ -1650,6 +1710,11 @@ Deno.serve(async (req: Request) => {
         }
 
         result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
+        // "reasoning_steps" (patrz DETECTION_RESPONSE_SCHEMA/POPRAWKA
+        // 2026-08-20(c)) to wyłącznie wewnętrzny brudnopis modelu, wymuszony
+        // przez schemat, żeby poprawić jakość WYPEŁNIANIA "patterns" —
+        // nigdy nie ma trafić do zapisanego wyniku ani do użytkownika.
+        delete (result as Record<string, unknown>).reasoning_steps
 
         // ETAP 3 (POPRAWKA 2026-08-20(b)) — "druga runda szukania", tylko
         // gdy gałąź wyżej ustawiła secondPassText (tekst i link ze ścieżki
