@@ -1929,11 +1929,44 @@ bez żadnego przychodu.
   (`imageInputTrigger` w `index.html`). Jeśli w przyszłości dojdzie kolejne
   pole plikowe — zastosuj ten sam wzorzec od razu, nie po zgłoszeniu.
 
+## Infrastruktura — własne domeny (USTALONE 2026-08-20)
+
+Użytkownik kupił i skonfigurował dwie domeny (OVH), rozwiązując punkt
+"własna domena", który wcześniej był na liście "świadomie odłożone":
+
+- **`gakori.app`** — adres samej aplikacji (PWA). Podpięty jako "Custom
+  domain" w GitHub Pages (plik `CNAME` w repo, 4 rekordy DNS `A` na adresy
+  GitHub `185.199.108/109/110/111.153`, `www` jako `CNAME` na
+  `areq93.github.io`). HTTPS wymuszony (Enforce HTTPS w ustawieniach
+  GitHub Pages). Mail `support@gakori.app` to przekierowanie (OVH) na
+  prywatny mail właściciela — nie prawdziwa skrzynka.
+- **`gakori.com`** — zarezerwowana pod przyszłą, osobną stronę marki
+  (jeszcze nie zbudowana, patrz zadanie w TODO). Mail `contact@gakori.com`
+  — tak samo, przekierowanie na prywatny mail.
+- **Cloudflare Turnstile** (captcha logowania/rejestracji, patrz sekcja
+  "Logowanie" niżej) — hostname `gakori.app` dopisany do widżetu (obok
+  starego `areq93.github.io`), secret key rotowany i zaktualizowany w
+  Supabase (Authentication → Attack Protection → Captcha secret).
+- **Brevo (wysyłka maili transakcyjnych)** — domena `gakori.app`
+  uwierzytelniona w Brevo (rekordy DKIM ×2, DMARC, "Brevo code" TXT —
+  żadnych konfliktów z istniejącym SPF/MX pod `@`, bo Brevo w tym wariancie
+  configu NIE wymagał osobnego wpisu SPF). Branded subdomain `mail.gakori.app`
+  (linki śledzące/obrazki w mailach pokazują teraz naszą domenę zamiast
+  domeny Brevo). Nowy zweryfikowany nadawca `support@gakori.app` (nazwa
+  "Zespół Gakori") zastąpił stary, niepoprawnie skonfigurowany nadawca
+  oparty na prywatnym Gmailu (`BREVO_SENDER_EMAIL` w Supabase
+  zaktualizowany) — to naprawiło brzydki, techniczny adres nadawcy
+  (`...@NNNNN.brevosend.com`) widoczny wcześniej w skrzynkach odbiorców.
+
+**Ryzyko przy zmianie nazwy repo/domeny (poznane na żywo)**: zmiana nazwy
+repozytorium GitHub z `pragma` na `Gakori` (zrobiona przez właściciela w
+panelu GitHub) automatycznie przekierowuje stary adres, więc nic się nie
+psuje od razu — ale już zainstalowane ikonki PWA na telefonach
+użytkowników (wskazujące na stary `start_url`/`scope`) mogą przestać
+działać poprawnie i wymagać ponownej instalacji.
+
 ## Świadomie odłożone na później (nie budować bez wyraźnej prośby)
 
-- Własna domena (naprawiłoby to markowanie Google OAuth pokazujące surową
-  domenę Supabase, i brzydki adres nadawcy Brevo przy odbiciach) —
-  użytkownik: "jeszcze nie".
 - Ekran intencji zakupowej (Fake Door test).
 - Obniżanie darmowego bonusu powitalnego / limity rejestracji po IP w
   Supabase — świadomie odłożone (zasada Lean Startup: nie buduj obrony
