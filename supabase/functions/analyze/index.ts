@@ -875,6 +875,20 @@ ${compactList}`
 // wszystkie znaczniki HTML jak leci, więc w tekście może zostać menu, stopka
 // itp. razem z właściwą treścią. Świadomy kompromis: analiza z odrobiną
 // szumu jest lepsza niż brak analizy w ogóle.
+// POPRAWKA 2026-08-21(b) — właściciel chciał, żeby aplikacja radziła sobie z
+// analizą "wszystkiego w internecie"; realny limit: strony wymagające
+// JavaScriptu do pokazania treści są dla TEGO podejścia (proste zapytanie
+// HTTP, bez prawdziwej przeglądarki) fizycznie nieosiągalne — Supabase Edge
+// Functions nie potrafią uruchomić przeglądarki, to ograniczenie platformy,
+// nie promptu/kodu (patrz GAKORI_CONTEXT.md, "Zasady współpracy" — świadomie
+// NIE dodajemy tu zewnętrznej usługi/zależności biznesowej bez osobnej,
+// przemyślanej decyzji). To, co REALNIE poprawiamy: część blokad
+// antybotowych sprawdza tylko podstawowe nagłówki (brakujące
+// Accept/Sec-Fetch-*/klienckie wskazówki przeglądarki od razu zdradzają
+// automat) — dopisany komplet nagłówków, jakie realnie wysyła Chrome przy
+// zwykłym wejściu na stronę, żeby przejść przez tę węższą kategorię
+// zabezpieczeń. Nie pomoże to stronom wymagającym JS (patrz wyżej) — to
+// świadomie ograniczona, ale zero-kosztowa i zero-zależnościowa poprawka.
 async function fetchUrlAsText(url: string): Promise<string | null> {
   try {
     const res = await fetchWithTimeout(
@@ -883,7 +897,17 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+          'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
           'Accept-Language': 'pl,en;q=0.8',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1',
+          'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
         },
       },
       FALLBACK_FETCH_TIMEOUT_MS

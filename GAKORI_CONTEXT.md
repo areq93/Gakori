@@ -1617,6 +1617,34 @@ zanim założysz, że działa.
       akordeon byłby przesadą). Nazwa występująca tylko raz zostaje zwykłą,
       pojedynczą kartą jak dotąd. Zero zmian backendowych — wyłącznie
       sposób wyświetlania już istniejących danych.
+    - **POPRAWKA 2026-08-21(b) — obsługa linków, których nie da się pobrać.**
+      Żywy przykład od właściciela: link do artykułu na globenergia.pl
+      kończył się błędem `url_fetch_failed` (nie udała się ani nasza próba,
+      ani próba Gemini). Właściciel wprost oczekiwał, żeby aplikacja
+      "potrafiła przeanalizować WSZYSTKO w internecie" — ustalone wspólnie,
+      po rozłożeniu na czynniki pierwsze, że to nie jest osiągalne w 100%
+      przy obecnej architekturze, i **świadomie NIE dodajemy tu zewnętrznej
+      usługi/zależności biznesowej (np. gotowego "czytnika stron") bez
+      osobnej, przemyślanej decyzji** — właściciel wyraźnie nie chce
+      ograniczać kontroli biznesu przez dokładanie cudzych usług do
+      krytycznej ścieżki produktu. Twardy powód techniczny: strony
+      wymagające JavaScriptu do pokazania treści wymagają PRAWDZIWEJ
+      przeglądarki, a Supabase Edge Functions fizycznie nie potrafią jej
+      uruchomić — to ograniczenie platformy, nie promptu/kodu. Jedyna
+      realna droga do pełnej kontroli nad tym byłby OSOBNY, samodzielnie
+      hostowany serwer z przeglądarką (np. Playwright na Fly.io/Railway) —
+      to osobny projekt infrastrukturalny (koszt hostingu, utrzymanie,
+      zabezpieczenie przed nadużyciem), świadomie odłożony, dopóki nie
+      okaże się to warte inwestycji. Na teraz zrobione dwie rzeczy, obie
+      zero-kosztowe i zero-zależnościowe:
+      1. `fetchUrlAsText()` dostał pełny komplet nagłówków, jakie realnie
+         wysyła przeglądarka Chrome (Accept, Sec-Fetch-*, sec-ch-ua) —
+         pomaga to tylko wąskiej kategorii zabezpieczeń sprawdzających
+         same nagłówki, NIE pomoże stronom wymagającym JS.
+      2. Komunikat błędu `err_url_fetch_failed` (wszystkie 10 języków,
+         `i18n.js`) wprost podpowiada wklejenie tekstu artykułu w trybie
+         "Tekst" jako obejście — użytkownik nigdy nie zostaje bez wyjścia,
+         nawet gdy pobranie linku się nie uda.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
@@ -2121,6 +2149,17 @@ działać poprawnie i wymagać ponownej instalacji.
 
 ## Świadomie odłożone na później (nie budować bez wyraźnej prośby)
 
+- **Własny, samodzielnie hostowany serwer z przeglądarką (np. Playwright na
+  Fly.io/Railway) do pobierania stron wymagających JavaScriptu** —
+  jedyna droga do pełnej, własnej kontroli nad analizą linków, które dziś
+  kończą się `url_fetch_failed` (patrz "POPRAWKA 2026-08-21(b)" wyżej).
+  Świadomie odłożone: to osobny projekt infrastrukturalny (koszt
+  hostingu, utrzymanie, zabezpieczenie przed nadużyciem jako otwartego
+  proxy), a nie dopisanie kawałka kodu — właściciel świadomie NIE chce
+  też w międzyczasie zewnętrznej usługi trzeciej strony (np. gotowego
+  "czytnika stron") w krytycznej ścieżce produktu, bo to ograniczałoby
+  kontrolę biznesu. Wracać do tego tylko po wyraźnej prośbie, najlepiej
+  gdy zbierze się więcej realnych przypadków linków, które dziś zawodzą.
 - Ekran intencji zakupowej (Fake Door test).
 - Obniżanie darmowego bonusu powitalnego / limity rejestracji po IP w
   Supabase — świadomie odłożone (zasada Lean Startup: nie buduj obrony
