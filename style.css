@@ -123,6 +123,11 @@
        wrażenie pełniejszego, bogatszego światła, bez zwiększania promienia
        samego rdzenia. */
     --lamp-halo: rgba(212, 168, 110, 0.16);
+    /* Promienie latarni jako zmienne (nie kolor per motyw — jedna wartość
+       współdzielona przez oba) — POPRAWKA 2026-08-21(n) niżej zmniejsza je
+       na wąskich ekranach zamiast całkiem gasić światło (jak wcześniej). */
+    --lamp-radius: 115px;
+    --lamp-halo-radius: 190px;
 }
 
 /* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
@@ -232,10 +237,10 @@ body {
        pierwszy), otoczka pod spodem, dając pełniejsze, bogatsze wrażenie
        światła bez żadnej pretensji do udawania liści/zieleni. */
     background-image:
-        radial-gradient(circle 115px at 0% 50%, var(--lamp-glow) 0%, var(--lamp-glow) 20%, transparent 70%),
-        radial-gradient(circle 115px at 100% 50%, var(--lamp-glow) 0%, var(--lamp-glow) 20%, transparent 70%),
-        radial-gradient(circle 190px at 0% 50%, var(--lamp-halo) 0%, transparent 75%),
-        radial-gradient(circle 190px at 100% 50%, var(--lamp-halo) 0%, transparent 75%),
+        radial-gradient(circle var(--lamp-radius) at 0% 50%, var(--lamp-glow) 0%, var(--lamp-glow) 20%, transparent 70%),
+        radial-gradient(circle var(--lamp-radius) at 100% 50%, var(--lamp-glow) 0%, var(--lamp-glow) 20%, transparent 70%),
+        radial-gradient(circle var(--lamp-halo-radius) at 0% 50%, var(--lamp-halo) 0%, transparent 75%),
+        radial-gradient(circle var(--lamp-halo-radius) at 100% 50%, var(--lamp-halo) 0%, transparent 75%),
         radial-gradient(ellipse 900px 500px at 50% -12%, var(--card-2) 0%, var(--paper) 60%);
     background-repeat: repeat-y, repeat-y, repeat-y, repeat-y, no-repeat;
     background-position: left top, right 450px, left top, right 450px, 0 0;
@@ -247,17 +252,25 @@ body {
 /* POPRAWKA 2026-08-21(k) — na węższych ekranach `.card` (max-width: 400px)
    zajmuje prawie całą dostępną szerokość, więc margines obok niej jest
    bliski zera — poświaty latarni geometrycznie nie mają gdzie się zmieścić,
-   nie dotykając cienia karty. Zamiast pogarszać efekt na szerokich ekranach,
-   żeby "zmieścić się" też na wąskich — WYŁĄCZAMY boczne poświaty poniżej
-   progu, przy którym margines gwarantowanie pomieści cały ich promień.
-   Jedyny `@media` w tym pliku — świadomy, punktowy wyjątek dla tego
-   konkretnego zabezpieczenia, nie zmiana ogólnego podejścia.
+   nie dotykając cienia karty. Jedyny `@media` w tym pliku — świadomy,
+   punktowy wyjątek dla tego konkretnego zabezpieczenia, nie zmiana
+   ogólnego podejścia.
    POPRAWKA 2026-08-21(l) — próg podniesiony z 700px na 850px, bo doszła
-   szersza otoczka `--lamp-halo` (promień 190px, większy niż rdzeń) — nowe
-   wyliczenie: 400px karta + 2×20px padding body + 2×190px promień otoczki,
-   zaokrąglone w górę. */
+   szersza otoczka `--lamp-halo` (promień 190px, większy niż rdzeń).
+   POPRAWKA 2026-08-21(n) — CAŁKOWITE gaszenie świateł poniżej progu
+   okazało się złym kompromisem: telefon (a to przede wszystkim aplikacja
+   mobilna) prawie zawsze jest węższy niż 850px, więc w praktyce światła
+   nie było widać NIGDZIE, gdzie realnie ogląda się tę aplikację —
+   zgłoszone wprost. Na najwęższych ekranach margines obok karty jest
+   bliski ZERA niezależnie od promienia (karta i tak wypełnia prawie całą
+   dostępną szerokość) — nie da się więc jednocześnie mieć widocznego
+   światła I zerowego kontaktu z cieniem karty. Kompromis: zamiast gasić,
+   ZMNIEJSZAMY promień do małej, ale wciąż widocznej wartości (mieści się
+   w większości samego marginesu `body` — 20px paddingu — z tylko
+   niewielkim, akceptowalnym zachodzeniem na sam cień karty, nie na jej
+   właściwą powierzchnię, która zawsze zostaje w pełni nieprzezroczysta). */
 @media (max-width: 850px) {
-    :root, :root[data-theme="dark"] { --lamp-glow: transparent; --lamp-halo: transparent; }
+    :root, :root[data-theme="dark"] { --lamp-radius: 32px; --lamp-halo-radius: 52px; }
 }
 h1 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

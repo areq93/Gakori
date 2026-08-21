@@ -1889,6 +1889,22 @@ zanim założysz, że działa.
          wzór", nawet przy rzadszym odstępie — to rozbija ten efekt.
       Próg zabezpieczenia dla wąskich ekranów (850px, patrz (l)) bez
       zmian — dotyczy promienia, nie odstępu, więc pozostaje aktualny.
+    - **POPRAWKA 2026-08-21(n) — CAŁKOWITE gaszenie świateł poniżej 850px
+      (patrz (k)/(l)) okazało się złym kompromisem: na telefonie (a to
+      przede wszystkim aplikacja mobilna) nie było ich widać W OGÓLE,
+      zgłoszone wprost.** Twarda geometryczna prawda: na najwęższych
+      ekranach margines obok `.card` jest bliski zera niezależnie od
+      promienia (karta wypełnia prawie całą dostępną szerokość) — nie da
+      się jednocześnie mieć widocznego światła I zerowego kontaktu z jej
+      cieniem na takich szerokościach. Zamiast dalej wybierać między
+      "widoczne, ale dotyka" a "wcale niewidoczne" — kompromis: `--lamp-radius`/
+      `--lamp-halo-radius` wydzielone jako osobne zmienne CSS (domyślnie
+      115px/190px, współdzielone przez oba motywy — rozmiar, nie kolor),
+      a poniżej 850px szerokości ZMNIEJSZANE (nie gaszone) do 32px/52px —
+      mieści się w większości samego marginesu `body` (20px padding), z
+      tylko niewielkim, zaakceptowanym zachodzeniem na sam CIEŃ karty
+      (nigdy na jej właściwą, w pełni nieprzezroczystą powierzchnię).
+      Wyłącznie `style.css`.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
