@@ -97,14 +97,15 @@
     --danger-text: #7c4038;
     --danger-border: #cca298;
     /* Gradient "gry świateł" wpisanej w litery (patrz .gakori-shine-text
-       niżej) — te same dwa krańce co znaczek-ikonka marki (#9a9184/#3f3c35),
-       dość ciemne dla dobrego kontrastu na jasnym --paper. W trybie ciemnym
-       (niżej) muszą być JAŚNIEJSZE, inaczej ciemny koniec zlewałby się z
-       prawie czarnym tłem — --brand-grad-end tam świadomie nadal używa
-       #9a9184 (ten sam odcień co jasny początek tutaj), żeby obie wersje
-       marki dzieliły przynajmniej jeden wspólny, rozpoznawalny kolor. */
-    --brand-grad-start: #b5ab9c;
-    --brand-grad-end: #3f3c35;
+       niżej). POPRAWKA 2026-08-21(f): OBA krańce dobrane tak, żeby KAŻDY z
+       osobna dawał pewny, ciemny kontrast wobec jasnego --paper — nie
+       jeden jasny + jeden ciemny (patrz historia tej poprawki w
+       GAKORI_CONTEXT.md, dlaczego to podejście zawiodło). --brand-grad-end
+       to wprost --ink (najciemniejszy, gwarantowany kontrast), start odrobinę
+       jaśniejszy, żeby gradient dawał subtelną zmienność, nie płaski kolor.
+       W trybie ciemnym (niżej) odwrotnie — oba krańce muszą być JASNE. */
+    --brand-grad-start: #6b6558;
+    --brand-grad-end: #201e1a;
 }
 
 /* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
@@ -138,10 +139,13 @@
     --ok-bg: #333d2b; --ok-text: #bccaa9; --ok-border: #4c5a3f;
     --warn-bg: #3c3120; --warn-text: #dcc292; --warn-border: #5c4a2e;
     --danger-bg: #3c2b27; --danger-text: #dcb1a8; --danger-border: #5c3f38;
-    /* Jaśniejsze niż w jasnym motywie (patrz komentarz przy :root wyżej) —
-       #9a9184 współdzielone z jasnym motywem jako wspólny anchor koloru. */
-    --brand-grad-start: #e7dfce;
-    --brand-grad-end: #9a9184;
+    /* Lustrzane odwrócenie jasnego motywu (patrz POPRAWKA 2026-08-21(f) przy
+       :root wyżej) — oba krańce JASNE, --brand-grad-start to wprost --ink
+       tego motywu (najjaśniejszy, gwarantowany kontrast na prawie czarnym
+       --paper), --brand-grad-end odrobinę stonowany, ale wciąż wyraźnie
+       jasny, nie zlewający się z tłem. */
+    --brand-grad-start: #f2efe7;
+    --brand-grad-end: #cabe9c;
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -170,7 +174,6 @@ h2 {
     text-align: center; text-transform: uppercase; letter-spacing: 0.06em;
     background: linear-gradient(160deg, var(--brand-grad-start) 0%, var(--brand-grad-end) 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
-    text-shadow: 0 1px 0 var(--highlight-edge);
 }
 .tagline { margin: 0 0 20px 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.45; text-align: center; }
 
@@ -185,7 +188,7 @@ h2 {
    w regule `body` wyżej), więc strona nie robi się "płaska" bez niego. */
 .gakori-brand { text-align: center; margin: 4px 0 22px 0; position: relative; z-index: 1; }
 .gakori-wordmark {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
+    display: flex; align-items: center; justify-content: center;
     font-size: 2.5rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
     margin: 0;
 }
@@ -194,23 +197,27 @@ h2 {
     text-align: center; text-transform: uppercase; letter-spacing: 0.09em;
 }
 /* "Gra świateł" wpisana w same litery (nie tylko w karty/przyciski) —
-   gradient przycięty do kształtu tekstu (`background-clip: text`), ten sam
-   ciepły, dwubiegunowy odcień co znaczek-ikonka obok (`--brand-grad-*`,
-   zdefiniowane osobno dla jasnego/ciemnego motywu niżej, bo w ciemnym
-   motywie ciemniejszy koniec gradientu zlewałby się z prawie czarnym tłem).
-   Subtelny text-shadow (ten sam --highlight-edge co reszta "Rzeźby") dodaje
-   odrobinę uniesienia, żeby litery nie wyglądały płasko mimo przezroczystego
-   `color`. Współdzielone przez nagłówek marki, hasło pod nim i nagłówki
-   sekcji (`h2` niżej) — jeden mechanizm, nie trzy osobne kopiowane gradienty. */
+   gradient przycięty do kształtu tekstu (`background-clip: text`).
+   Współdzielone przez nagłówek marki, hasło pod nim i nagłówki sekcji (`h2`
+   niżej) — jeden mechanizm, nie trzy osobne kopiowane gradienty.
+   POPRAWKA 2026-08-21(f) — w jasnym motywie napis wychodził praktycznie
+   niewidoczny ("białe na białym", zgłoszone na żywo): winny był
+   `text-shadow` korzystający z `--highlight-edge` — zmiennej pomyślanej do
+   JASNEJ obwódki na ciemnych, uniesionych powierzchniach (karty/przyciski),
+   NIE do tekstu. W jasnym motywie ta zmienna jest prawie nieprzezroczystą
+   bielą (`rgba(255,255,255,0.9)`, dobraną pod cień na ciemnym tle) — na
+   cienkich literach z gradientem to po prostu zalewało cały napis bielą
+   (w ciemnym motywie ta sama zmienna ma tylko 0.14 przezroczystości, więc
+   tam efekt był niezauważalny — stąd różnica między motywami). Naprawa:
+   usunięty text-shadow (gradient sam w sobie już daje efekt świateł, dodatkowy
+   cień nie jest konieczny), a oba krańce gradientu (`--brand-grad-*` niżej)
+   dobrane tak, żeby KAŻDY z osobna dawał pewny kontrast wobec `--paper` —
+   nie polegamy już na tym, że krótki, jednowierszowy napis akurat "trafi"
+   w ciemniejszą część długiego, ukośnego gradientu. */
 .gakori-shine-text {
     background: linear-gradient(160deg, var(--brand-grad-start) 0%, var(--brand-grad-end) 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
-    text-shadow: 0 1px 0 var(--highlight-edge);
 }
-/* Mały, powtarzalny znak marki — ta sama, opływowa "kropla" co w logo
-   aplikacji, obok nagłówka "Gakori". Gradient naśladuje miękkie przejście
-   światła po zaokrąglonej powierzchni rzeźby. */
-.gakori-mark { flex-shrink: 0; filter: drop-shadow(0 3px 6px var(--shadow-color-soft)); }
 
 .card {
     background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 45%, var(--card) 100%);

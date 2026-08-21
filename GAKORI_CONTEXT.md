@@ -1745,6 +1745,36 @@ zanim założysz, że działa.
       - Wyłącznie frontend (`index.html`, `account.html`, `historia.html`,
         `scan.html`, `style.css`, `i18n.js`) — wdraża się samo przez
         GitHub Pages po pushu do `main`, zero ręcznego kroku w Supabase.
+    - **POPRAWKA 2026-08-21(f) — dwie poprawki po pierwszym wdrożeniu (e),
+      obie zgłoszone na żywo ze zrzutami ekranu:**
+      1. **W jasnym motywie napis "GAKORI"/nagłówki sekcji były praktycznie
+         niewidoczne** ("białe na białym") — w ciemnym motywie działało
+         dobrze, więc to nie był oczywisty błąd na pierwszy rzut oka.
+         Winny: `text-shadow` w `.gakori-shine-text`/`h2` korzystał z
+         `--highlight-edge` — zmiennej pomyślanej do jasnej obwódki na
+         CIEMNYCH, uniesionych powierzchniach (karty/przyciski), nie do
+         tekstu. W jasnym motywie ta zmienna to prawie nieprzezroczysta
+         biel (`rgba(255,255,255,0.9)`) — na cienkich literach z gradientem
+         to zalewało cały napis bielą (w ciemnym motywie ta sama zmienna ma
+         tylko 0.14 przezroczystości, stąd błąd był tam niewidoczny —
+         dokładnie dlatego różne wrażenie w obu motywach). Naprawa: usunięty
+         `text-shadow` (gradient sam daje wystarczający efekt świateł), a
+         `--brand-grad-start`/`--brand-grad-end` przeprojektowane tak, żeby
+         OBA krańce z osobna dawały pewny kontrast wobec `--paper` — nie
+         polegamy już na tym, że krótki, jednowierszowy napis akurat
+         "trafi" w ciemniejszą/jaśniejszą część długiego, ukośnego
+         gradientu (poprzednie wartości zakładały płynne przejście od
+         jasnego do ciemnego krańca, które przy małej wysokości tekstu
+         praktycznie nigdy nie docierało do drugiego krańca).
+      2. **Mały znaczek-"kropla" obok napisu "Gakori" to była właśnie ta
+         "plamka", o którą właściciel pytał od początku** — pierwsza runda
+         (e) usunęła inny element (duże, rozmyte tło `.gakori-backdrop`),
+         bo tak zinterpretowałem niejasne "jakaś plamka, nie wiem co to" —
+         błędnie, właścicielowi chodziło o ten mały, kroplowaty znaczek.
+         Usunięty CAŁKOWICIE ze wszystkich 4 stron — zostaje sam napis
+         "Gakori" (gradient tekstowy), bez żadnej ikony obok.
+      Wyłącznie frontend (`style.css` + `index.html`/`account.html`/
+      `historia.html`/`scan.html`) — wdraża się samo.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
