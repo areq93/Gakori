@@ -2228,10 +2228,13 @@ Deno.serve(async (req: Request) => {
     }
 
     // Reguła A10 — dzienny budżet w USD (wszyscy użytkownicy razem).
-    // `system_daily_spend` ma jeden wiersz na dzień (UTC) — data jest samym
+    // `system_daily_spend` ma jeden wiersz na dzień — data jest samym
     // kluczem, więc licznik "resetuje się" sam każdego nowego dnia, bez
-    // żadnej ręcznej interwencji ani zadania cyklicznego.
-    const today = new Date().toISOString().slice(0, 10)
+    // żadnej ręcznej interwencji ani zadania cyklicznego. POPRAWKA
+    // 2026-08-21(t) — dzień liczony wg czasu POLSKIEGO (Europe/Warsaw), nie
+    // UTC — inaczej "nowy dzień" zaczynałby się o 1:00/2:00 w nocy czasu
+    // polskiego (zależnie od pory roku), zamiast o północy.
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(new Date())
     const { data: existingSpend } = await supabase
       .from('system_daily_spend')
       .select('total_usd')

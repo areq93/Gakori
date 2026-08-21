@@ -2133,9 +2133,12 @@ oba dodane w Etapie 2, **w dolarach, świadomie NIE w złotówkach** — patrz
 "Audyt systemowy" niżej).
 
 **`system_daily_spend`** (dodane 2026-08-21, Etap 2) — jeden wiersz na
-dzień: `spend_date` (date, PK, UTC), `total_usd` (numeric) — suma
-rzeczywistego kosztu Gemini (wszyscy użytkownicy razem) tego dnia, patrz
-reguła 10 niżej. Data jako klucz = licznik resetuje się sam co nowy dzień.
+dzień: `spend_date` (date, PK, **czas polski, Europe/Warsaw** — POPRAWKA
+2026-08-21(t), pierwotnie było UTC, poprawione na wyraźną prośbę
+właściciela, żeby dzień zaczynał się o północy czasu polskiego, nie
+1:00/2:00 w nocy), `total_usd` (numeric) — suma rzeczywistego kosztu Gemini
+(wszyscy użytkownicy razem) tego dnia, patrz reguła 10 niżej. Data jako
+klucz = licznik resetuje się sam co nowy dzień.
 
 **`system_incident_log`** (dodane 2026-08-21) — log zdarzeń świadczących o
 awarii SYSTEMU (nie pojedynczego konta — od tego jest `failed_scan_attempts`,
@@ -2319,9 +2322,10 @@ zależności walutowych.
     `system_thresholds.daily_budget_usd` (ustalone z właścicielem: **$125
     dziennie, do podniesienia, gdy projekt się rozrośnie**). Suma dnia żyje
     w nowej tabeli `system_daily_spend` (`spend_date` data jako klucz,
-    `total_usd`) — jeden wiersz na dzień (UTC), więc licznik "resetuje się"
-    sam każdego nowego dnia, bez żadnego zadania cyklicznego ani ręcznej
-    interwencji.
+    `total_usd`) — jeden wiersz na dzień **czasu polskiego** (Europe/Warsaw,
+    nie UTC — patrz POPRAWKA 2026-08-21(t) przy opisie tabeli wyżej), więc
+    licznik "resetuje się" sam o północy każdego nowego dnia, bez żadnego
+    zadania cyklicznego ani ręcznej interwencji.
 
 Obie reguły, tak jak wszystkie pozostałe: natychmiastowe zatrzymanie dla
 wszystkich, TO JEDNO zapytanie też nic nie dostaje, mail do właściciela,
