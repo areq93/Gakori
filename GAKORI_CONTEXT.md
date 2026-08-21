@@ -1930,6 +1930,19 @@ zanim założysz, że działa.
       "przede wszystkim aplikacja mobilna"), nie tylko na podglądzie na
       komputerze, zanim zainwestuje się wiele rund dostrajania. Wyłącznie
       `style.css`.
+    - **POPRAWKA 2026-08-21(q) — brak spójności gry świateł między motywami:
+      w jasnym wyraźny "przebieg" światła, w ciemnym napis wyglądał płasko.**
+      Żywy zrzut obu motywów obok siebie. Przyczyna: `--brand-grad-dark`/
+      `--brand-grad-light` dla trybu ciemnego (`#cabe9c`/`#f2efe7`) były zbyt
+      blisko siebie kolorystycznie — obie jasne, mało kontrastu MIĘDZY sobą
+      (w przeciwieństwie do jasnego motywu, gdzie `#201e1a` → `#9a9184` to
+      duży skok). Podbite analogicznie do jasnego motywu: krańce
+      ciemniejsze/bardziej nasycone złoto (`#9a7f4a` — wciąż WYRAŹNIE
+      jaśniejsze niż prawie czarny `--paper`, więc nie znikają jak w (f)),
+      błysk pośrodku zostaje jasną kremową bielą (`#f7ecc9`) dla mocnego
+      kontrastu MIĘDZY krańcami, nie tylko wobec tła. Dotyczy nagłówka
+      marki, hasła pod nim i wszystkich nagłówków sekcji (`h2`) naraz —
+      współdzielone zmienne. Wyłącznie `style.css`.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):

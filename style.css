@@ -148,9 +148,18 @@
        przy :root wyżej) — krańce (`--brand-grad-dark`) JASNE, ale stonowane
        (gwarantowany kontrast na prawie czarnym --paper), błysk pośrodku
        (`--brand-grad-light`) to wprost --ink tego motywu — najjaśniejszy,
-       najmocniejszy "błysk". */
-    --brand-grad-dark: #cabe9c;
-    --brand-grad-light: #f2efe7;
+       najmocniejszy "błysk".
+       POPRAWKA 2026-08-21(q) — poprzednie #cabe9c/#f2efe7 były zbyt blisko
+       siebie kolorystycznie (obie jasne, mało kontrastu MIĘDZY sobą) —
+       napis wychodził płasko, prawie bez widocznego "przebiegu" światła,
+       niespójnie z wyraźnym efektem w jasnym motywie (zgłoszone na żywo, ze
+       zrzutami ekranu obu motywów obok siebie). W jasnym motywie kontrast
+       MIĘDZY krańcami jest duży (#201e1a → #9a9184) — tu podbity
+       analogicznie: krańce ciemniejsze/bardziej nasycone złoto (wciąż
+       WYRAŹNIE jaśniejsze niż prawie czarny --paper, więc nie znikają jak
+       w (f)), błysk zostaje jasną kremową bielą dla mocnego kontrastu. */
+    --brand-grad-dark: #9a7f4a;
+    --brand-grad-light: #f7ecc9;
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
