@@ -2127,7 +2127,15 @@ wyłącznik" niżej), JEDEN wiersz (`id = true`):
 edytowalne "pokrętła czułości" reguł automatycznych, patrz niżej:
 `consecutive_failure_limit`, `error_rate_percent`,
 `error_rate_window_minutes`, `error_rate_min_sample`,
-`malformed_response_limit`, `malformed_response_window_minutes`.
+`malformed_response_limit`, `malformed_response_window_minutes`,
+`single_request_cost_limit_usd` (reguła 8), `daily_budget_usd` (reguła 10,
+oba dodane w Etapie 2, **w dolarach, świadomie NIE w złotówkach** — patrz
+"Audyt systemowy" niżej).
+
+**`system_daily_spend`** (dodane 2026-08-21, Etap 2) — jeden wiersz na
+dzień: `spend_date` (date, PK, UTC), `total_usd` (numeric) — suma
+rzeczywistego kosztu Gemini (wszyscy użytkownicy razem) tego dnia, patrz
+reguła 10 niżej. Data jako klucz = licznik resetuje się sam co nowy dzień.
 
 **`system_incident_log`** (dodane 2026-08-21) — log zdarzeń świadczących o
 awarii SYSTEMU (nie pojedynczego konta — od tego jest `failed_scan_attempts`,
@@ -2136,9 +2144,10 @@ osobna, niezmieniona tabela): `id`, `created_at`, `reason` (text — jeden z:
 `user_id` (nullable, tylko do debugowania — kto akurat trafił na awarię, nie
 wpływa na logikę reguł).
 
-RLS na wszystkich trzech: włączone, ZERO publicznych polityk (dokładnie jak
-`rate_limit_blocks`/`failed_scan_attempts`) — dostęp wyłącznie przez
-`service_role` w Edge Function.
+RLS na wszystkich czterech (`system_status`/`system_thresholds`/
+`system_incident_log`/`system_daily_spend`): włączone, ZERO publicznych
+polityk (dokładnie jak `rate_limit_blocks`/`failed_scan_attempts`) —
+dostęp wyłącznie przez `service_role` w Edge Function.
 
 ## Ochrona cashflow przed nadużyciem (rate limiting) — dodane 2026-08-18
 
@@ -2288,18 +2297,35 @@ zgadywanki do skorygowania na realnych danych produkcyjnych), sprawdzane w
    `malformed_response` — nie było potrzeby dublować już istniejącej
    ochrony).
 
-**Świadomie NIE wdrożone jeszcze (następny krok, nie ten sam co Etap 1)**:
-8. Pojedyncze zapytanie kosztuje nienaturalnie dużo (sprawdzane przed
-   wysłaniem i po otrzymaniu odpowiedzi, wg rzeczywistego zużycia tokenów).
-10. Rzeczywisty dzienny koszt Gemini (w PLN) przekracza 500 zł (ustalone z
-    właścicielem, do podniesienia, gdy projekt się rozrośnie).
-
-Obie wymagają, żebyśmy zaczęli NAPRAWDĘ mierzyć rzeczywiste zużycie tokenów
-zwracane przez Gemini przy KAŻDYM z ~8 różnych miejsc w kodzie, które
-wywołują Gemini (główna analiza, tłumaczenie, druga runda szukania wzorców,
+**Etap 2 (dodane 2026-08-21, wdrożone) — reguły A8/A10, prawdziwy koszt
+Gemini**: mierzone we WSZYSTKICH ~12 miejscach wywołania Gemini w kodzie
+(główna analiza, kategoryzacja, tłumaczenie, druga runda szukania wzorców,
 weryfikacja/scalanie PDF i obrazu, każdy fragment PDF-a osobno, każdy obraz
-osobno) — świadomie odłożone jako osobny, staranny krok, żeby nie robić
-chirurgii we wszystkich tych miejscach naraz i niczego nie przeoczyć.
+osobno, ratunkowa ścieżka "URL context") — Gemini sam mówi, ile "zużył"
+(`usageMetadata` w każdej odpowiedzi), więc `callGemini()` samo przelicza to
+na dolary (`computeGeminiCostUsd()`, stałe `GEMINI_INPUT_PRICE_PER_MILLION_USD`/
+`GEMINI_OUTPUT_PRICE_PER_MILLION_USD`) i dopisuje do współdzielonego
+`CostTracker` (`{ totalUsd: number }`), przekazywanego przez WSZYSTKIE
+funkcje pomocnicze wywołujące Gemini aż do samego `Deno.serve`.
+**Świadoma decyzja z właścicielem 2026-08-21: liczymy WYŁĄCZNIE w dolarach
+(USD)** — "globalna waluta", zero przeliczeń kursowych, zero zewnętrznych
+zależności walutowych.
+8. **Koszt jednego zapytania** (`costTracker.totalUsd`, suma WSZYSTKICH
+   wywołań Gemini w obrębie TEGO JEDNEGO zapytania użytkownika) nie może
+   przekroczyć `system_thresholds.single_request_cost_limit_usd`
+   (domyślnie $6.25 — 5% dziennego budżetu). Sprawdzane PRZED zapisem do
+   cache'u, tuż po regułach 1/4.
+10. **Dzienny budżet w USD**, wszyscy użytkownicy razem —
+    `system_thresholds.daily_budget_usd` (ustalone z właścicielem: **$125
+    dziennie, do podniesienia, gdy projekt się rozrośnie**). Suma dnia żyje
+    w nowej tabeli `system_daily_spend` (`spend_date` data jako klucz,
+    `total_usd`) — jeden wiersz na dzień (UTC), więc licznik "resetuje się"
+    sam każdego nowego dnia, bez żadnego zadania cyklicznego ani ręcznej
+    interwencji.
+
+Obie reguły, tak jak wszystkie pozostałe: natychmiastowe zatrzymanie dla
+wszystkich, TO JEDNO zapytanie też nic nie dostaje, mail do właściciela,
+komunikat w języku użytkownika, włączenie z powrotem wyłącznie ręczne.
 
 ## Cennik (do skalibrowania na realnych danych — na razie przybliżenia)
 

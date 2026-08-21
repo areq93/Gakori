@@ -60,6 +60,35 @@ function computeExpectedCost(inputType: string, charCount: number, imageCount: n
   return FIXED_FEE + Math.ceil(charCount / 1000) * MULTIPLIER_PER_1000_CHARS
 }
 
+// --- Reguły A8/A10 audytu bezpieczeństwa (POPRAWKA 2026-08-21(s)) ---
+// Ceny gemini-3.5-flash-lite sprawdzone na żywo 13.08.2026 — jeśli Google
+// zmieni cennik, zaktualizować obie stałe (nigdzie indziej w kodzie nie ma
+// tych liczb "na sztywno" drugi raz).
+const GEMINI_INPUT_PRICE_PER_MILLION_USD = 0.3
+const GEMINI_OUTPUT_PRICE_PER_MILLION_USD = 2.5
+
+// Wspólny "słoik" na koszt WSZYSTKICH wywołań Gemini w obrębie JEDNEGO
+// zapytania użytkownika — jedno zapytanie do naszej funkcji potrafi w
+// środku wywołać Gemini kilka razy (kategoryzacja, główna analiza, druga
+// runda szukania, tłumaczenie, każdy fragment PDF-a/obraz osobno), więc
+// prawdziwy koszt trzeba zbierać zewsząd, nie tylko z jednego wywołania.
+// Przekazywany przez WSZYSTKIE funkcje pomocnicze wywołujące Gemini
+// (parametr `costTracker` niżej) — obiekt, więc każde dopisanie do
+// `costTracker.totalUsd` widać od razu tam, gdzie ten sam obiekt trzyma
+// Deno.serve (patrz sekcja 5 niżej).
+type CostTracker = { totalUsd: number }
+
+function computeGeminiCostUsd(geminiResponse: { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }): number {
+  const usage = geminiResponse?.usageMetadata
+  if (!usage) return 0
+  const inputTokens = usage.promptTokenCount ?? 0
+  const outputTokens = usage.candidatesTokenCount ?? 0
+  return (
+    (inputTokens / 1_000_000) * GEMINI_INPUT_PRICE_PER_MILLION_USD +
+    (outputTokens / 1_000_000) * GEMINI_OUTPUT_PRICE_PER_MILLION_USD
+  )
+}
+
 // --- PDF (FAZA 2) ---
 // Strona PDF-a liczona identycznie jak obraz kosztowo — ustalone wcześniej
 // w GAKORI_CONTEXT.md ("jedna strona PDF-a ≈ jeden obraz kosztowo").
@@ -198,7 +227,8 @@ const CATEGORY_RESPONSE_SCHEMA = {
 async function pickRelevantCategories(
   contentPrompt: string,
   useUrlContext: boolean,
-  geminiKey: string
+  geminiKey: string,
+  costTracker?: CostTracker
 ): Promise<string[]> {
   const prompt = `Poniżej jest treść do wstępnego rozpoznania. Twoje zadanie: oceń dopasowanie KAŻDEJ z poniższych 15 kategorii modeli mentalnych do tej treści Z OSOBNA, a potem wybierz WSZYSTKIE kategorie, które faktycznie pasują do wzorców widocznych w tej treści (manipulacja, błędy poznawcze, albo trafne, wartościowe rozumowanie) — NIE analizuj jeszcze żadnych szczegółów, nie szukaj cytatów, na tym etapie oceniasz tylko dopasowanie kategorii. NIE ma sztywnego limitu liczby kategorii do wybrania — czasem pasuje tylko jedna, czasem kilka naraz (np. artykuł finansowy może jednocześnie pasować do EKONOMIA, MATEMATYKA I STATYSTYKA, PSYCHOLOGIA i STRATEGIA). Nie ograniczaj się z góry do jednej, najbardziej oczywistej kategorii (np. samej psychologii/perswazji), jeśli treść realnie porusza wątki z kilku dziedzin naraz. Lista kategorii (dokładnie w tym brzmieniu):
 ${MENTAL_MODEL_CATEGORIES.join(', ')}
@@ -214,7 +244,7 @@ ${contentPrompt}`
   }
   if (useUrlContext) requestBody.tools = [{ urlContext: {} }]
 
-  const data = await callGemini(requestBody, geminiKey)
+  const data = await callGemini(requestBody, geminiKey, GEMINI_TIMEOUT_MS, costTracker)
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) return []
   try {
@@ -594,7 +624,8 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
 async function callGemini(
   requestBody: Record<string, unknown>,
   geminiKey: string,
-  timeoutMs: number = GEMINI_TIMEOUT_MS
+  timeoutMs: number = GEMINI_TIMEOUT_MS,
+  costTracker?: CostTracker
 ): Promise<any> {
   try {
     const res = await fetchWithTimeout(
@@ -606,7 +637,12 @@ async function callGemini(
       },
       timeoutMs
     )
-    return await res.json()
+    const data = await res.json()
+    // Reguły A8/A10 — zbieramy PRAWDZIWY koszt tego wywołania (Gemini sam
+    // mówi, ile "zużył") do wspólnego słoika, niezależnie od tego, co
+    // dalej zrobi wywołujący z odpowiedzią.
+    if (costTracker) costTracker.totalUsd += computeGeminiCostUsd(data)
+    return data
   } catch {
     // Timeout albo błąd sieci — zwracamy pusty obiekt, żeby dalszy kod
     // (sprawdzający brak "candidates" w odpowiedzi) potraktował to tak samo
@@ -625,7 +661,8 @@ async function translateResult(
   result: Record<string, unknown>,
   targetLangCode: string,
   geminiKey: string,
-  responseSchema: Record<string, unknown> = RESPONSE_SCHEMA
+  responseSchema: Record<string, unknown> = RESPONSE_SCHEMA,
+  costTracker?: CostTracker
 ): Promise<Record<string, unknown> | null> {
   const langName = LANGUAGE_NAMES[targetLangCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const prompt = `Przetłumacz poniższy JSON na język ${langName}. Zasady:
@@ -649,7 +686,9 @@ ${JSON.stringify(result)}`
         responseSchema,
       },
     },
-    geminiKey
+    geminiKey,
+    GEMINI_TIMEOUT_MS,
+    costTracker
   )
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) return null
@@ -691,7 +730,8 @@ async function findAdditionalPatterns(
   originalContent: string,
   existingPatterns: Array<Record<string, unknown>>,
   systemPrompt: string,
-  geminiKey: string
+  geminiKey: string,
+  costTracker?: CostTracker
 ): Promise<Array<Record<string, unknown>>> {
   const compactExisting =
     existingPatterns.length > 0
@@ -717,7 +757,9 @@ ${originalContent}`
         responseSchema: ADDITIONAL_PATTERNS_SCHEMA,
       },
     },
-    geminiKey
+    geminiKey,
+    GEMINI_TIMEOUT_MS,
+    costTracker
   )
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) return existingPatterns
@@ -752,7 +794,8 @@ ${originalContent}`
 async function verifyAndRefinePdfPatterns(
   patterns: Array<Record<string, unknown>>,
   langCode: string,
-  geminiKey: string
+  geminiKey: string,
+  costTracker?: CostTracker
 ): Promise<Array<Record<string, unknown>>> {
   if (patterns.length === 0) return patterns
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
@@ -775,7 +818,9 @@ ${JSON.stringify(patterns)}`
         responseSchema: PDF_VERIFICATION_SCHEMA,
       },
     },
-    geminiKey
+    geminiKey,
+    GEMINI_TIMEOUT_MS,
+    costTracker
   )
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) return patterns
@@ -798,7 +843,8 @@ async function composePdfSummary(
   patterns: Array<{ pattern_type: string; name: string }>,
   qScore: number,
   langCode: string,
-  geminiKey: string
+  geminiKey: string,
+  costTracker?: CostTracker
 ): Promise<string> {
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const compactList =
@@ -811,7 +857,7 @@ q_score: ${qScore}
 Wykryte wzorce:
 ${compactList}`
 
-  const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] }, geminiKey)
+  const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] }, geminiKey, GEMINI_TIMEOUT_MS, costTracker)
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   return typeof text === 'string' && text.trim() ? text.trim() : ''
 }
@@ -828,7 +874,8 @@ ${compactList}`
 async function verifyAndRefineImagePatterns(
   patterns: Array<Record<string, unknown>>,
   langCode: string,
-  geminiKey: string
+  geminiKey: string,
+  costTracker?: CostTracker
 ): Promise<Array<Record<string, unknown>>> {
   if (patterns.length === 0) return patterns
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
@@ -851,7 +898,9 @@ ${JSON.stringify(patterns)}`
         responseSchema: IMAGE_VERIFICATION_SCHEMA,
       },
     },
-    geminiKey
+    geminiKey,
+    GEMINI_TIMEOUT_MS,
+    costTracker
   )
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) return patterns
@@ -869,7 +918,8 @@ async function composeImageSummary(
   patterns: Array<{ pattern_type: string; name: string }>,
   qScore: number,
   langCode: string,
-  geminiKey: string
+  geminiKey: string,
+  costTracker?: CostTracker
 ): Promise<string> {
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const compactList =
@@ -882,7 +932,7 @@ q_score: ${qScore}
 Wykryte wzorce:
 ${compactList}`
 
-  const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] }, geminiKey)
+  const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] }, geminiKey, GEMINI_TIMEOUT_MS, costTracker)
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   return typeof text === 'string' && text.trim() ? text.trim() : ''
 }
@@ -1024,7 +1074,17 @@ Deno.serve(async (req: Request) => {
       error_rate_min_sample: thresholdsRow?.error_rate_min_sample ?? 20,
       malformed_response_limit: thresholdsRow?.malformed_response_limit ?? 5,
       malformed_response_window_minutes: thresholdsRow?.malformed_response_window_minutes ?? 10,
+      // Reguły A8/A10 — ustalone z właścicielem 2026-08-21: pojedyncze
+      // zapytanie nie powinno przekroczyć 5% dziennego budżetu, a cały
+      // dzień (wszyscy użytkownicy razem) nie powinien przekroczyć $125.
+      single_request_cost_limit_usd: thresholdsRow?.single_request_cost_limit_usd ?? 6.25,
+      daily_budget_usd: thresholdsRow?.daily_budget_usd ?? 125,
     }
+
+    // Reguły A8/A10 — wspólny "słoik" na prawdziwy koszt Gemini w obrębie
+    // TEGO JEDNEGO zapytania (patrz CostTracker/callGemini wyżej). Musi być
+    // zadeklarowany PRZED jakimkolwiek wywołaniem Gemini niżej.
+    const costTracker: CostTracker = { totalUsd: 0 }
 
     // Zatrzymuje system (patrz reguła, która to wywołała, w treści `reason`)
     // i wysyła Tobie (REPORT_RECIPIENT_EMAIL, ten sam adres co raport
@@ -1607,7 +1667,8 @@ Deno.serve(async (req: Request) => {
           ? PDF_RESPONSE_SCHEMA
           : original.input_type === 'image'
             ? IMAGE_RESPONSE_SCHEMA
-            : RESPONSE_SCHEMA
+            : RESPONSE_SCHEMA,
+        costTracker
       )
       if (result) usedTranslation = true
     }
@@ -1655,7 +1716,8 @@ Deno.serve(async (req: Request) => {
           const categories = await pickRelevantCategories(
             `${rawTextNotice}\n\nTEKST DO ANALIZY:\n${preFetchedText}`,
             false,
-            geminiKey!
+            geminiKey!,
+            costTracker
           )
           const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
           geminiData = await callGemini(
@@ -1674,7 +1736,9 @@ Deno.serve(async (req: Request) => {
                 responseSchema: DETECTION_RESPONSE_SCHEMA,
               },
             },
-            geminiKey!
+            geminiKey!,
+            GEMINI_TIMEOUT_MS,
+            costTracker
           )
           // Etap 3 (findAdditionalPatterns) dostanie dokładnie ten sam
           // tekst i instrukcje co Etap 2 wyżej (systemPrompt + dopisek o
@@ -1730,7 +1794,8 @@ Deno.serve(async (req: Request) => {
               rescueOriginal.result as Record<string, unknown>,
               outputLanguage,
               geminiKey!,
-              RESPONSE_SCHEMA
+              RESPONSE_SCHEMA,
+              costTracker
             )
             if (translated) {
               result = translated
@@ -1763,7 +1828,9 @@ Deno.serve(async (req: Request) => {
                   responseSchema: DETECTION_RESPONSE_SCHEMA,
                 },
               },
-              geminiKey!
+              geminiKey!,
+              GEMINI_TIMEOUT_MS,
+              costTracker
             )
 
             const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
@@ -1827,7 +1894,9 @@ Deno.serve(async (req: Request) => {
                 responseSchema: IMAGE_CHUNK_SCHEMA,
               },
             },
-            geminiKey!
+            geminiKey!,
+            GEMINI_TIMEOUT_MS,
+            costTracker
           )
           // Gemini może sam zablokować odpowiedź na poziomie WŁASNYCH filtrów
           // bezpieczeństwa (najbardziej drastyczne przypadki) — wtedy nie ma
@@ -1890,12 +1959,13 @@ Deno.serve(async (req: Request) => {
         const imageQScore = Math.round(
           imageResults.reduce((sum, r) => sum + r!.q_score, 0) / imageResults.length
         )
-        const verifiedImagePatterns = await verifyAndRefineImagePatterns(allImagePatterns, outputLanguage, geminiKey!)
+        const verifiedImagePatterns = await verifyAndRefineImagePatterns(allImagePatterns, outputLanguage, geminiKey!, costTracker)
         const imageSummary = await composeImageSummary(
           verifiedImagePatterns as Array<{ pattern_type: string; name: string }>,
           imageQScore,
           outputLanguage,
-          geminiKey!
+          geminiKey!,
+          costTracker
         )
         // Ustawiamy `result` BEZPOŚREDNIO (z pominięciem współdzielonego
         // `geminiData` niżej) — tak samo jak PDF, obraz ma teraz inną
@@ -1977,7 +2047,8 @@ Deno.serve(async (req: Request) => {
               },
             },
             geminiKey!,
-            PDF_GEMINI_TIMEOUT_MS
+            PDF_GEMINI_TIMEOUT_MS,
+            costTracker
           )
           const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
           if (!text) return null
@@ -2019,7 +2090,7 @@ Deno.serve(async (req: Request) => {
         // pokazaniem jej użytkownikowi i PRZED napisaniem podsumowania
         // (Etap 3 niżej musi dostać już oczyszczoną listę, inaczej
         // podsumowanie mogłoby wspominać usunięte duplikaty).
-        const verifiedPatterns = await verifyAndRefinePdfPatterns(allPatterns, outputLanguage, geminiKey!)
+        const verifiedPatterns = await verifyAndRefinePdfPatterns(allPatterns, outputLanguage, geminiKey!, costTracker)
         // Średnia ważona liczbą stron w każdej części — przybliża "jakość
         // całego tekstu", nie tylko średnią arytmetyczną z części o różnej
         // długości (ostatnia część bywa krótsza niż PDF_CHUNK_PAGES).
@@ -2035,7 +2106,8 @@ Deno.serve(async (req: Request) => {
           verifiedPatterns as Array<{ pattern_type: string; name: string }>,
           pdfQScore,
           outputLanguage,
-          geminiKey!
+          geminiKey!,
+          costTracker
         )
         // Ustawiamy `result` BEZPOŚREDNIO (z pominięciem współdzielonego
         // `geminiData` niżej) — PDF ma teraz inną architekturę (wiele
@@ -2044,7 +2116,7 @@ Deno.serve(async (req: Request) => {
         result = { q_score: pdfQScore, patterns: verifiedPatterns, summary: pdfSummary }
       } else {
         // ETAP 1 (tani) + ETAP 2 — patrz komentarz w gałęzi "url" wyżej.
-        const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!)
+        const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!, costTracker)
         const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
         geminiData = await callGemini(
           {
@@ -2054,7 +2126,9 @@ Deno.serve(async (req: Request) => {
               responseSchema: DETECTION_RESPONSE_SCHEMA,
             },
           },
-          geminiKey!
+          geminiKey!,
+          GEMINI_TIMEOUT_MS,
+          costTracker
         )
         // Etap 3 (findAdditionalPatterns) — patrz obsługa niżej, po
         // sparsowaniu geminiData.
@@ -2117,7 +2191,8 @@ Deno.serve(async (req: Request) => {
             secondPassText,
             initialPatterns,
             secondPassSystemPrompt,
-            geminiKey!
+            geminiKey!,
+            costTracker
           )
           result = { ...(result as Record<string, unknown>), patterns: finalPatterns }
         }
@@ -2141,6 +2216,35 @@ Deno.serve(async (req: Request) => {
         await tripKillSwitch(reason)
         return outageResponse(reason)
       }
+    }
+
+    // Reguła A8 — koszt WSZYSTKICH wywołań Gemini w obrębie TEGO JEDNEGO
+    // zapytania (patrz costTracker/callGemini wyżej) nie powinien przekroczyć
+    // ustalonej z właścicielem części dziennego budżetu.
+    if (costTracker.totalUsd > thresholds.single_request_cost_limit_usd) {
+      const reason = `Reguła 8: pojedyncze zapytanie kosztowało $${costTracker.totalUsd.toFixed(4)} — powyżej progu $${thresholds.single_request_cost_limit_usd}.`
+      await tripKillSwitch(reason)
+      return outageResponse(reason)
+    }
+
+    // Reguła A10 — dzienny budżet w USD (wszyscy użytkownicy razem).
+    // `system_daily_spend` ma jeden wiersz na dzień (UTC) — data jest samym
+    // kluczem, więc licznik "resetuje się" sam każdego nowego dnia, bez
+    // żadnej ręcznej interwencji ani zadania cyklicznego.
+    const today = new Date().toISOString().slice(0, 10)
+    const { data: existingSpend } = await supabase
+      .from('system_daily_spend')
+      .select('total_usd')
+      .eq('spend_date', today)
+      .maybeSingle()
+    const newDailyTotal = (existingSpend?.total_usd ?? 0) + costTracker.totalUsd
+    await supabase
+      .from('system_daily_spend')
+      .upsert({ spend_date: today, total_usd: newDailyTotal }, { onConflict: 'spend_date' })
+    if (newDailyTotal > thresholds.daily_budget_usd) {
+      const reason = `Reguła 10: dzienny koszt Gemini osiągnął $${newDailyTotal.toFixed(2)} — powyżej progu $${thresholds.daily_budget_usd}.`
+      await tripKillSwitch(reason)
+      return outageResponse(reason)
     }
 
     // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników)
