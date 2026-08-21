@@ -1913,6 +1913,23 @@ zanim założysz, że działa.
       widocznego I zerowego kontaktu z cieniem — to jest właśnie ten
       zaakceptowany kompromis, tym razem przesunięty mocniej w stronę
       "widoczne"). Wyłącznie `style.css`.
+    - **POPRAWKA 2026-08-21(p) — CAŁKOWITE wycofanie efektu "latarni wzdłuż
+      alejki" ((h)-(o)), na żywą, jednoznaczną prośbę po zobaczeniu wersji
+      (o) na telefonie: "jak tak ma to wyglądać to już wolę żeby tego nie
+      było".** Zapytany wprost, czy usunąć tylko z telefonu czy całkowicie
+      — właściciel wybrał CAŁKOWICIE, wszędzie (też na komputerze). `body`
+      w `style.css` wrócił do stanu sprzed (h): jedna, niepowtarzająca się
+      poświata u góry strony, bez bocznych latarni. Usunięte też wszystkie
+      powiązane zmienne (`--lamp-glow`, `--lamp-halo`, `--lamp-radius`,
+      `--lamp-halo-radius`) i jedyny `@media` w pliku (był tylko dla tego
+      efektu). **Wniosek na przyszłość**: cały ten wątek (h)-(p) to
+      pouczający przykład, że dekoracyjny efekt CSS bardzo dobrze wyglądający
+      na jednym urządzeniu/rozmiarze ekranu może zupełnie nie działać na
+      innym (desktop vs mobile) — przy kolejnych podobnych pomysłach warto
+      od razu testować na realnym, docelowym urządzeniu (telefon, skoro to
+      "przede wszystkim aplikacja mobilna"), nie tylko na podglądzie na
+      komputerze, zanim zainwestuje się wiele rund dostrajania. Wyłącznie
+      `style.css`.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
