@@ -1775,6 +1775,22 @@ zanim założysz, że działa.
          "Gakori" (gradient tekstowy), bez żadnej ikony obok.
       Wyłącznie frontend (`style.css` + `index.html`/`account.html`/
       `historia.html`/`scan.html`) — wdraża się samo.
+    - **POPRAWKA 2026-08-21(g) — mocniejsza "gra świateł" na wyraźną prośbę
+      ("światło = prestiż", nawiązanie do wystawiennictwa/rzeźby).**
+      Płaski, dwukolorowy gradient tekstu z (f) zamieniony na TRZYPUNKTOWY
+      (`--brand-grad-dark` → `--brand-grad-light` w 50% → `--brand-grad-dark`)
+      — imituje światło ślizgające się po zaokrąglonej powierzchni litery,
+      nie płaskie przejście. Kierunek zmieniony z 160deg na 100deg (bliżej
+      poziomu) — przy krótkim, jednowierszowym napisie ukośny/pionowy
+      gradient prawie nie sweepuje w poziomie, więc błysk pośrodku by nie
+      było widać. Dodany `filter: drop-shadow(0 2px 3px
+      var(--shadow-color-soft))` — delikatny, ciemny cień pod literami dla
+      wrażenia uniesienia (ta sama zmienna co reszta "Rzeźby", więc
+      automatycznie poprawna w obu motywach; `filter`, nie `text-shadow` —
+      działa na już wyrenderowanym, przezroczystym kształcie liter, więc
+      nie grozi tym samym błędem "zalania bielą" co (f)). Zmienne
+      przemianowane z `--brand-grad-start/-end` na bardziej opisowe
+      `--brand-grad-dark/-light`. Wyłącznie `style.css`.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):

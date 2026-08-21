@@ -97,15 +97,20 @@
     --danger-text: #7c4038;
     --danger-border: #cca298;
     /* Gradient "gry świateł" wpisanej w litery (patrz .gakori-shine-text
-       niżej). POPRAWKA 2026-08-21(f): OBA krańce dobrane tak, żeby KAŻDY z
-       osobna dawał pewny, ciemny kontrast wobec jasnego --paper — nie
+       niżej). POPRAWKA 2026-08-21(f): KRAŃCE (`--brand-grad-dark`) dobrane
+       tak, żeby dawały pewny, ciemny kontrast wobec jasnego --paper — nie
        jeden jasny + jeden ciemny (patrz historia tej poprawki w
-       GAKORI_CONTEXT.md, dlaczego to podejście zawiodło). --brand-grad-end
-       to wprost --ink (najciemniejszy, gwarantowany kontrast), start odrobinę
-       jaśniejszy, żeby gradient dawał subtelną zmienność, nie płaski kolor.
-       W trybie ciemnym (niżej) odwrotnie — oba krańce muszą być JASNE. */
-    --brand-grad-start: #6b6558;
-    --brand-grad-end: #201e1a;
+       GAKORI_CONTEXT.md, dlaczego płynne przejście od jasnego do ciemnego
+       zawiodło na krótkim, jednowierszowym napisie). POPRAWKA
+       2026-08-21(g), na wyraźną prośbę o mocniejszą "grę świateł" (jak w
+       wystawiennictwie/rzeźbie — światło = prestiż): TRZYPUNKTOWY gradient
+       (ciemno → jasny błysk pośrodku → znowu ciemno), nie płaskie dwa
+       kolory — `--brand-grad-light` to WYRAŹNY błysk w środku napisu, wciąż
+       ciemniejszy niż --paper (więc nigdy nie "znika" jak w POPRAWKA (f)),
+       ale zauważalnie jaśniejszy niż krańce. W trybie ciemnym (niżej)
+       odwrotnie — krańce muszą być JASNE, błysk jeszcze jaśniejszy. */
+    --brand-grad-dark: #201e1a;
+    --brand-grad-light: #9a9184;
 }
 
 /* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
@@ -139,13 +144,13 @@
     --ok-bg: #333d2b; --ok-text: #bccaa9; --ok-border: #4c5a3f;
     --warn-bg: #3c3120; --warn-text: #dcc292; --warn-border: #5c4a2e;
     --danger-bg: #3c2b27; --danger-text: #dcb1a8; --danger-border: #5c3f38;
-    /* Lustrzane odwrócenie jasnego motywu (patrz POPRAWKA 2026-08-21(f) przy
-       :root wyżej) — oba krańce JASNE, --brand-grad-start to wprost --ink
-       tego motywu (najjaśniejszy, gwarantowany kontrast na prawie czarnym
-       --paper), --brand-grad-end odrobinę stonowany, ale wciąż wyraźnie
-       jasny, nie zlewający się z tłem. */
-    --brand-grad-start: #f2efe7;
-    --brand-grad-end: #cabe9c;
+    /* Lustrzane odwrócenie jasnego motywu (patrz POPRAWKA 2026-08-21(f)/(g)
+       przy :root wyżej) — krańce (`--brand-grad-dark`) JASNE, ale stonowane
+       (gwarantowany kontrast na prawie czarnym --paper), błysk pośrodku
+       (`--brand-grad-light`) to wprost --ink tego motywu — najjaśniejszy,
+       najmocniejszy "błysk". */
+    --brand-grad-dark: #cabe9c;
+    --brand-grad-light: #f2efe7;
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -172,8 +177,9 @@ h2 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 1.15rem; font-weight: 800; margin: 0 0 16px 0;
     text-align: center; text-transform: uppercase; letter-spacing: 0.06em;
-    background: linear-gradient(160deg, var(--brand-grad-start) 0%, var(--brand-grad-end) 100%);
+    background: linear-gradient(100deg, var(--brand-grad-dark) 0%, var(--brand-grad-light) 50%, var(--brand-grad-dark) 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 3px var(--shadow-color-soft));
 }
 .tagline { margin: 0 0 20px 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.45; text-align: center; }
 
@@ -201,22 +207,28 @@ h2 {
    Współdzielone przez nagłówek marki, hasło pod nim i nagłówki sekcji (`h2`
    niżej) — jeden mechanizm, nie trzy osobne kopiowane gradienty.
    POPRAWKA 2026-08-21(f) — w jasnym motywie napis wychodził praktycznie
-   niewidoczny ("białe na białym", zgłoszone na żywo): winny był
-   `text-shadow` korzystający z `--highlight-edge` — zmiennej pomyślanej do
-   JASNEJ obwódki na ciemnych, uniesionych powierzchniach (karty/przyciski),
-   NIE do tekstu. W jasnym motywie ta zmienna jest prawie nieprzezroczystą
-   bielą (`rgba(255,255,255,0.9)`, dobraną pod cień na ciemnym tle) — na
-   cienkich literach z gradientem to po prostu zalewało cały napis bielą
-   (w ciemnym motywie ta sama zmienna ma tylko 0.14 przezroczystości, więc
-   tam efekt był niezauważalny — stąd różnica między motywami). Naprawa:
-   usunięty text-shadow (gradient sam w sobie już daje efekt świateł, dodatkowy
-   cień nie jest konieczny), a oba krańce gradientu (`--brand-grad-*` niżej)
-   dobrane tak, żeby KAŻDY z osobna dawał pewny kontrast wobec `--paper` —
-   nie polegamy już na tym, że krótki, jednowierszowy napis akurat "trafi"
-   w ciemniejszą część długiego, ukośnego gradientu. */
+   niewidoczny ("białe na białym"): winny był `text-shadow` korzystający z
+   `--highlight-edge` (zmiennej pomyślanej do jasnej obwódki na ciemnych
+   kartach/przyciskach, NIE do tekstu — w jasnym motywie prawie
+   nieprzezroczysta biel zalewała cienkie litery). Usunięty text-shadow.
+   POPRAWKA 2026-08-21(g) — na wyraźną prośbę o MOCNIEJSZĄ grę świateł (jak
+   w wystawiennictwie/rzeźbie: światło = prestiż): zamiast płaskiego,
+   dwukolorowego przejścia — TRZYPUNKTOWY gradient (ciemno → wyraźny błysk
+   pośrodku → znowu ciemno), imitujący światło ślizgające się po
+   zaokrąglonej, wypukłej powierzchni litery. Kierunek celowo bliski
+   poziomemu (100deg, nie 160deg) — przy krótkim, jednowierszowym napisie
+   ukośny/pionowy gradient prawie nie sweepuje w poziomie, więc błysk by
+   się nie było widać; przy 100deg błysk realnie "przebiega" wzdłuż całego
+   wyrazu. Dodatkowo `filter: drop-shadow` (nie `text-shadow` — działa na
+   już wyrenderowanym kształcie liter z przezroczystym tłem, więc nie
+   grozi tym samym błędem co POPRAWKA (f)) — delikatny, ciemny cień pod
+   literami dla wrażenia uniesienia nad stroną, tej samej zmiennej
+   (`--shadow-color-soft`) co reszta "Rzeźby", więc automatycznie
+   poprawny w obu motywach. */
 .gakori-shine-text {
-    background: linear-gradient(160deg, var(--brand-grad-start) 0%, var(--brand-grad-end) 100%);
+    background: linear-gradient(100deg, var(--brand-grad-dark) 0%, var(--brand-grad-light) 50%, var(--brand-grad-dark) 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 3px var(--shadow-color-soft));
 }
 
 .card {
