@@ -1814,6 +1814,27 @@ zanim założysz, że działa.
       (np. lista wyników w `scan.html`/`historia.html`) użytkownik
       "mija" kolejne latarnie przy przewijaniu, jak spacer wzdłuż alei.
       Wyłącznie `style.css`.
+    - **POPRAWKI 2026-08-21(i)/(j)/(k) — kolejne doszlifowania "latarni" po
+      podglądzie na żywo, oraz jedno zabezpieczenie.** Trzy rundy tuningu na
+      żywą prośbę właściciela: (i) odstęp 520px→260px, promień 170px→115px,
+      intensywność +60%; (j) odstęp 260px→130px + dodany "plateau" pełnej
+      intensywności do 20% promienia przed zanikiem (mocniejszy kontrast
+      jasnego źródła wobec tego, jak się rozchodzi, BEZ zwiększania
+      zasięgu/promienia); (k) odstęp 130px→87px (jeszcze więcej latarni).
+      Przy (k) właściciel poprosił wprost o zapewnienie, że boczna poświata
+      nigdy nie "rzuca światła" na główny panel (`.card`) — policzone
+      geometrycznie: `.card` ma `max-width: 400px`, na węższych ekranach
+      (mobile — a to przede wszystkim aplikacja mobilna) karta zajmuje
+      prawie całą szerokość, więc margines obok niej jest bliski zera —
+      przy promieniu 115px poświata geometrycznie MUSIAŁABY dotykać cienia
+      karty, nie da się tego pogodzić z widocznym efektem. Zamiast
+      pogarszać efekt na szerokich ekranach, żeby "zmieścić się" też na
+      wąskich — dodany JEDYNY `@media (max-width: 700px)` w tym pliku
+      (świadomy, punktowy wyjątek od zasady "brak media queries", patrz
+      "Zasady współpracy" niżej — próg policzony z geometrii: 400px karta +
+      2×20px padding body + 2×115px promień, zaokrąglone w górę), wyłączający
+      boczne poświaty (`--lamp-glow: transparent`) poniżej tej szerokości —
+      górna poświata i cała reszta UI bez zmian. Wyłącznie `style.css`.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):

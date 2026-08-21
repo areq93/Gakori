@@ -172,32 +172,56 @@ body {
        w regularnych odstępach w pionie (jak lampy uliczne co kilka metrów).
        Dwie pierwsze warstwy to właśnie te latarnie — jedna "przyklejona" do
        lewej krawędzi (`at 0% 50%` w obrębie własnego kafelka), druga do
-       prawej (`at 100% 50%`), każda w kafelku 100%×130px powtarzanym w
-       pionie (`repeat-y`) — 130px to odstęp między kolejnymi "latarniami"
+       prawej (`at 100% 50%`), każda w kafelku 100%×87px powtarzanym w
+       pionie (`repeat-y`) — 87px to odstęp między kolejnymi "latarniami"
        (POPRAWKA 2026-08-21(i) — zmniejszony o połowę z pierwotnych 520px,
        promień poświaty zmniejszony o 1/3 z 170px na 115px, intensywność
        podbita o 60%; POPRAWKA 2026-08-21(j) — odstęp zmniejszony JESZCZE
-       raz o połowę z 260px na 130px (więcej latarni), a każda poświata
-       dostała dodatkowy "plateau" — pełna intensywność aż do 20% promienia,
-       dopiero potem zanik do przezroczystości w tych samych 70% co
-       wcześniej — mocniejszy kontrast między jasnym źródłem a tym, jak się
-       rozchodzi, BEZ zwiększania zasięgu/promienia)
+       raz o połowę z 260px na 130px, a każda poświata dostała dodatkowy
+       "plateau" — pełna intensywność aż do 20% promienia, dopiero potem
+       zanik do przezroczystości w tych samych 70% co wcześniej —
+       mocniejszy kontrast między jasnym źródłem a tym, jak się rozchodzi,
+       BEZ zwiększania zasięgu/promienia; POPRAWKA 2026-08-21(k) — odstęp
+       zmniejszony JESZCZE raz, tym razem o 1/3, ze 130px na 87px — jeszcze
+       więcej latarni)
        (można podkręcić/rozluźnić, zmieniając tę jedną liczbę w
        background-size niżej, MUSI być identyczna w obu miejscach dla danej
        warstwy). Trzecia warstwa to oryginalna, niepowtarzająca się poświata
        u samej góry strony (bez zmian) — stąd trzy identycznie
        poukładane listy w image/position/repeat/size, każda pozycja
-       odpowiada tej samej warstwie we wszystkich czterech właściwościach. */
+       odpowiada tej samej warstwie we wszystkich czterech właściwościach.
+       POPRAWKA 2026-08-21(k) — zabezpieczenie zgłoszone wprost: przy
+       promieniu 115px poświaty NIE MIESZCZĄ się w marginesie obok karty na
+       wąskich, mobilnych ekranach (`.card` ma `max-width: 400px`, przy
+       węższym viewporcie karta i tak zajmuje prawie całą szerokość, więc
+       margines obok niej jest bliski zera) — na takich szerokościach
+       poświata geometrycznie MUSIAŁABY dotykać cienia karty, nie da się
+       tego pogodzić z widocznym efektem. Rozwiązanie niżej (media query):
+       poświaty boczne WYŁĄCZONE poniżej bezpiecznej szerokości ekranu, gdzie
+       nie ma gwarancji marginesu — górna poświata i cała reszta UI bez zmian. */
     background-image:
         radial-gradient(circle 115px at 0% 50%, var(--lamp-glow) 0%, var(--lamp-glow) 20%, transparent 70%),
         radial-gradient(circle 115px at 100% 50%, var(--lamp-glow) 0%, var(--lamp-glow) 20%, transparent 70%),
         radial-gradient(ellipse 900px 500px at 50% -12%, var(--card-2) 0%, var(--paper) 60%);
     background-repeat: repeat-y, repeat-y, no-repeat;
     background-position: left top, right top, 0 0;
-    background-size: 100% 130px, 100% 130px, auto;
+    background-size: 100% 87px, 100% 87px, auto;
     color: var(--ink);
     line-height: 1.5;
     position: relative;
+}
+/* POPRAWKA 2026-08-21(k) — na węższych ekranach `.card` (max-width: 400px)
+   zajmuje prawie całą dostępną szerokość, więc margines obok niej jest
+   bliski zera — poświaty latarni (promień 115px) geometrycznie nie mają
+   gdzie się zmieścić, nie dotykając cienia karty. Zamiast pogarszać efekt
+   na szerokich ekranach, żeby "zmieścić się" też na wąskich — WYŁĄCZAMY
+   boczne poświaty poniżej progu, przy którym margines gwarantowanie
+   pomieści cały ich promień (400px karta + 2×20px padding body + 2×115px
+   promień zaokrąglone w górę) — górna poświata i cała reszta UI bez zmian.
+   Jedyny `@media` w tym pliku — świadomy, punktowy wyjątek dla tego
+   konkretnego zabezpieczenia, nie zmiana ogólnego podejścia. */
+@media (max-width: 700px) {
+    :root, :root[data-theme="dark"] { --lamp-glow: transparent; }
 }
 h1 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
