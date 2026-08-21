@@ -2114,6 +2114,32 @@ zalogowanego użytkownika), więc `profiles` ma regułę RLS pozwalającą
 zalogowanemu użytkownikowi na `UPDATE` własnego wiersza (`auth.uid() =
 id`), obok istniejącej reguły `SELECT`.
 
+**`system_status`** (dodane 2026-08-21 — patrz "Audyt systemowy — główny
+wyłącznik" niżej), JEDEN wiersz (`id = true`):
+- `id` (boolean, PK, zawsze `true`), `analyze_enabled` (boolean, domyślnie
+  `true`), `disabled_reason` (text, nullable — kto/co wyłączyło: ręcznie
+  właściciel, albo która reguła automatyczna), `consecutive_failures`
+  (integer — dziś NIEUŻYWANE jako licznik, reguła 6 liczy to zapytaniem do
+  `system_incident_log`, kolumna zostawiona na wypadek przyszłej zmiany
+  architektury), `updated_at`.
+
+**`system_thresholds`** (dodane 2026-08-21), JEDEN wiersz (`id = true`) —
+edytowalne "pokrętła czułości" reguł automatycznych, patrz niżej:
+`consecutive_failure_limit`, `error_rate_percent`,
+`error_rate_window_minutes`, `error_rate_min_sample`,
+`malformed_response_limit`, `malformed_response_window_minutes`.
+
+**`system_incident_log`** (dodane 2026-08-21) — log zdarzeń świadczących o
+awarii SYSTEMU (nie pojedynczego konta — od tego jest `failed_scan_attempts`,
+osobna, niezmieniona tabela): `id`, `created_at`, `reason` (text — jeden z:
+`gemini_error`, `url_fetch_failed`, `malformed_response`, `save_failed`),
+`user_id` (nullable, tylko do debugowania — kto akurat trafił na awarię, nie
+wpływa na logikę reguł).
+
+RLS na wszystkich trzech: włączone, ZERO publicznych polityk (dokładnie jak
+`rate_limit_blocks`/`failed_scan_attempts`) — dostęp wyłącznie przez
+`service_role` w Edge Function.
+
 ## Ochrona cashflow przed nadużyciem (rate limiting) — dodane 2026-08-18
 
 **Problem**: nieudana analiza (np. link, którego nie da się pobrać, albo
@@ -2165,6 +2191,115 @@ bez żadnego przychodu.
 - Mechanizm dotyczy WYŁĄCZNIE zalogowanych — dla anonimowych pierwszy skan
   tekstu jest darmowy niezależnie od wyniku, więc nie ma tam dodatkowego
   ryzyka finansowego do ograniczenia tym mechanizmem.
+
+## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
+
+Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
+zwrotne — patrz rozmowa z 2026-08-21) ustalono, że NAJWAŻNIEJSZYM
+priorytetem jest hierarchiczny system awaryjnego zatrzymywania, na wzór
+organizmu: jeden główny wyłącznik dla całego systemu, sprawdzany jako
+absolutnie pierwsza rzecz w `analyze/index.ts` — zanim cokolwiek innego się
+wydarzy. Docelowo (NIE zbudowane jeszcze) mają dojść węższe, "podwyłączniki"
+dla mniejszych części systemu (np. tylko rejestracja/maile) — na razie
+Etap 1 dotyczy WYŁĄCZNIE `analyze` (jedyne miejsce z prawdziwym kosztem i
+prawdziwym ryzykiem finansowym — reszta systemu jest darmowa).
+
+**Filozofia**: fail-open na SAMYM sprawdzeniu wyłącznika (błąd odczytu
+`system_status`/`system_thresholds` nie blokuje analizy — awaria KONTROLI
+nie może stać się nowym powodem przestoju), ale fail-CLOSED, gdy wyłącznik
+jest jawnie zgaszony. System wyłącza się automatycznie sam (żeby chronić,
+gdy właściciela nie ma przy komputerze), ale **włączyć z powrotem może
+WYŁĄCZNIE właściciel, ręcznie**, po sprawdzeniu, co się stało — automatyczne
+wyłączanie nigdy nie ocenia samo, czy już naprawdę bezpiecznie wrócić do
+działania.
+
+**Co się dzieje, gdy KTÓRAKOLWIEK z reguł niżej się spełni** (bez wyjątków):
+system zatrzymuje się natychmiast dla WSZYSTKICH, TO JEDNO zapytanie, które
+akurat wywołało regułę, też nic nie dostaje (żadnego wyniku, żadnego
+obciążenia — świadoma decyzja: nie wiadomo, czy to zapytanie samo w sobie
+nie jest przyczyną problemu, np. wyjątkowo kosztownym plikiem), do
+właściciela (`REPORT_RECIPIENT_EMAIL`, ten sam adres co raport dzienny)
+leci natychmiastowy mail z dokładnym powodem, a każdy użytkownik widzi
+spokojny komunikat w SWOIM języku (i18n.js, klucz `err_system_paused`) —
+nie po polsku na sztywno. Jeśli po zbadaniu sprawy okaże się, że zatrzymanie
+tego jednego zapytania było niesprawiedliwe (błąd był po naszej stronie, nie
+podejrzana próba) — właściciel poprawia ręcznie zapis w historii tej osoby;
+to NIE jest zautomatyzowane.
+
+**Wdrożone reguły (Etap 1, `analyze/index.ts`)** — dwie grupy:
+
+Grupa A — księgowość, ZERO tolerancji (sprawdzenie dokładne, bez progów do
+zgadywania), sprawdzane przy każdej próbie naliczenia/odjęcia kredytów
+(funkcje `chargeCredits()` i sprawdzenie tuż przed sekcją "6. ZAPIS WYNIKU
+DO CACHE'U"):
+1. Zrobiono analizę (nie z cache'u), ale próbowano naliczyć kredyty bez
+   zalogowanego konta/profilu — nie powinno się zdarzyć strukturalnie, to
+   dodatkowe zabezpieczenie na wypadek przyszłego błędu.
+2. Odjęcie kredytów niepotwierdzone przez bazę (błąd zapisu `UPDATE`
+   `profiles`, zwrócone saldo inne niż oczekiwane, albo błąd zapisu do
+   `wallet_transactions`) — dawniej te błędy były CICHO ignorowane (kod nie
+   sprawdzał `error`/wyniku `UPDATE` w ogóle).
+3. Saldo użytkownika wyszło na minus po odjęciu.
+4. Naliczona liczba kredytów (`cost`) nie zgadza się z tym, co niezależnie
+   przelicza `computeExpectedCost()` wg tego samego wzoru cennika, dla
+   danego typu treści.
+5. **Rozliczenie konta**: saldo musi zawsze DOKŁADNIE równać się
+   `INITIAL_WALLET_BONUS` (20, musi być zgodne z DEFAULT kolumny
+   `profiles.wallet_balance`) plus suma WSZYSTKICH wierszy tego konta w
+   `wallet_transactions`. **WAŻNE — zapamiętać przy budowie systemu
+   płatności**: gdy powstaną prawdziwe zakupy pakietów, ta reguła musi
+   zostać rozszerzona o porównanie z historią zakupów (`package_purchases`),
+   żeby dalej być prawdziwie "absolutnym" zabezpieczeniem księgowości.
+   **WAŻNE — ręczne korekty**: jeśli KIEDYKOLWIEK poprawiasz komuś saldo
+   bezpośrednio w Supabase Table Editor, dopisz też odpowiadający wiersz w
+   `wallet_transactions` (np. `type: 'manual_adjustment'`) — inaczej ta
+   reguła niesłusznie zatrzyma cały system.
+
+Grupa C — skala i jakość (progi liczbowe w `system_thresholds`, startowe
+zgadywanki do skorygowania na realnych danych produkcyjnych), sprawdzane w
+`logSystemIncident()`, wywoływanej OBOK (nie zamiast) istniejącego
+`logFailedAttempt()` przy każdej prawdziwej awarii (nie przy zwykłym
+"trzeba potwierdzić koszt PDF-a" — to nie jest awaria):
+6. **Konsekwentne porażki bez sukcesu między nimi** (domyślnie 50) — liczone
+   NIE w sztywnym oknie czasowym, tylko jako "ile wpisów w
+   `system_incident_log` powstało od ostatniej NOWEJ analizy zapisanej do
+   `scans`" — dzięki temu reguła działa identycznie przy dużym i przy
+   znikomym ruchu, bez potrzeby trzymania osobnego, mutowalnego licznika.
+7. **Odsetek błędów w krótkim oknie** (domyślnie 3% w 15 min), liczony
+   DOPIERO gdy w oknie było wystarczająco dużo prób (domyślnie 20 —
+   inaczej 1 błąd na 2 próby wyglądałby jak "50% katastrofa"). "Sukces" =
+   NOWA analiza zapisana do `scans` — świadomie NIE liczymy trafień w
+   cache (nic nie mówią o tym, czy Gemini/nasz kod aktualnie działają, i
+   mogłyby ukryć prawdziwą awarię przy dobrym ruchu na już-zapisanych
+   treściach). Reguły 6 i 7 NIE blokują się wzajemnie — działają
+   niezależnie i równolegle, uzupełniają się: 6 szybciej złapie awarię przy
+   dużym ruchu (dużo błędów naraz), 7 szybciej złapie awarię przy małym
+   ruchu (mało zapytań, ale proporcjonalnie prawie wszystkie padają) —
+   razem dają najszybsze możliwe wykrycie przy KAŻDYM poziomie ruchu.
+9. **Nieprawidłowe/bezużyteczne odpowiedzi od Gemini** (domyślnie 5 w 10
+   min) — odpowiedź technicznie przyszła, ale nie da się jej sparsować jako
+   JSON albo brakuje wymaganych pól (`patterns`/`q_score`) — sygnał, że
+   dostawca AI mógł coś zmienić po swojej stronie, nie zwykły błąd sieci.
+   Świadomie sprawdzane w PEŁNI TYLKO na głównej ścieżce tekst/link
+   (najważniejszy, najbardziej reprezentatywny punkt) — ścieżki obraz/PDF
+   mają WŁASNE, już wcześniej istniejące sprawdzenia kształtu odpowiedzi w
+   `analyzeImageChunk()`/`analyzePdfChunk()` (liczą się do reguł 6/7 jako
+   zwykły `gemini_error`, ale nie są osobno tagowane jako
+   `malformed_response` — nie było potrzeby dublować już istniejącej
+   ochrony).
+
+**Świadomie NIE wdrożone jeszcze (następny krok, nie ten sam co Etap 1)**:
+8. Pojedyncze zapytanie kosztuje nienaturalnie dużo (sprawdzane przed
+   wysłaniem i po otrzymaniu odpowiedzi, wg rzeczywistego zużycia tokenów).
+10. Rzeczywisty dzienny koszt Gemini (w PLN) przekracza 500 zł (ustalone z
+    właścicielem, do podniesienia, gdy projekt się rozrośnie).
+
+Obie wymagają, żebyśmy zaczęli NAPRAWDĘ mierzyć rzeczywiste zużycie tokenów
+zwracane przez Gemini przy KAŻDYM z ~8 różnych miejsc w kodzie, które
+wywołują Gemini (główna analiza, tłumaczenie, druga runda szukania wzorców,
+weryfikacja/scalanie PDF i obrazu, każdy fragment PDF-a osobno, każdy obraz
+osobno) — świadomie odłożone jako osobny, staranny krok, żeby nie robić
+chirurgii we wszystkich tych miejscach naraz i niczego nie przeoczyć.
 
 ## Cennik (do skalibrowania na realnych danych — na razie przybliżenia)
 

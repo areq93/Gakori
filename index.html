@@ -1076,6 +1076,7 @@
                     unsafe_content: 'err_unsafe_content',
                     too_many_images: 'err_too_many_images',
                     invalid_pdf: 'err_invalid_pdf',
+                    system_paused: 'err_system_paused',
                 };
                 if (data.error === 'pdf_too_long') {
                     summary.innerText = t('err_pdf_too_long', { count: data.page_count, max: data.max_pages });

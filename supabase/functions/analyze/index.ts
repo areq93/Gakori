@@ -41,6 +41,25 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // 8 MB
 const MAX_IMAGES_PER_SCAN = 6
 const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024 // 20 MB łącznie
 
+// Musi być zgodne z DEFAULT wartości `profiles.wallet_balance` w bazie —
+// używane WYŁĄCZNIE przez regułę 5 audytu bezpieczeństwa niżej
+// (rozliczenie konta: saldo musi się równać bonusowi startowemu plus suma
+// wszystkich transakcji). Jeśli kiedykolwiek zmienimy wysokość bonusu
+// startowego w bazie, trzeba zmienić też tę stałą.
+const INITIAL_WALLET_BONUS = 20
+
+// Niezależne od głównego wyliczenia `cost` niżej przeliczenie ceny wg tego
+// samego wzoru — używane WYŁĄCZNIE do samosprawdzenia się (reguła 4 audytu
+// bezpieczeństwa: "czy to, co naliczyliśmy, naprawdę zgadza się ze wzorem
+// dla tego typu treści"). Musi pozostać zsynchronizowane z gałęziami niżej
+// (image/url/pdf/text), które liczą `cost` po raz pierwszy.
+function computeExpectedCost(inputType: string, charCount: number, imageCount: number, pageCount: number): number {
+  if (inputType === 'image') return IMAGE_SCAN_COST * imageCount
+  if (inputType === 'url') return URL_SCAN_COST
+  if (inputType === 'pdf') return PDF_PAGE_COST * pageCount
+  return FIXED_FEE + Math.ceil(charCount / 1000) * MULTIPLIER_PER_1000_CHARS
+}
+
 // --- PDF (FAZA 2) ---
 // Strona PDF-a liczona identycznie jak obraz kosztowo — ustalone wcześniej
 // w GAKORI_CONTEXT.md ("jedna strona PDF-a ≈ jeden obraz kosztowo").
@@ -960,6 +979,104 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    // 0. GŁÓWNY WYŁĄCZNIK ("organizm") — POPRAWKA 2026-08-21(r), pierwszy
+    // krok audytu bezpieczeństwa systemu (patrz GAKORI_CONTEXT.md, sekcja
+    // "Audyt systemowy" / "Główny wyłącznik"). Sprawdzany JAKO PIERWSZA
+    // RZECZ w całej funkcji, przed sparsowaniem body, przed autoryzacją,
+    // przed cache'em — jeśli wyłącznik jest zgaszony (ręcznie przez
+    // właściciela ALBO automatycznie przez jedną z reguł bezpieczeństwa
+    // niżej), NIC w tej funkcji nie idzie dalej, żadne zapytanie do Gemini
+    // nigdy nie wystartuje. Świadomie fail-open na poziomie SAMEGO
+    // sprawdzenia (błąd odczytu tej jednej tabeli nie blokuje analizy —
+    // awaria TEJ kontroli nie może stać się nowym powodem przestoju), ale
+    // fail-CLOSED, gdy sam wyłącznik jest jawnie wyłączony.
+    const { data: systemStatus } = await supabase
+      .from('system_status')
+      .select('analyze_enabled, disabled_reason')
+      .eq('id', true)
+      .maybeSingle()
+    if (systemStatus && systemStatus.analyze_enabled === false) {
+      return new Response(
+        JSON.stringify({ error: 'system_paused', reason: systemStatus.disabled_reason ?? null }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Progi czułości reguł automatycznych niżej — trzymane w bazie (nie na
+    // sztywno w kodzie), żeby właściciel mógł je samodzielnie podkręcać/
+    // poluzowywać w Supabase bez proszenia o zmianę kodu. Fail-open na
+    // odczycie (jak wyżej) — jeśli tabeli nie da się odczytać, używamy tych
+    // samych wartości startowych, co domyślne kolumny w bazie.
+    const { data: thresholdsRow } = await supabase
+      .from('system_thresholds')
+      .select('*')
+      .eq('id', true)
+      .maybeSingle()
+    const thresholds = {
+      consecutive_failure_limit: thresholdsRow?.consecutive_failure_limit ?? 50,
+      error_rate_percent: thresholdsRow?.error_rate_percent ?? 3,
+      error_rate_window_minutes: thresholdsRow?.error_rate_window_minutes ?? 15,
+      error_rate_min_sample: thresholdsRow?.error_rate_min_sample ?? 20,
+      malformed_response_limit: thresholdsRow?.malformed_response_limit ?? 5,
+      malformed_response_window_minutes: thresholdsRow?.malformed_response_window_minutes ?? 10,
+    }
+
+    // Zatrzymuje system (patrz reguła, która to wywołała, w treści `reason`)
+    // i wysyła Tobie (REPORT_RECIPIENT_EMAIL, ten sam adres co raport
+    // dzienny) natychmiastowy mail z dokładnym powodem. Nie zatrzymuje
+    // ponownie, jeśli system jest już zatrzymany — bez tego kilka równoległych
+    // zapytań mogłoby wysłać kilka identycznych maili naraz.
+    async function tripKillSwitch(reason: string): Promise<void> {
+      const { data: current } = await supabase
+        .from('system_status')
+        .select('analyze_enabled')
+        .eq('id', true)
+        .maybeSingle()
+      if (current && current.analyze_enabled === false) return
+
+      await supabase
+        .from('system_status')
+        .update({ analyze_enabled: false, disabled_reason: reason, updated_at: new Date().toISOString() })
+        .eq('id', true)
+
+      const brevoKey = Deno.env.get('BREVO_API_KEY')
+      const senderEmail = Deno.env.get('BREVO_SENDER_EMAIL')
+      const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Gakori — alarm systemowy'
+      const recipient = Deno.env.get('REPORT_RECIPIENT_EMAIL')
+      if (!brevoKey || !senderEmail || !recipient) return
+      try {
+        await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+          body: JSON.stringify({
+            sender: { email: senderEmail, name: senderName },
+            to: [{ email: recipient }],
+            subject: '🔴 Gakori: analiza zatrzymana automatycznie',
+            htmlContent: `<p>Główny wyłącznik zatrzymał właśnie analizę w Gakori — <strong>automatycznie</strong>, bez Twojego udziału.</p><p><strong>Powód:</strong> ${reason}</p><p><strong>Czas:</strong> ${new Date().toISOString()}</p><p>Nikt nie dostanie teraz nowej analizy, dopóki ręcznie nie włączysz systemu z powrotem (Supabase Dashboard → Table Editor → <code>system_status</code> → <code>analyze_enabled</code> → <code>true</code>) — najpierw sprawdź, co się stało.</p>`,
+          }),
+        })
+      } catch {
+        // Świadomie fail-open TYLKO na samym wysłaniu maila — brak alertu
+        // e-mailowego nie może cofnąć już podjętej decyzji o zatrzymaniu.
+      }
+    }
+
+    // Buduje odpowiedź dla użytkownika, gdy system jest/właśnie został
+    // zatrzymany — front-end tłumaczy kod błędu na język użytkownika
+    // (patrz i18n.js, klucz err_system_paused), `reason` to WYŁĄCZNIE
+    // techniczny szczegół do debugowania, nigdy nie jest pokazywany wprost.
+    function outageResponse(reason?: string): Response {
+      return new Response(
+        JSON.stringify({ error: 'system_paused', reason: reason ?? null }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const body = await req.json()
     const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, confirmed } = body
     const outputLanguage = typeof language === 'string' && LANGUAGE_NAMES[language] ? language : DEFAULT_LANGUAGE
@@ -990,11 +1107,6 @@ Deno.serve(async (req: Request) => {
         { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
 
     // 1. UWIERZYTELNIENIE — weryfikacja tokenu JWT z nagłówka Authorization
     // (Supabase Auth). POPRAWKA 2026-08-19: świadomie PRZED sekcją CACHE
@@ -1119,6 +1231,143 @@ Deno.serve(async (req: Request) => {
       const blockedUntil = new Date(Date.now() + blockMinutes * 60 * 1000).toISOString()
 
       await supabase.from('rate_limit_blocks').insert({ user_id, blocked_until: blockedUntil })
+    }
+
+    // Reguły C6/C7/C9 audytu bezpieczeństwa — "coś nawala w skali", w
+    // odróżnieniu od logFailedAttempt() wyżej (który pilnuje TYLKO jednego
+    // konta). Wywoływana OBOK logFailedAttempt() przy każdej prawdziwej
+    // awarii systemu (nie przy zwykłym "trzeba potwierdzić koszt PDF-a" —
+    // to nie jest awaria). `reason` to krótki, stały kod (np.
+    // 'gemini_error', 'url_fetch_failed', 'malformed_response',
+    // 'save_failed') — patrz GAKORI_CONTEXT.md po pełną listę i uzasadnienie.
+    async function logSystemIncident(reason: string): Promise<void> {
+      await supabase.from('system_incident_log').insert({ reason, user_id })
+
+      // Reguła 6 — twarda liczba porażek POD RZĄD, bez ani jednego sukcesu
+      // (nowej analizy zapisanej do `scans`) pomiędzy nimi. Świadomie
+      // liczone jako "ile niepowodzeń od ostatniego sukcesu", a NIE w
+      // sztywnym oknie czasowym — dzięki temu działa identycznie przy
+      // dużym i przy znikomym ruchu (patrz GAKORI_CONTEXT.md).
+      const { data: lastScan } = await supabase
+        .from('scans')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const sinceLastSuccess = lastScan?.created_at ?? '1970-01-01T00:00:00Z'
+      const { count: consecutiveFailures } = await supabase
+        .from('system_incident_log')
+        .select('*', { count: 'exact', head: true })
+        .gt('created_at', sinceLastSuccess)
+      if ((consecutiveFailures ?? 0) >= thresholds.consecutive_failure_limit) {
+        await tripKillSwitch(
+          `Reguła 6: ${consecutiveFailures} nieudanych prób pod rząd, bez ani jednego sukcesu.`
+        )
+        return
+      }
+
+      // Reguła 7 — odsetek błędów w krótkim oknie, liczony DOPIERO gdy w tym
+      // oknie było wystarczająco dużo prób (żeby np. 1 błąd na 2 próby nie
+      // wyglądał jak "50% katastrofa"). "Sukces" = NOWA analiza zapisana do
+      // `scans` — świadomie NIE liczymy tu trafień w cache (nic nie mówią o
+      // tym, czy Gemini/nasz kod aktualnie działają).
+      const windowStart = new Date(Date.now() - thresholds.error_rate_window_minutes * 60000).toISOString()
+      const { count: failuresInWindow } = await supabase
+        .from('system_incident_log')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', windowStart)
+      const { count: successesInWindow } = await supabase
+        .from('scans')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', windowStart)
+      const totalInWindow = (failuresInWindow ?? 0) + (successesInWindow ?? 0)
+      if (totalInWindow >= thresholds.error_rate_min_sample) {
+        const errorRatePercent = ((failuresInWindow ?? 0) / totalInWindow) * 100
+        if (errorRatePercent >= thresholds.error_rate_percent) {
+          await tripKillSwitch(
+            `Reguła 7: ${errorRatePercent.toFixed(1)}% błędów w ostatnich ${thresholds.error_rate_window_minutes} min (${failuresInWindow}/${totalInWindow}).`
+          )
+          return
+        }
+      }
+
+      // Reguła 9 — Gemini odpowiada, ale w nieoczekiwanym/bezużytecznym
+      // kształcie, powtarzalnie w krótkim czasie (sygnał, że dostawca AI
+      // mógł coś zmienić po swojej stronie).
+      if (reason === 'malformed_response') {
+        const malformedWindowStart = new Date(
+          Date.now() - thresholds.malformed_response_window_minutes * 60000
+        ).toISOString()
+        const { count: malformedCount } = await supabase
+          .from('system_incident_log')
+          .select('*', { count: 'exact', head: true })
+          .eq('reason', 'malformed_response')
+          .gte('created_at', malformedWindowStart)
+        if ((malformedCount ?? 0) >= thresholds.malformed_response_limit) {
+          await tripKillSwitch(
+            `Reguła 9: ${malformedCount} nieprawidłowych/bezużytecznych odpowiedzi Gemini w ostatnich ${thresholds.malformed_response_window_minutes} min.`
+          )
+        }
+      }
+    }
+
+    // Reguły A2/A3/A5 audytu bezpieczeństwa — jedyne miejsce, które wolno
+    // odjąć komuś kredyty. Sprawdza SAMO SIEBIE zaraz po każdej próbie:
+    // czy odjęcie faktycznie zaszło (2), czy saldo nie wyszło na minus (3),
+    // czy saldo konta zgadza się z całą jego historią transakcji (5).
+    // Zwraca `null` przy sukcesie, albo treść reguły, która się nie zgodziła
+    // (i sama już zdążyła zatrzymać system przez tripKillSwitch powyżej).
+    async function chargeCredits(
+      amount: number,
+      txType: string,
+      relatedScanId: string | null
+    ): Promise<string | null> {
+      if (!user_id || !profile) return null // nic do obciążenia (anonim/za darmo)
+
+      const expectedBalance = profile.wallet_balance - amount
+      const { data: updated, error: updateError } = await supabase
+        .from('profiles')
+        .update({ wallet_balance: expectedBalance })
+        .eq('id', user_id)
+        .select('wallet_balance')
+        .single()
+      if (updateError || !updated || updated.wallet_balance !== expectedBalance) {
+        const reason = `Reguła 2: odjęcie kredytów niepotwierdzone (user_id=${user_id}, kwota=${amount}).`
+        await tripKillSwitch(reason)
+        return reason
+      }
+      if (updated.wallet_balance < 0) {
+        const reason = `Reguła 3: saldo ujemne po odjęciu (user_id=${user_id}, saldo=${updated.wallet_balance}).`
+        await tripKillSwitch(reason)
+        return reason
+      }
+
+      const { error: txError } = await supabase.from('wallet_transactions').insert({
+        user_id,
+        amount: -amount,
+        type: txType,
+        related_scan_id: relatedScanId,
+      })
+      if (txError) {
+        const reason = `Reguła 2: zapis transakcji się nie udał (user_id=${user_id}).`
+        await tripKillSwitch(reason)
+        return reason
+      }
+
+      // Reguła 5 — rozliczenie konta: saldo MUSI się równać bonusowi
+      // startowemu plus suma wszystkich transakcji tego konta. WAŻNE: jeśli
+      // kiedykolwiek ręcznie poprawiasz komuś saldo w Supabase Table Editor,
+      // dopisz też odpowiadający wiersz w `wallet_transactions` (np. typ
+      // 'manual_adjustment') — inaczej ta reguła niesłusznie zatrzyma system.
+      const { data: allTx } = await supabase.from('wallet_transactions').select('amount').eq('user_id', user_id)
+      const txSum = (allTx ?? []).reduce((sum, row: { amount: number }) => sum + row.amount, 0)
+      if (updated.wallet_balance !== INITIAL_WALLET_BONUS + txSum) {
+        const reason = `Reguła 5: saldo konta nie zgadza się z historią transakcji (user_id=${user_id}).`
+        await tripKillSwitch(reason)
+        return reason
+      }
+
+      return null
     }
 
     let cost: number
@@ -1313,18 +1562,8 @@ Deno.serve(async (req: Request) => {
     // miejscu (sekcja 4 wyżej), więc funkcja może z nich bezpiecznie
     // skorzystać przez domknięcie (closure).
     async function respondUnsafeContent(category: string): Promise<Response> {
-      if (user_id && profile) {
-        await supabase
-          .from('profiles')
-          .update({ wallet_balance: profile.wallet_balance - cost })
-          .eq('id', user_id)
-        await supabase.from('wallet_transactions').insert({
-          user_id,
-          amount: -cost,
-          type: 'unsafe_content_penalty',
-          related_scan_id: null,
-        })
-      }
+      const chargeFailure = await chargeCredits(cost, 'unsafe_content_penalty', null)
+      if (chargeFailure) return outageResponse(chargeFailure)
       return new Response(
         JSON.stringify({ error: 'unsafe_content', category, charged: user_id ? cost : 0 }),
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -1530,6 +1769,7 @@ Deno.serve(async (req: Request) => {
             const retrievalStatus = geminiData.candidates?.[0]?.urlContextMetadata?.urlMetadata?.[0]?.urlRetrievalStatus
             if (retrievalStatus && retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS') {
               await logFailedAttempt()
+              await logSystemIncident('url_fetch_failed')
               return new Response(
                 JSON.stringify({
                   error: 'url_fetch_failed',
@@ -1621,6 +1861,7 @@ Deno.serve(async (req: Request) => {
 
         if (imageResults.some((r) => r === null)) {
           await logFailedAttempt()
+          await logSystemIncident('gemini_error')
           return new Response(
             JSON.stringify({ error: 'gemini_error', message: 'Nie udało się przeanalizować wszystkich obrazów.' }),
             { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -1762,6 +2003,7 @@ Deno.serve(async (req: Request) => {
 
         if (chunkResults.some((r) => r === null)) {
           await logFailedAttempt()
+          await logSystemIncident('gemini_error')
           return new Response(
             JSON.stringify({
               error: 'gemini_error',
@@ -1829,13 +2071,35 @@ Deno.serve(async (req: Request) => {
       if (!result) {
         if (!geminiData?.candidates?.[0]?.content?.parts?.[0]?.text) {
           await logFailedAttempt()
+          await logSystemIncident('gemini_error')
           return new Response(
             JSON.stringify({ error: 'gemini_error', details: geminiData }),
             { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
-        result = JSON.parse(geminiData.candidates[0].content.parts[0].text)
+        // Reguła A9 audytu bezpieczeństwa — Gemini zwróciło odpowiedź, ale
+        // albo nie da się jej w ogóle sparsować jako JSON, albo ma
+        // nieoczekiwany kształt (brak listy wzorców/oceny) — sygnał, że
+        // dostawca AI mógł coś zmienić po swojej stronie, a nie zwykły błąd
+        // sieci. Świadomie sprawdzane TYLKO tu (główna ścieżka tekst/link) —
+        // to najważniejszy, najbardziej reprezentatywny punkt; ścieżki
+        // obraz/PDF mają własne, już istniejące sprawdzenia kształtu w
+        // analyzeImageChunk()/analyzePdfChunk() (patrz `r === null` wyżej).
+        try {
+          const parsed = JSON.parse(geminiData.candidates[0].content.parts[0].text)
+          if (!Array.isArray(parsed.patterns) || typeof parsed.q_score !== 'number') {
+            throw new Error('unexpected_shape')
+          }
+          result = parsed
+        } catch {
+          await logFailedAttempt()
+          await logSystemIncident('malformed_response')
+          return new Response(
+            JSON.stringify({ error: 'gemini_error', message: 'Odpowiedź Gemini miała nieoczekiwany kształt.' }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
         // "reasoning_steps" (patrz DETECTION_RESPONSE_SCHEMA/POPRAWKA
         // 2026-08-20(c)) to wyłącznie wewnętrzny brudnopis modelu, wymuszony
         // przez schemat, żeby poprawić jakość WYPEŁNIANIA "patterns" —
@@ -1860,8 +2124,26 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników)
     const finalCost = user_id ? cost : 0
+
+    // Reguły A1/A4 audytu bezpieczeństwa — sprawdzone PRZED zapisem do
+    // cache'u i PRZED obciążeniem, żeby w razie niezgodności nie zapisać do
+    // wspólnego cache'u wiersza z błędną ceną.
+    if (finalCost > 0 && (!user_id || !profile)) {
+      const reason = 'Reguła 1: próba naliczenia kredytów bez zalogowanego konta/profilu.'
+      await tripKillSwitch(reason)
+      return outageResponse(reason)
+    }
+    if (user_id) {
+      const expectedCost = computeExpectedCost(input_type, char_count, imageBytesList.length, pdfPageCount)
+      if (cost !== expectedCost) {
+        const reason = `Reguła 4: naliczono ${cost} kr., wzór wskazuje ${expectedCost} kr. (typ treści: ${input_type}).`
+        await tripKillSwitch(reason)
+        return outageResponse(reason)
+      }
+    }
+
+    // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników)
     const { data: newScan, error: insertError } = await supabase
       .from('scans')
       .insert({
@@ -1886,6 +2168,7 @@ Deno.serve(async (req: Request) => {
     // czytelny błąd z prawdziwym powodem z bazy.
     if (insertError || !newScan) {
       await logFailedAttempt()
+      await logSystemIncident('save_failed')
       return new Response(
         JSON.stringify({
           error: 'save_failed',
@@ -1907,20 +2190,11 @@ Deno.serve(async (req: Request) => {
         )
     }
 
-    // 7. ODJĘCIE KREDYTÓW (tylko dla zalogowanych)
-    if (user_id && profile) {
-      await supabase
-        .from('profiles')
-        .update({ wallet_balance: profile.wallet_balance - finalCost })
-        .eq('id', user_id)
-
-      await supabase.from('wallet_transactions').insert({
-        user_id,
-        amount: -finalCost,
-        type: 'spend',
-        related_scan_id: newScan.id,
-      })
-    }
+    // 7. ODJĘCIE KREDYTÓW (tylko dla zalogowanych) — patrz chargeCredits()
+    // wyżej, sprawdza samo siebie po transakcji (reguły A2/A3/A5 audytu
+    // bezpieczeństwa).
+    const chargeFailure = await chargeCredits(finalCost, 'spend', newScan.id)
+    if (chargeFailure) return outageResponse(chargeFailure)
 
     return new Response(
       JSON.stringify({ cached: false, cost: finalCost, id: newScan.id, result }),
