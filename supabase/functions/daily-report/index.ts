@@ -199,6 +199,21 @@ Deno.serve(async (req: Request) => {
     // statystyki miesięczne Brevo niedostępne
   }
 
+  // --- Niedostarczone maile (send-auth-email nie zdołał wysłać przez
+  // Brevo — np. limit dzienny) w ostatnich 24h, patrz GAKORI_CONTEXT.md,
+  // "Ochrona przed limitem maili" (POPRAWKA 2026-08-21(u)) ---
+  let emailFailures24h: number | null = null
+  try {
+    const { count, error } = await supabase
+      .from('email_failures')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', since(24))
+    if (error) throw error
+    emailFailures24h = count ?? 0
+  } catch (_err) {
+    // metryka niedostarczonych maili niedostępna
+  }
+
   // --- Budowanie treści maila ---
   const fmt = (v: number | null, unit = '') => (v === null ? 'brak danych' : `${Math.round(v * 10) / 10}${unit}`)
   const dateStr = new Date().toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' })
@@ -229,10 +244,15 @@ Deno.serve(async (req: Request) => {
     `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(creditsSpentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wydanych dziś</span></div>`
   )
 
+  const emailFailuresHtml =
+    emailFailures24h && emailFailures24h > 0
+      ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">${emailFailures24h} mail(i) nie udało się wysłać w ostatnich 24h (prawdopodobnie limit Brevo) — użytkownicy mieli w aplikacji przycisk "wyślij ponownie", ale warto zerknąć, czy to się nie nasila.</p>`
+      : ''
+
   const emailsCard = card(
     'Maile',
     `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(emailsSentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">dziś (limit dzienny Brevo: 300)</span></div>
-<div style="font-size:14px;color:#374151;margin-top:6px;">łącznie w tym miesiącu: ${fmt(emailsSentThisMonth)}</div>`
+<div style="font-size:14px;color:#374151;margin-top:6px;">łącznie w tym miesiącu: ${fmt(emailsSentThisMonth)}</div>${emailFailuresHtml}`
   )
 
   const topHtml =

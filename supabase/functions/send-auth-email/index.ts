@@ -513,6 +513,40 @@ const EMAIL_CONTENT: Record<string, LangContent> = {
 
 const RTL_LANGUAGES = ['ar']
 
+// Ochrona przed limitem Brevo (300 maili/dzień) — POPRAWKA 2026-08-21(u).
+// Dzień liczony wg czasu POLSKIEGO (Europe/Warsaw), ten sam trik co w
+// analyze/index.ts (reguła 10 audytu bezpieczeństwa) — dla spójności.
+function warsawToday(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(new Date())
+}
+
+// Zlicza UDANE wysyłki tego dnia — czyta to też front-end (index.html,
+// publiczny odczyt w RLS), żeby pokazać dodatkowe ostrzeżenie przy
+// rejestracji, gdy zbliżamy się do limitu Brevo.
+async function recordEmailSent(supabase: ReturnType<typeof createClient>): Promise<void> {
+  const today = warsawToday()
+  const { data: existing } = await supabase
+    .from('email_daily_count')
+    .select('sent_count')
+    .eq('spend_date', today)
+    .maybeSingle()
+  await supabase
+    .from('email_daily_count')
+    .upsert({ spend_date: today, sent_count: (existing?.sent_count ?? 0) + 1 }, { onConflict: 'spend_date' })
+}
+
+// Loguje NIEUDANĄ próbę (np. limit Brevo wyczerpany) — WYŁĄCZNIE do
+// widoczności w Twoim dziennym raporcie. Świadomie NIE budujemy tu kolejki
+// do automatycznego ponawiania — link w mailu (signup/recovery) ma swój
+// termin ważności, a mechanizm Supabase do generowania świeżego linku "na
+// zapas" bywa zawodny (potrafi oddać ten sam, już nieważny token — patrz
+// GAKORI_CONTEXT.md). Bezpieczniejsze rozwiązanie: użytkownik sam, jednym
+// kliknięciem "Wyślij ponownie" w aplikacji, prosi o NOWY, na pewno świeży
+// link, dokładnie w chwili, gdy tego potrzebuje.
+async function recordEmailFailure(supabase: ReturnType<typeof createClient>, kind: string): Promise<void> {
+  await supabase.from('email_failures').insert({ kind })
+}
+
 function buildHtml(content: { subject: string } & EmailContent, username: string, actionUrl: string | null, lang: string): string {
   const greeting = content.greeting(username)
   const bodyHtml = content.body.map((p) => `<p>${p}</p>`).join('\n')
@@ -638,13 +672,23 @@ Deno.serve(async (req: Request) => {
     })
 
     if (!brevoRes.ok) {
-      const details = await brevoRes.text()
-      return new Response(JSON.stringify({ error: 'brevo_error', details }), {
-        status: 500,
+      // POPRAWKA 2026-08-21(u) — świadomie NIE zwracamy tu błędu do
+      // Supabase: gdyby ten hook odpowiedział błędem, cała czynność
+      // użytkownika (rejestracja/odzyskiwanie hasła) też widocznie by mu
+      // się nie udała, mimo że to nasz problem z limitem/dostawcą maili,
+      // nie jego. Zamiast tego logujemy próbę (widoczność w dziennym
+      // raporcie) i mówimy Supabase "OK" — użytkownik dostaje normalny
+      // komunikat "sprawdź skrzynkę", a jeśli mail faktycznie nie dotrze,
+      // ma w aplikacji przycisk "wyślij ponownie", który poprosi o
+      // całkiem nowy, na pewno działający link w chwili kliknięcia.
+      await recordEmailFailure(supabase, email_action_type)
+      return new Response(JSON.stringify({}), {
+        status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
+    await recordEmailSent(supabase)
     return new Response(JSON.stringify({}), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

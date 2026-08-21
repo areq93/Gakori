@@ -1212,6 +1212,44 @@ zanim założysz, że działa.
      (Starter itd.), gdy realny ruch będzie się do tego zbliżał —
      świadomie NIE zrobione teraz (Lean Startup — nie budować/płacić za
      obronę przed ruchem, którego jeszcze nie ma).
+- **Ochrona przed limitem Brevo — punkt 4 audytu bezpieczeństwa (dodane
+  2026-08-21, POPRAWKA (u))**:
+  - **Ostrzeżenie w aplikacji**: `send-auth-email` liczy WŁASNY licznik
+    udanych wysyłek (`email_daily_count`, jeden wiersz na dzień **czasu
+    polskiego**, ta sama logika co `system_daily_spend` w `analyze`) —
+    niezależny od statystyk Brevo używanych w `daily-report`. Tabela ma
+    RLS z jawnym wyjątkiem: **publiczny SELECT** (jedyna tabela `system_*`/
+    `email_*`, którą wolno czytać z przeglądarki bez logowania — udostępnia
+    WYŁĄCZNIE liczbę maili wysłanych dziś, nic wrażliwego). `index.html`
+    sprawdza ją tuż przed pokazaniem "sprawdź skrzynkę" po rejestracji i
+    po wysłaniu maila odzyskiwania hasła — jeśli licznik dobił do 240 (80%
+    limitu 300), dokłada dodatkowe, spokojne zdanie o możliwym opóźnieniu.
+  - **Żaden mail nie może "zniknąć" bez śladu, ale ŚWIADOMIE bez
+    automatycznej kolejki do ponawiania**: jeśli wysyłka przez Brevo się
+    nie uda (np. wyczerpany limit), `send-auth-email` NIE zwraca błędu do
+    Supabase (inaczej sama czynność użytkownika — rejestracja/odzyskiwanie
+    hasła — też widocznie by się nie udała) — zamiast tego loguje
+    niepowodzenie do `email_failures` (WYŁĄCZNIE do Twojej widoczności w
+    `daily-report`, dopisana linijka "N maili nie udało się wysłać w
+    ostatnich 24h") i mówi Supabase "OK".
+  - **Świadomie odrzucony pomysł**: pierwotnie planowana automatyczna
+    kolejka, która sama próbowałaby ponownie wysłać zapisany mail w tle.
+    Odrzucone, bo link w mailu (signup/recovery) ma termin ważności, a
+    mechanizm Supabase do wygenerowania "świeżego" linku na żądanie
+    (`admin.generateLink`) ma udokumentowany, realny problem — potrafi
+    oddać dokładnie ten sam, już nieważny token zamiast nowego
+    (github.com/supabase/auth#1357). Zamiast ryzykować wysłanie martwego
+    linku i wprowadzenie użytkownika w błąd, w aplikacji jest zamiast tego
+    prawdziwy przycisk **"Wyślij mail ponownie"** (`resendEmailBtn` w
+    `index.html`) — pokazuje się po każdej udanej próbie rejestracji,
+    używa `sb.auth.resend({type:'signup', email, ...})`, czyli standardowej
+    funkcji Supabase, która zawsze generuje NOWY, gwarantowanie świeży
+    link dokładnie w chwili kliknięcia. Dla odzyskiwania hasła nie trzeba
+    osobnego przycisku — kliknięcie istniejącego linku "Zapomniałeś
+    hasła?" po raz kolejny już działa jako "wyślij ponownie".
+  - Baza: `email_daily_count` (`spend_date` date PK, `sent_count` integer)
+    z publicznym SELECT; `email_failures` (`id`, `created_at`, `kind`) bez
+    publicznych polityk (tylko `service_role`, jak reszta tabel `system_*`).
 - **Funkcja `daily-report`** (`supabase/functions/daily-report/index.ts`)
   — wysyła raz dziennie, koleżeńskim tonem (to właściciel wysyła raport
   sam do siebie, nie oficjalna komunikacja z użytkownikiem), mail z
@@ -1220,7 +1258,9 @@ zanim założysz, że działa.
   zalogowani/anonimowi i nowe/tłumaczenia; top 5 najczęściej oglądanych
   analiz w KAŻDYM języku, w którym coś już jest (wg `view_count`); wydane
   kredyty; maile wysłane dziś i suma od początku miesiąca (wg statystyk
-  Brevo). Świadomie USUNIĘTE z raportu (właściciel ocenił jako
+  Brevo), plus ostrzeżenie, jeśli w ostatnich 24h coś się nie wysłało
+  (`email_failures`, patrz "Ochrona przed limitem Brevo" wyżej). Świadomie
+  USUNIĘTE z raportu (właściciel ocenił jako
   niepotrzebne): łączna liczba kont, łączna liczba analiz od początku,
   liczba wykrytych wzorców manipulacji/rozumowania, średni `q_score`.
   Wyłącznie na adres właściciela (`REPORT_RECIPIENT_EMAIL`), nie do

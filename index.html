@@ -51,6 +51,7 @@
             <div style="text-align:center; color:var(--ink-soft); font-size:12px; margin:12px 0;" data-i18n="divider_or">— lub —</div>
             <button id="googleLoginBtn" type="button" data-i18n="btn_google_login">Zaloguj przez Google</button>
             <div id="authStatus" style="margin-top:10px; font-size:13px;"></div>
+            <button id="resendEmailBtn" type="button" style="display:none; margin-top:8px; font-size:13px;" data-i18n="btn_resend_email">Wyślij mail ponownie</button>
         </div>
 
         <div id="authRecovery" style="display:none;">
@@ -453,10 +454,30 @@
             document.getElementById('googleLoginBtn').innerText = mode === 'login' ? t('btn_google_login') : t('btn_google_signup');
             document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
             document.getElementById('authStatus').innerText = '';
+            document.getElementById('resendEmailBtn').style.display = 'none';
         }
         document.querySelectorAll('[data-authmode]').forEach(btn => {
             btn.addEventListener('click', () => setAuthMode(btn.dataset.authmode));
         });
+
+        // Ochrona przed limitem maili Brevo (300/dzień) — POPRAWKA
+        // 2026-08-21(u). `email_daily_count` jest publicznie czytelna
+        // (RLS: tylko SELECT, żadnych innych danych) — patrz
+        // GAKORI_CONTEXT.md. Dzień liczony wg czasu polskiego, tak samo
+        // jak po stronie backendu, żeby oba zawsze zgadzały się co do tego,
+        // "który to dzień".
+        const EMAIL_NEAR_LIMIT_THRESHOLD = 240;
+        function warsawToday() {
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(new Date());
+        }
+        async function isEmailNearLimit() {
+            try {
+                const { data } = await sb.from('email_daily_count').select('sent_count').eq('spend_date', warsawToday()).maybeSingle();
+                return (data?.sent_count ?? 0) >= EMAIL_NEAR_LIMIT_THRESHOLD;
+            } catch {
+                return false;
+            }
+        }
 
         // 0d. Logowanie / Rejestracja e-mailem i hasłem
         document.getElementById('authSubmitBtn').addEventListener('click', async () => {
@@ -510,9 +531,49 @@
                     if (data.user && data.user.identities && data.user.identities.length === 0) {
                         statusEl.innerHTML = '<span class="status-err">' + t('err_account_exists_login') + '</span>';
                     } else {
-                        statusEl.innerHTML = '<span class="status-ok">' + t('status_check_email') + '</span>';
+                        let checkEmailHtml = '<span class="status-ok">' + t('status_check_email') + '</span>';
+                        if (await isEmailNearLimit()) {
+                            checkEmailHtml += '<br><span class="status-ok">' + t('status_email_may_be_delayed') + '</span>';
+                        }
+                        statusEl.innerHTML = checkEmailHtml;
+                        // Przycisk "wyślij ponownie" — na wypadek, gdyby mail jednak nie
+                        // dotarł (patrz GAKORI_CONTEXT.md, "Ochrona przed limitem maili").
+                        // Zawsze pokazywany po udanej rejestracji, niezależnie od tego, czy
+                        // akurat jesteśmy blisko limitu — to po prostu przydatna opcja.
+                        pendingResendEmail = email;
+                        document.getElementById('resendEmailBtn').style.display = 'inline-block';
                     }
                 }
+            } catch (err) {
+                statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
+            } finally {
+                resetTurnstile();
+            }
+        });
+
+        // "Wyślij mail ponownie" — prosi Supabase o CAŁKIEM NOWY, na pewno
+        // świeży link potwierdzający, dokładnie w chwili kliknięcia (nie
+        // odsyłamy nigdy wcześniej zapisanej, potencjalnie już nieważnej
+        // treści — patrz uzasadnienie w GAKORI_CONTEXT.md).
+        let pendingResendEmail = null;
+        document.getElementById('resendEmailBtn').addEventListener('click', async () => {
+            const statusEl = document.getElementById('authStatus');
+            if (!pendingResendEmail) return;
+            if (!turnstileToken) {
+                statusEl.innerHTML = '<span class="status-err">' + t('err_captcha_required') + '</span>';
+                return;
+            }
+            try {
+                const { error } = await sb.auth.resend({
+                    type: 'signup',
+                    email: pendingResendEmail,
+                    options: {
+                        emailRedirectTo: window.location.origin + window.location.pathname,
+                        captchaToken: turnstileToken
+                    }
+                });
+                if (error) throw error;
+                statusEl.innerHTML = '<span class="status-ok">' + t('status_resend_sent') + '</span>';
             } catch (err) {
                 statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
             } finally {
@@ -539,7 +600,11 @@
                     captchaToken: turnstileToken
                 });
                 if (error) throw error;
-                statusEl.innerHTML = '<span class="status-ok">' + t('status_recovery_email_sent') + '</span>';
+                let recoveryHtml = '<span class="status-ok">' + t('status_recovery_email_sent') + '</span>';
+                if (await isEmailNearLimit()) {
+                    recoveryHtml += '<br><span class="status-ok">' + t('status_email_may_be_delayed') + '</span>';
+                }
+                statusEl.innerHTML = recoveryHtml;
             } catch (err) {
                 statusEl.innerHTML = '<span class="status-err">' + translateAuthError(err) + '</span>';
             } finally {
