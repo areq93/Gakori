@@ -111,6 +111,11 @@
        odwrotnie — krańce muszą być JASNE, błysk jeszcze jaśniejszy. */
     --brand-grad-dark: #201e1a;
     --brand-grad-light: #9a9184;
+    /* Ciepła "poświata latarni" w tle strony (patrz `body` niżej) — na
+       wyraźną prośbę o symetryczne, powtarzające się światełka po obu
+       bokach, jak latarnie wzdłuż alejki. Ciepły, złocisty odcień (nie
+       neutralny szary) — to on ma dawać "romantyczny, prestiżowy klimat". */
+    --lamp-glow: rgba(196, 143, 90, 0.22);
 }
 
 /* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
@@ -151,6 +156,10 @@
        najmocniejszy "błysk". */
     --brand-grad-dark: #cabe9c;
     --brand-grad-light: #f2efe7;
+    /* Ta sama ciepła poświata latarni co w jasnym motywie, ale mocniejsza —
+       na prawie czarnym tle ciepłe światło "świeci" dużo dramatyczniej, tak
+       jak prawdziwe latarnie najlepiej widać właśnie po zmroku. */
+    --lamp-glow: rgba(255, 200, 130, 0.16);
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -158,7 +167,26 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     display: flex; flex-direction: column; align-items: center; padding: 20px;
     background-color: var(--paper);
-    background-image: radial-gradient(ellipse 900px 500px at 50% -12%, var(--card-2) 0%, var(--paper) 60%);
+    /* POPRAWKA 2026-08-21(h) — "latarnie wzdłuż alejki", na wyraźną prośbę:
+       symetryczne, ciepłe poświaty po OBU bokach strony, powtarzające się
+       w regularnych odstępach w pionie (jak lampy uliczne co kilka metrów).
+       Dwie pierwsze warstwy to właśnie te latarnie — jedna "przyklejona" do
+       lewej krawędzi (`at 0% 50%` w obrębie własnego kafelka), druga do
+       prawej (`at 100% 50%`), każda w kafelku 100%×520px powtarzanym w
+       pionie (`repeat-y`) — 520px to odstęp między kolejnymi "latarniami"
+       (można podkręcić/rozluźnić, zmieniając tę jedną liczbę w
+       background-size niżej, MUSI być identyczna w obu miejscach dla danej
+       warstwy). Trzecia warstwa to oryginalna, niepowtarzająca się poświata
+       u samej góry strony (bez zmian) — stąd trzy identycznie
+       poukładane listy w image/position/repeat/size, każda pozycja
+       odpowiada tej samej warstwie we wszystkich czterech właściwościach. */
+    background-image:
+        radial-gradient(circle 170px at 0% 50%, var(--lamp-glow) 0%, transparent 70%),
+        radial-gradient(circle 170px at 100% 50%, var(--lamp-glow) 0%, transparent 70%),
+        radial-gradient(ellipse 900px 500px at 50% -12%, var(--card-2) 0%, var(--paper) 60%);
+    background-repeat: repeat-y, repeat-y, no-repeat;
+    background-position: left top, right top, 0 0;
+    background-size: 100% 520px, 100% 520px, auto;
     color: var(--ink);
     line-height: 1.5;
     position: relative;

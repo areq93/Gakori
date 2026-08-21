@@ -1791,6 +1791,29 @@ zanim założysz, że działa.
       nie grozi tym samym błędem "zalania bielą" co (f)). Zmienne
       przemianowane z `--brand-grad-start/-end` na bardziej opisowe
       `--brand-grad-dark/-light`. Wyłącznie `style.css`.
+    - **POPRAWKA 2026-08-21(h) — "latarnie wzdłuż alejki" w tle całej
+      aplikacji.** Właściciel poprosił o rozszerzenie tej samej idei "gra
+      świateł = prestiż" na całe UI, konkretnie: symetryczne, ciepłe
+      poświaty po OBU bokach strony, powtarzające się w regularnych
+      odstępach w pionie — jak lampy uliczne wzdłuż alejki spacerowej, co
+      kilka metrów, dające "romantyczny, prestiżowy klimat". Zrobione
+      czysto w CSS (`body` w `style.css`), bez żadnych obrazków/plików —
+      dwie DODATKOWE warstwy `background-image` (obok istniejącej,
+      niezmienionej poświaty u góry strony): `radial-gradient(circle 170px
+      at 0% 50%, var(--lamp-glow) 0%, transparent 70%)` przyklejony do
+      lewej krawędzi kafelka i lustrzany `at 100% 50%` do prawej, każdy w
+      kafelku `100% × 520px` powtarzanym w pionie (`background-repeat:
+      repeat-y`) — 520px to odstęp między kolejnymi "latarniami" (jedna
+      liczba do przestrojenia w przyszłości, jeśli okaże się za gęsto/za
+      rzadko — musi być identyczna w `background-size` dla obu warstw).
+      Nowa zmienna `--lamp-glow` (ciepły, złocisty odcień, osobna wartość
+      per motyw — w ciemnym motywie mocniejsza, bo ciepłe światło na
+      prawie czarnym tle "świeci" dużo dramatyczniej, tak jak prawdziwe
+      latarnie najlepiej widać po zmroku). Poświaty przewijają się razem z
+      treścią strony (nie `position: fixed`) — na dłuższych stronach
+      (np. lista wyników w `scan.html`/`historia.html`) użytkownik
+      "mija" kolejne latarnie przy przewijaniu, jak spacer wzdłuż alei.
+      Wyłącznie `style.css`.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
