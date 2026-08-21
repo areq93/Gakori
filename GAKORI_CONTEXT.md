@@ -1871,6 +1871,24 @@ zanim założysz, że działa.
       szersza otoczka (190px) wymaga więcej marginesu niż sam rdzeń (115px),
       żeby nie dotykać karty na średnich szerokościach ekranu. Wyłącznie
       `style.css`.
+    - **POPRAWKA 2026-08-21(m) — nawrót z zagęszczenia: 87px odstępu
+      wyglądało jak mechaniczna tapeta, nie jak latarnie.** Żywy zrzut
+      ekranu od właściciela: przy odstępie 87px (efekt kolejnych rund
+      dogęszczania (i)/(j)/(k)) lewa i prawa poświata tworzyły gęsty,
+      idealnie powtarzalny, lustrzanie symetryczny wzór — zgłoszone wprost
+      jako "syntetyczno-symetryczne", "sztuczność aż gryzie". Dwie zmiany,
+      obie w `body` w `style.css`:
+      1. Odstęp (`background-size`, wszystkie 4 warstwy: rdzeń+otoczka ×
+         lewo+prawo) podniesiony z 87px na 900px — DUŻO rzadziej niż nawet
+         pierwotne 520px z (h), zdecydowanie mniej świateł na stronie.
+      2. Prawa strona przesunięta o pół kafelka względem lewej
+         (`background-position` prawych warstw: `right 450px` zamiast
+         `right top`) — żeby lewa i prawa latarnia NIE stały zawsze
+         dokładnie na tej samej wysokości. Sztywne lustro (obie strony w
+         idealnym rytmie) samo w sobie już czytało się jako "wyliczony
+         wzór", nawet przy rzadszym odstępie — to rozbija ten efekt.
+      Próg zabezpieczenia dla wąskich ekranów (850px, patrz (l)) bez
+      zmian — dotyczy promienia, nie odstępu, więc pozostaje aktualny.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):
