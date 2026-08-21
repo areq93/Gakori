@@ -1900,11 +1900,19 @@ zanim założysz, że działa.
       "widoczne, ale dotyka" a "wcale niewidoczne" — kompromis: `--lamp-radius`/
       `--lamp-halo-radius` wydzielone jako osobne zmienne CSS (domyślnie
       115px/190px, współdzielone przez oba motywy — rozmiar, nie kolor),
-      a poniżej 850px szerokości ZMNIEJSZANE (nie gaszone) do 32px/52px —
-      mieści się w większości samego marginesu `body` (20px padding), z
-      tylko niewielkim, zaakceptowanym zachodzeniem na sam CIEŃ karty
-      (nigdy na jej właściwą, w pełni nieprzezroczystą powierzchnię).
-      Wyłącznie `style.css`.
+      a poniżej 850px szerokości ZMNIEJSZANE (nie gaszone) — z tylko
+      niewielkim, zaakceptowanym zachodzeniem na sam CIEŃ karty (nigdy na
+      jej właściwą, w pełni nieprzezroczystą powierzchnię). Wyłącznie
+      `style.css`.
+    - **POPRAWKA 2026-08-21(o) — pierwsza próba z (n) (32px/52px) dalej
+      NIEZAUWAŻALNA na żywym telefonie ("nic nie widzę lepiej").** Promienie
+      na wąskich ekranach podniesione wprost ponad dwukrotnie, z 32px/52px
+      na 70px/120px — świadomie kosztem odrobinę większego zachodzenia na
+      cień karty (patrz uzasadnienie w (n): przy realnym braku marginesu na
+      najwęższych telefonach nie da się mieć jednocześnie efektu
+      widocznego I zerowego kontaktu z cieniem — to jest właśnie ten
+      zaakceptowany kompromis, tym razem przesunięty mocniej w stronę
+      "widoczne"). Wyłącznie `style.css`.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):

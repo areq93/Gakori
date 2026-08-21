@@ -265,12 +265,15 @@ body {
    bliski ZERA niezależnie od promienia (karta i tak wypełnia prawie całą
    dostępną szerokość) — nie da się więc jednocześnie mieć widocznego
    światła I zerowego kontaktu z cieniem karty. Kompromis: zamiast gasić,
-   ZMNIEJSZAMY promień do małej, ale wciąż widocznej wartości (mieści się
-   w większości samego marginesu `body` — 20px paddingu — z tylko
+   ZMNIEJSZAMY promień do małej, ale wciąż widocznej wartości — z
    niewielkim, akceptowalnym zachodzeniem na sam cień karty, nie na jej
-   właściwą powierzchnię, która zawsze zostaje w pełni nieprzezroczysta). */
+   właściwą powierzchnię, która zawsze zostaje w pełni nieprzezroczysta.
+   POPRAWKA 2026-08-21(o) — pierwsza próba (32px/52px) okazała się dalej
+   NIEZAUWAŻALNA na żywym telefonie ("nic nie widzę lepiej") — podniesiona
+   wprost do 70px/120px (ponad dwukrotnie), świadomie kosztem odrobinę
+   większego zachodzenia na cień karty, żeby efekt było realnie widać. */
 @media (max-width: 850px) {
-    :root, :root[data-theme="dark"] { --lamp-radius: 32px; --lamp-halo-radius: 52px; }
+    :root, :root[data-theme="dark"] { --lamp-radius: 70px; --lamp-halo-radius: 120px; }
 }
 h1 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
