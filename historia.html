@@ -18,15 +18,21 @@
 </head>
 <body>
 
-    <svg class="gakori-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
-        <defs>
-            <linearGradient id="gakoriBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
-                <stop offset="0%" stop-color="#9a9184"/>
-                <stop offset="100%" stop-color="#3f3c35"/>
-            </linearGradient>
-        </defs>
-        <path transform="rotate(-18 50 50)" fill="url(#gakoriBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
-    </svg>
+    <header class="gakori-brand">
+        <h1 class="gakori-wordmark">
+            <svg class="gakori-mark" width="34" height="34" viewBox="0 0 100 100" aria-hidden="true">
+                <defs>
+                    <linearGradient id="gakoriMarkGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+                        <stop offset="0%" stop-color="#9a9184"/>
+                        <stop offset="100%" stop-color="#3f3c35"/>
+                    </linearGradient>
+                </defs>
+                <path transform="rotate(-18 50 50)" fill="url(#gakoriMarkGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
+            </svg>
+            <span class="gakori-shine-text">Gakori</span>
+        </h1>
+        <p class="gakori-tagline gakori-shine-text" data-i18n="tagline">Najważniejszą zasadą przetrwania jest wiedza</p>
+    </header>
 
     <!-- Ten sam górny pasek co account.html — ta strona ZAWSZE wymaga
          zalogowania (patrz getSession() niżej), więc pasek jest zawsze

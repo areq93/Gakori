@@ -96,6 +96,15 @@
     --danger-bg: #e6d3ce;
     --danger-text: #7c4038;
     --danger-border: #cca298;
+    /* Gradient "gry świateł" wpisanej w litery (patrz .gakori-shine-text
+       niżej) — te same dwa krańce co znaczek-ikonka marki (#9a9184/#3f3c35),
+       dość ciemne dla dobrego kontrastu na jasnym --paper. W trybie ciemnym
+       (niżej) muszą być JAŚNIEJSZE, inaczej ciemny koniec zlewałby się z
+       prawie czarnym tłem — --brand-grad-end tam świadomie nadal używa
+       #9a9184 (ten sam odcień co jasny początek tutaj), żeby obie wersje
+       marki dzieliły przynajmniej jeden wspólny, rozpoznawalny kolor. */
+    --brand-grad-start: #b5ab9c;
+    --brand-grad-end: #3f3c35;
 }
 
 /* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
@@ -129,6 +138,10 @@
     --ok-bg: #333d2b; --ok-text: #bccaa9; --ok-border: #4c5a3f;
     --warn-bg: #3c3120; --warn-text: #dcc292; --warn-border: #5c4a2e;
     --danger-bg: #3c2b27; --danger-text: #dcb1a8; --danger-border: #5c3f38;
+    /* Jaśniejsze niż w jasnym motywie (patrz komentarz przy :root wyżej) —
+       #9a9184 współdzielone z jasnym motywem jako wspólny anchor koloru. */
+    --brand-grad-start: #e7dfce;
+    --brand-grad-end: #9a9184;
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -147,28 +160,57 @@ h1 {
     text-align: center; margin: 0 0 4px 0;
     display: flex; align-items: center; justify-content: center; gap: 10px;
 }
+/* POPRAWKA 2026-08-21(e) — ujednolicone ze stałym nagłówkiem marki: WSZYSTKIE
+   nagłówki sekcji w aplikacji ("Wyszukaj analizę", "Twoje konto", "Twoje
+   analizy PDF", "Potwierdź analizę") dostają ten sam, drukowany, wyśrodkowany
+   styl z gry świateł — żeby jeden nie wyglądał inaczej niż reszta. */
 h2 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 1.4rem; font-weight: 700; color: var(--ink); margin: 0 0 16px 0;
+    font-size: 1.15rem; font-weight: 800; margin: 0 0 16px 0;
+    text-align: center; text-transform: uppercase; letter-spacing: 0.06em;
+    background: linear-gradient(160deg, var(--brand-grad-start) 0%, var(--brand-grad-end) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 1px 0 var(--highlight-edge);
 }
 .tagline { margin: 0 0 20px 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.45; text-align: center; }
 
-/* Mały, powtarzalny znak marki — ta sama, opływowa "kropla" co w logo
-   aplikacji, obok nagłówka "Gakori" (patrz <h1> w index.html). Gradient
-   naśladuje miękkie przejście światła po zaokrąglonej powierzchni rzeźby. */
-.gakori-mark { flex-shrink: 0; filter: drop-shadow(0 3px 6px var(--shadow-color-soft)); }
-
-/* Duży, mocno rozmyty odpowiednik znaku marki, ustawiony ZA kartą startową
-   (patrz index.html) — bez tego cała reszta ekranu wyglądała jak zupełnie
-   inny, niepowiązany świat niż samo logo. Position:fixed + niska
-   nieprzezroczystość + blur = ambientowa poświata w tle, nie kolejna
-   ikonka do czytania. */
-.gakori-backdrop {
-    position: fixed; top: -8%; left: 50%; transform: translateX(-50%);
-    width: 640px; height: 640px; max-width: 160vw;
-    opacity: 0.22; filter: blur(34px); pointer-events: none; z-index: 0;
+/* POPRAWKA 2026-08-21(e) — nagłówek marki był dotąd uwięziony WEWNĄTRZ
+   ekranu logowania (`#authCard` w index.html) — znikał więc od razu po
+   zalogowaniu i nigdy nie pojawiał się na koncie/historii/wyniku analizy
+   (zgłoszone wprost: "ma być wszędzie, nawet w panelu użytkownika").
+   Wyniesiony do stałego, zawsze widocznego `<header class="gakori-brand">`
+   na samej górze KAŻDEJ z 4 stron. Przy okazji usunięty duży, rozmyty
+   kształt w tle (`.gakori-backdrop`) — zbędny obok stałego nagłówka, a
+   `body` i tak ma już własną, subtelną poświatę (patrz `background-image`
+   w regule `body` wyżej), więc strona nie robi się "płaska" bez niego. */
+.gakori-brand { text-align: center; margin: 4px 0 22px 0; position: relative; z-index: 1; }
+.gakori-wordmark {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    font-size: 2.5rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
+    margin: 0;
 }
-:root[data-theme="dark"] .gakori-backdrop { opacity: 0.3; }
+.gakori-tagline {
+    margin: 8px 0 0 0; font-size: 12.5px; font-weight: 700; line-height: 1.5;
+    text-align: center; text-transform: uppercase; letter-spacing: 0.09em;
+}
+/* "Gra świateł" wpisana w same litery (nie tylko w karty/przyciski) —
+   gradient przycięty do kształtu tekstu (`background-clip: text`), ten sam
+   ciepły, dwubiegunowy odcień co znaczek-ikonka obok (`--brand-grad-*`,
+   zdefiniowane osobno dla jasnego/ciemnego motywu niżej, bo w ciemnym
+   motywie ciemniejszy koniec gradientu zlewałby się z prawie czarnym tłem).
+   Subtelny text-shadow (ten sam --highlight-edge co reszta "Rzeźby") dodaje
+   odrobinę uniesienia, żeby litery nie wyglądały płasko mimo przezroczystego
+   `color`. Współdzielone przez nagłówek marki, hasło pod nim i nagłówki
+   sekcji (`h2` niżej) — jeden mechanizm, nie trzy osobne kopiowane gradienty. */
+.gakori-shine-text {
+    background: linear-gradient(160deg, var(--brand-grad-start) 0%, var(--brand-grad-end) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 1px 0 var(--highlight-edge);
+}
+/* Mały, powtarzalny znak marki — ta sama, opływowa "kropla" co w logo
+   aplikacji, obok nagłówka "Gakori". Gradient naśladuje miękkie przejście
+   światła po zaokrąglonej powierzchni rzeźby. */
+.gakori-mark { flex-shrink: 0; filter: drop-shadow(0 3px 6px var(--shadow-color-soft)); }
 
 .card {
     background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 45%, var(--card) 100%);

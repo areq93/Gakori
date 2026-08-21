@@ -1683,6 +1683,68 @@ zanim założysz, że działa.
         tego samego adresu URL (litera w literę) i nie wykrywa, czy treść
         strony zdążyła się zmienić od czasu ręcznego wklejenia — ten sam
         kompromis, jaki już akceptujemy w całym współdzielonym cache'u.
+    - **POPRAWKA 2026-08-21(d) — bfcache czyścił formularz ZA PÓŹNO
+      (zostawał stary wklejony tekst).** Żywy przykład: po analizie i
+      powrocie do menu wklejona wcześniej treść dalej "wisiała" w trybie
+      "Tekst" — dokładnie ten sam mechanizm bfcache (przeglądarka
+      przywraca "zamrożoną" starą wersję strony przy nawigacji zamiast
+      wczytać ją od nowa), który już wcześniej naprawialiśmy dla listy
+      publicznych analiz (`window.addEventListener('pageshow', ...)` w
+      `index.html`, patrz komentarz w kodzie). Rozszerzony TEN SAM listener
+      (nie dodany drugi, osobny) o czyszczenie `#textInput`/`#urlInput`
+      oraz reset wybranych obrazów/PDF-a (`selectedImageFiles`,
+      `selectedPdfFile` + ponowne wywołanie ich funkcji renderujących) —
+      za każdym razem, gdy `event.persisted === true`. Wyłącznie frontend
+      (`index.html`).
+    - **POPRAWKA 2026-08-21(e) — stały nagłówek marki wszędzie + "gra
+      świateł" wpisana w tekst.** Napis "Gakori" i hasło pod nim żyły
+      dotąd WYŁĄCZNIE wewnątrz ekranu logowania (`#authCard` w
+      `index.html`) — znikały więc od razu po zalogowaniu i nigdy nie
+      pojawiały się na koncie/historii/wyniku analizy. Właściciel
+      zgłosił to wprost: nagłówek marki ma być zawsze widoczny, na każdej
+      stronie, w tym samym miejscu (góra, na środku). Zmiany:
+      - Nowy, wspólny blok `<header class="gakori-brand">` (znaczek +
+        `<h1 class="gakori-wordmark">` + `<p class="gakori-tagline">`)
+        wklejony jako PIERWSZY element `<body>` we WSZYSTKICH 4 plikach
+        (`index.html`, `account.html`, `historia.html`, `scan.html`) —
+        `body` już ma `display:flex; flex-direction:column;
+        align-items:center`, więc nagłówek naturalnie ląduje nad każdą
+        kartą, bez żadnego pozycjonowania na sztywno.
+      - Usunięty duży, rozmyty kształt w tle (`.gakori-backdrop`, obecny
+        dotąd na WSZYSTKICH 4 stronach) — właściciel nie wiedział, po co
+        tam jest, i faktycznie stał się zbędny obok stałego nagłówka;
+        `body` ma już własną, subtelną poświatę (`background-image:
+        radial-gradient(...)`), więc strona się nie spłaszczyła.
+      - Nowa klasa `.gakori-shine-text` (CSS `background-clip: text` +
+        przezroczysty `color` + lekki `text-shadow`) — "gra świateł" (ten
+        sam termin i mechanizm co gradienty na kartach/przyciskach,
+        patrz komentarz przy `:root` na górze pliku) wpisana TERAZ też w
+        same litery, nie tylko w powierzchnie. Dwa nowe zmienne CSS,
+        osobne dla jasnego/ciemnego motywu (`--brand-grad-start/-end`) —
+        w ciemnym motywie muszą być JAŚNIEJSZE, inaczej ciemny koniec
+        gradientu zlewałby się z prawie czarnym tłem; obie wersje dzielą
+        wspólny kolor `#9a9184` jako "kotwicę", żeby marka nadal wyglądała
+        rozpoznawalnie tym samym logo w obu motywach.
+      - `<h1>` teraz drukowanymi literami (`text-transform: uppercase`),
+        większy (2.5rem), z tym samym efektem świateł.
+      - Hasło pod logo (`tagline`, wszystkie 10 języków w `i18n.js`)
+        zmienione z opisowego "Wklej tekst, a my pokażemy Ci..." na
+        krótkie motto "Najważniejszą zasadą przetrwania jest wiedza" —
+        też drukowanymi literami, mniejsze, ten sam efekt świateł.
+      - Żeby całość była SPÓJNA (nie tylko jeden nagłówek inny niż
+        reszta) — WSZYSTKIE nagłówki sekcji (`<h2>`, dotąd zwykły ciemny
+        tekst bez wyrównania) dostały ten sam styl: drukowane litery,
+        wyśrodkowane, gra świateł. Dotyczy to też "Twoje konto", "Twoje
+        analizy PDF" i "Potwierdź analizę", nie tylko nagłówka nad
+        wyszukiwarką — świadoma decyzja o rozszerzeniu zakresu poza to, o
+        co właściciel pytał wprost, żeby nie było niespójnie.
+      - Nagłówek nad przeglądarką publicznych analiz (`public_scans_heading`,
+        wszystkie 10 języków) skrócony z "Zobacz, co już wykryliśmy" na
+        "Wyszukaj analizę" — lepiej pasuje do paska wyszukiwania pod
+        spodem.
+      - Wyłącznie frontend (`index.html`, `account.html`, `historia.html`,
+        `scan.html`, `style.css`, `i18n.js`) — wdraża się samo przez
+        GitHub Pages po pushu do `main`, zero ręcznego kroku w Supabase.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):

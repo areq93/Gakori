@@ -18,15 +18,21 @@
 </head>
 <body>
 
-    <svg class="gakori-backdrop" width="640" height="640" viewBox="0 0 100 100" aria-hidden="true">
-        <defs>
-            <linearGradient id="gakoriBackdropGrad" x1="15%" y1="0%" x2="85%" y2="100%">
-                <stop offset="0%" stop-color="#9a9184"/>
-                <stop offset="100%" stop-color="#3f3c35"/>
-            </linearGradient>
-        </defs>
-        <path transform="rotate(-18 50 50)" fill="url(#gakoriBackdropGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
-    </svg>
+    <header class="gakori-brand">
+        <h1 class="gakori-wordmark">
+            <svg class="gakori-mark" width="34" height="34" viewBox="0 0 100 100" aria-hidden="true">
+                <defs>
+                    <linearGradient id="gakoriMarkGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+                        <stop offset="0%" stop-color="#9a9184"/>
+                        <stop offset="100%" stop-color="#3f3c35"/>
+                    </linearGradient>
+                </defs>
+                <path transform="rotate(-18 50 50)" fill="url(#gakoriMarkGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
+            </svg>
+            <span class="gakori-shine-text">Gakori</span>
+        </h1>
+        <p class="gakori-tagline gakori-shine-text" data-i18n="tagline">Najważniejszą zasadą przetrwania jest wiedza</p>
+    </header>
 
     <a id="userMenuBtn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
     <div id="creditBalance" class="credit-balance" style="display:none;" data-i18n-aria-label="credit_balance_label" aria-label="Stan kredytów">
@@ -38,20 +44,6 @@
     </div>
 
     <div class="card" id="authCard" style="display:none;">
-        <h1 style="margin-top:0">
-            <svg class="gakori-mark" width="34" height="34" viewBox="0 0 100 100" aria-hidden="true">
-                <defs>
-                    <linearGradient id="gakoriMarkGrad" x1="15%" y1="0%" x2="85%" y2="100%">
-                        <stop offset="0%" stop-color="#9a9184"/>
-                        <stop offset="100%" stop-color="#3f3c35"/>
-                    </linearGradient>
-                </defs>
-                <path transform="rotate(-18 50 50)" fill="url(#gakoriMarkGrad)" d="M50,8 C74,32 88,48 88,63 A38,38 0 1,1 12,63 C12,48 26,32 50,8 Z"/>
-            </svg>
-            Gakori
-        </h1>
-        <p class="tagline" data-i18n="tagline">Wklej tekst, a my pokażemy Ci, czy ktoś próbuje Tobą manipulować.</p>
-
         <div id="authLoggedOut">
             <select id="authLanguageSelect" style="margin-bottom:10px;"></select>
             <div class="tabs">
@@ -138,7 +130,7 @@
     </div>
 
     <div class="card" id="publicScansCard" style="display:none;">
-        <h2 data-i18n="public_scans_heading">Zobacz, co już wykryliśmy</h2>
+        <h2 data-i18n="public_scans_heading">Wyszukaj analizę</h2>
         <input type="search" id="publicScansSearch" data-i18n-placeholder="placeholder_search" placeholder="Szukaj po słowach kluczowych...">
         <div id="publicScansList"></div>
     </div>
@@ -337,6 +329,18 @@
             if (event.persisted) {
                 publicScansInitialized = false;
                 if (sb) initPublicScans();
+                // POPRAWKA 2026-08-21(d) — ten sam mechanizm bfcache: przeglądarka
+                // przywracała też WYPEŁNIONE pola formularza analizy (np. wklejony
+                // tekst z poprzedniej próby) zamiast pustego ekranu gotowego na
+                // nową treść — zgłoszone na żywo (po powrocie z wyniku analizy
+                // stary tekst dalej "wisiał" w trybie Tekst). Czyścimy pola
+                // wejściowe wszystkich trybów, żeby ekran zawsze wracał czysty.
+                document.getElementById('textInput').value = ''
+                document.getElementById('urlInput').value = ''
+                selectedImageFiles = []
+                renderImagePreviewList()
+                selectedPdfFile = null
+                renderPdfSelectionInfo()
             }
         });
 
