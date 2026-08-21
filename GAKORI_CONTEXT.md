@@ -1835,6 +1835,42 @@ zanim założysz, że działa.
       2×20px padding body + 2×115px promień, zaokrąglone w górę), wyłączający
       boczne poświaty (`--lamp-glow: transparent`) poniżej tej szerokości —
       górna poświata i cała reszta UI bez zmian. Wyłącznie `style.css`.
+    - **POPRAWKA 2026-08-21(l) — próba "gałązki oliwnej"/nastroju z
+      referencyjnego zdjęcia nocnej alejki, i dlaczego z niej zrezygnowano.**
+      Właściciel poprosił o rozszerzenie latarni o motyw gałązki oliwnej
+      (skojarzenie ze starożytnym Rzymem — zielona w jasnym motywie,
+      pozłacana w ciemnym) — na przykładzie zdjęcia oświetlonej nocą
+      alejki ogrodowej z krzewami w poświacie latarń. Wypróbowane DWA
+      podejścia poza samą aplikacją (osobne pliki HTML do podglądu, żeby
+      nie ryzykować wdrożenia czegoś nietrafionego na żywo):
+      1. Cztery warianty rysowanej gałązki (SVG, ścieżki bezier imitujące
+         liście/łodygę) — odrzucone: na komputerze wyglądało "sztucznie,
+         jak naklejka", zbyt sztywne wobec fotograficznego, rozmytego
+         charakteru zdjęcia.
+      2. Trzy warianty rozmytej, wtopionej w światło plamy koloru
+         (`filter: blur` na kilku nakładających się radial-gradientów,
+         zielonkawy odcień zamiast osobnego kształtu liścia) — też
+         odrzucone: bez konkretnego rysunku/faktury liścia sam rozmyty
+         gradient koloru nie oddaje NICZEGO ze zdjęcia, wygląda jak
+         bezkształtna plama, nie jak oświetlona roślinność.
+      **Wniosek, ustalony wspólnie**: wierne oddanie zdjęcia (faktura
+      liści, żyłkowanie, realny cień) wymagałoby prawdziwej ilustracji, nie
+      samego CSS — to osobna, poważniejsza robota graficzna, nie kolejny
+      dostrojony parametr. Świadomie zarzucone (nie odkładamy na później w
+      obecnej formie — jeśli kiedyś wróci, to jako pytanie o prawdziwe
+      assety graficzne, nie kolejny gradient). Zamiast tego, z testowanych
+      wariantów, spodobał się (bez pretensji do udawania liści) Wariant "1.
+      Umiarkowany" — jego jakość światła wykorzystana do wzbogacenia
+      ISTNIEJĄCEGO efektu latarni: nowa, DODATKOWA zmienna `--lamp-halo`
+      (szeroka, promień 190px, niska intensywność) dodana WOKÓŁ
+      dotychczasowego, ostrzejszego rdzenia `--lamp-glow` (promień 115px,
+      bez zmian) — rdzeń zostaje na wierzchu (listowany pierwszy w
+      `background-image`), otoczka pod spodem. Efekt: pełniejsze, bogatsze
+      światło niż wcześniej, ale uczciwie NIE nazywane "liśćmi"/"zielenią".
+      Przy okazji podniesiony próg zabezpieczenia z (k) z 700px na 850px —
+      szersza otoczka (190px) wymaga więcej marginesu niż sam rdzeń (115px),
+      żeby nie dotykać karty na średnich szerokościach ekranu. Wyłącznie
+      `style.css`.
 - **Zabezpieczenia jakości w `buildSystemPrompt()`, zdiagnozowane na żywo z
   użytkownikiem** — traktowane jako zasady NADRZĘDNE (osobne sekcje w
   prompcie, na równi z NEUTRALNOŚĆ/BEZPIECZEŃSTWO):

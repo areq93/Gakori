@@ -116,6 +116,13 @@
        bokach, jak latarnie wzdłuż alejki. Ciepły, złocisty odcień (nie
        neutralny szary) — to on ma dawać "romantyczny, prestiżowy klimat". */
     --lamp-glow: rgba(196, 143, 90, 0.35);
+    /* POPRAWKA 2026-08-21(l) — dodatkowa, szersza i dużo słabsza "otoczka"
+       wokół rdzenia latarni (patrz `.bloom`-owy szkic testowany na żywo z
+       właścicielem) — sam rdzeń (`--lamp-glow`) wygląda trochę jak ostry
+       "krąg latarki"; ta druga, szersza warstwa o niskiej sile daje
+       wrażenie pełniejszego, bogatszego światła, bez zwiększania promienia
+       samego rdzenia. */
+    --lamp-halo: rgba(212, 168, 110, 0.16);
 }
 
 /* Tryb ciemny — ta sama, miękka "rzeźbiona" estetyka, tylko odwrócona
@@ -160,6 +167,9 @@
        na prawie czarnym tle ciepłe światło "świeci" dużo dramatyczniej, tak
        jak prawdziwe latarnie najlepiej widać właśnie po zmroku. */
     --lamp-glow: rgba(255, 200, 130, 0.26);
+    /* Ta sama otoczka co w jasnym motywie (patrz POPRAWKA 2026-08-21(l)),
+       tylko mocniejsza — ten sam powód co przy --lamp-glow wyżej. */
+    --lamp-halo: rgba(255, 215, 160, 0.14);
 }
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -198,30 +208,46 @@ body {
        poświata geometrycznie MUSIAŁABY dotykać cienia karty, nie da się
        tego pogodzić z widocznym efektem. Rozwiązanie niżej (media query):
        poświaty boczne WYŁĄCZONE poniżej bezpiecznej szerokości ekranu, gdzie
-       nie ma gwarancji marginesu — górna poświata i cała reszta UI bez zmian. */
+       nie ma gwarancji marginesu — górna poświata i cała reszta UI bez zmian.
+       POPRAWKA 2026-08-21(l) — próbowaliśmy oddać nastrój zdjęcia oświetlonej
+       nocą alejki ogrodowej (właściciel przysłał zdjęcie referencyjne) —
+       dwa podejścia (rysowana gałązka, potem rozmyta plama koloru z
+       filter:blur) NIE oddały tego wystarczająco wiernie, żeby było warte
+       dalszego czasu (prawdziwe odwzorowanie wymagałoby realnej ilustracji
+       liści, nie samego CSS) — ustalone wspólnie, żeby na tym poprzestać.
+       Zamiast tego: wzbogacony sam istniejący efekt latarni o DODATKOWĄ,
+       szerszą i dużo słabszą "otoczkę" (`--lamp-halo`, promień 190px, niska
+       intensywność) WOKÓŁ dotychczasowego, ostrzejszego rdzenia (`--lamp-glow`,
+       promień 115px, bez zmian) — rdzeń zostaje na wierzchu (listowany
+       pierwszy), otoczka pod spodem, dając pełniejsze, bogatsze wrażenie
+       światła bez żadnej pretensji do udawania liści/zieleni. */
     background-image:
         radial-gradient(circle 115px at 0% 50%, var(--lamp-glow) 0%, var(--lamp-glow) 20%, transparent 70%),
         radial-gradient(circle 115px at 100% 50%, var(--lamp-glow) 0%, var(--lamp-glow) 20%, transparent 70%),
+        radial-gradient(circle 190px at 0% 50%, var(--lamp-halo) 0%, transparent 75%),
+        radial-gradient(circle 190px at 100% 50%, var(--lamp-halo) 0%, transparent 75%),
         radial-gradient(ellipse 900px 500px at 50% -12%, var(--card-2) 0%, var(--paper) 60%);
-    background-repeat: repeat-y, repeat-y, no-repeat;
-    background-position: left top, right top, 0 0;
-    background-size: 100% 87px, 100% 87px, auto;
+    background-repeat: repeat-y, repeat-y, repeat-y, repeat-y, no-repeat;
+    background-position: left top, right top, left top, right top, 0 0;
+    background-size: 100% 87px, 100% 87px, 100% 87px, 100% 87px, auto;
     color: var(--ink);
     line-height: 1.5;
     position: relative;
 }
 /* POPRAWKA 2026-08-21(k) — na węższych ekranach `.card` (max-width: 400px)
    zajmuje prawie całą dostępną szerokość, więc margines obok niej jest
-   bliski zera — poświaty latarni (promień 115px) geometrycznie nie mają
-   gdzie się zmieścić, nie dotykając cienia karty. Zamiast pogarszać efekt
-   na szerokich ekranach, żeby "zmieścić się" też na wąskich — WYŁĄCZAMY
-   boczne poświaty poniżej progu, przy którym margines gwarantowanie
-   pomieści cały ich promień (400px karta + 2×20px padding body + 2×115px
-   promień zaokrąglone w górę) — górna poświata i cała reszta UI bez zmian.
+   bliski zera — poświaty latarni geometrycznie nie mają gdzie się zmieścić,
+   nie dotykając cienia karty. Zamiast pogarszać efekt na szerokich ekranach,
+   żeby "zmieścić się" też na wąskich — WYŁĄCZAMY boczne poświaty poniżej
+   progu, przy którym margines gwarantowanie pomieści cały ich promień.
    Jedyny `@media` w tym pliku — świadomy, punktowy wyjątek dla tego
-   konkretnego zabezpieczenia, nie zmiana ogólnego podejścia. */
-@media (max-width: 700px) {
-    :root, :root[data-theme="dark"] { --lamp-glow: transparent; }
+   konkretnego zabezpieczenia, nie zmiana ogólnego podejścia.
+   POPRAWKA 2026-08-21(l) — próg podniesiony z 700px na 850px, bo doszła
+   szersza otoczka `--lamp-halo` (promień 190px, większy niż rdzeń) — nowe
+   wyliczenie: 400px karta + 2×20px padding body + 2×190px promień otoczki,
+   zaokrąglone w górę. */
+@media (max-width: 850px) {
+    :root, :root[data-theme="dark"] { --lamp-glow: transparent; --lamp-halo: transparent; }
 }
 h1 {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
