@@ -53,6 +53,12 @@
                 <summary id="scanTextSourceSummary"></summary>
                 <div id="scanTextSourceContent" class="scan-text-source-content"></div>
             </details>
+            <div id="scanManualSourceBox" style="display:none; margin-bottom:14px; font-size:13px;">
+                <p id="scanManualSourceNotice" style="color:var(--ink-soft);"></p>
+                <button id="scanReportMismatchBtn" type="button" style="margin-right:8px;" data-i18n="btn_report_mismatch">Zgłoś niezgodność z treścią źródła</button>
+                <button id="scanForceRefreshBtn" type="button" data-i18n="btn_force_refresh">Sprawdź, czy coś się zmieniło</button>
+                <p id="scanManualSourceStatus" style="margin-top:6px;"></p>
+            </div>
             <div id="scanBadge" class="result-badge"></div>
             <div id="scanPatterns"></div>
             <div class="summary-block">
@@ -69,6 +75,15 @@
 
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd';
+        const SUPABASE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/analyze';
+        const REPORT_MISMATCH_FUNCTION_URL = SUPABASE_URL + '/functions/v1/report-link-mismatch';
+
+        // Ten sam sposób liczenia hasha co w index.html (musi dać identyczny
+        // wynik dla tego samego linku, żeby trafić w ten sam wiersz cache'u).
+        async function sha256Hex(buffer) {
+            const digest = await crypto.subtle.digest('SHA-256', buffer);
+            return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+        }
 
         let sb = null;
         try {
@@ -271,7 +286,7 @@
                 showNotFound();
             } else {
                 sessionReady.then(() => sb.from('scans')
-                    .select('input_type, source_url, text_content, result')
+                    .select('input_type, source_url, text_content, result, is_manual_source')
                     .eq('id', scanId)
                     .maybeSingle())
                     .then(({ data, error }) => {
@@ -381,6 +396,80 @@
                                 buildHighlightedText(data.text_content, quoteEntries)
                             );
                             textSourceEl.style.display = 'block';
+                        }
+
+                        // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,
+                        // "Zaufanie do ręcznie wklejonych linków". Stała,
+                        // widoczna informacja, nigdy nie znika.
+                        if (data.is_manual_source) {
+                            document.getElementById('scanManualSourceNotice').innerText = t('manual_source_notice');
+                            document.getElementById('scanManualSourceBox').style.display = 'block';
+
+                            const manualStatusEl = document.getElementById('scanManualSourceStatus');
+                            document.getElementById('scanReportMismatchBtn').addEventListener('click', async () => {
+                                if (!currentSession) {
+                                    manualStatusEl.innerHTML = '<span class="status-err">' + t('err_signup_required') + '</span>';
+                                    return;
+                                }
+                                try {
+                                    const res = await fetch(REPORT_MISMATCH_FUNCTION_URL, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': 'Bearer ' + currentSession.access_token,
+                                            'apikey': SUPABASE_ANON_KEY
+                                        },
+                                        body: JSON.stringify({ scan_id: scanId })
+                                    });
+                                    const resData = await res.json();
+                                    manualStatusEl.innerHTML = resData.ok
+                                        ? '<span class="status-ok">' + t('status_mismatch_reported') + '</span>'
+                                        : '<span class="status-err">' + t('result_generic_error') + '</span>';
+                                } catch {
+                                    manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
+                                }
+                            });
+
+                            // "Sprawdź, czy coś się zmieniło" — zawsze przez tryb
+                            // "Link" na `source_url` (niezależnie od tego, czy TEN
+                            // konkretny wpis jest input_type 'text' czy 'url') —
+                            // to jedyny sposób, żeby realnie sprawdzić, czy strona
+                            // już daje się pobrać automatycznie. Zawsze świadomy,
+                            // płatny wybór (patrz `forceRefresh` w analyze/index.ts).
+                            if (data.source_url && /^https?:\/\//i.test(data.source_url)) {
+                                document.getElementById('scanForceRefreshBtn').addEventListener('click', async () => {
+                                    manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
+                                    try {
+                                        const hash = await sha256Hex(new TextEncoder().encode(data.source_url));
+                                        const authToken = currentSession ? currentSession.access_token : SUPABASE_ANON_KEY;
+                                        const res = await fetch(SUPABASE_FUNCTION_URL, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': 'Bearer ' + authToken,
+                                                'apikey': SUPABASE_ANON_KEY
+                                            },
+                                            body: JSON.stringify({
+                                                input_type: 'url',
+                                                content_hash: hash,
+                                                source_url: data.source_url,
+                                                language: getCurrentLanguage(),
+                                                force_refresh: true
+                                            })
+                                        });
+                                        const resData = await res.json();
+                                        if (resData.id) {
+                                            window.location.href = 'scan.html?id=' + resData.id;
+                                        } else {
+                                            manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
+                                        }
+                                    } catch {
+                                        manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
+                                    }
+                                });
+                            } else {
+                                document.getElementById('scanForceRefreshBtn').style.display = 'none';
+                            }
                         }
 
                         const badge = document.getElementById('scanBadge');

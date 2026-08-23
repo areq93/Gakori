@@ -89,6 +89,99 @@ function computeGeminiCostUsd(geminiResponse: { usageMetadata?: { promptTokenCou
   )
 }
 
+// --- Punkt 5 audytu bezpieczeństwa (POPRAWKA 2026-08-21(v)) — zaufanie do
+// linków wklejanych ręcznie (tryb "Tekst" + opcjonalny link źródła, patrz
+// POPRAWKA 2026-08-21(c) wyżej). Pełne uzasadnienie i odrzucone warianty
+// (kary, próg "2 niezależnych zgłoszeń" z porównaniem przez Gemini) —
+// patrz GAKORI_CONTEXT.md, "Zaufanie do ręcznie wklejonych linków".
+//
+// Odcisk adresu IP (NIGDY surowy adres — patrz uzasadnienie w
+// GAKORI_CONTEXT.md) używany WYŁĄCZNIE do zliczania cichych potwierdzeń
+// (ile RÓŻNYCH osób obejrzało treść bez zgłoszenia problemu). Fail-open:
+// brak nagłówka nie wywala funkcji, po prostu nic nie zaliczamy.
+async function hashIp(req: Request): Promise<string | null> {
+  const forwarded = req.headers.get('x-forwarded-for')
+  const ip = forwarded ? forwarded.split(',')[0].trim() : null
+  if (!ip) return null
+  const bytes = new TextEncoder().encode(ip)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+// Loguje "ciche potwierdzenie" (ktoś obejrzał ręcznie wklejoną treść i nie
+// zgłosił problemu) — WYŁĄCZNIE do wewnętrznego liczenia, nigdy pokazywane
+// użytkownikowi (patrz GAKORI_CONTEXT.md — świadomie ukryte, żeby nie dało
+// się tego świadomie "przechytrzyć"). `ON CONFLICT DO NOTHING` przez UNIQUE
+// (scan_id, ip_hash) — ta sama osoba wracająca wielokrotnie liczy się raz.
+async function logQuietConfirmation(supabase: ReturnType<typeof createClient>, scanId: string, req: Request): Promise<void> {
+  const ipHash = await hashIp(req)
+  if (!ipHash) return
+  await supabase.from('link_view_confirmations').upsert(
+    { scan_id: scanId, ip_hash: ipHash },
+    { onConflict: 'scan_id,ip_hash', ignoreDuplicates: true }
+  )
+}
+
+// Warstwa 1 (bonus, darmowa, gdy to możliwe) — patrz GAKORI_CONTEXT.md.
+// Throttlowane: sprawdzamy świeżość NAJWYŻEJ raz na 24h na dany wpis, nie
+// przy każdym wyświetleniu — inaczej obciążalibyśmy cudze strony
+// niepotrzebnie częstymi zapytaniami. Celowo prosty, darmowy heurystyczny
+// test (długość + nakładanie się słów) — TO NIE jest ochrona przed
+// subtelną manipulacją (od tego jest zgłoszenie przez człowieka, patrz
+// niżej), tylko szansa złapania OCZYWISTYCH rozbieżności za darmo, gdy
+// strona akurat da się pobrać. Uruchamiane przez EdgeRuntime.waitUntil —
+// PO wysłaniu odpowiedzi użytkownikowi, więc nigdy go nie spowalnia.
+function looksSubstantiallyDifferent(original: string, fresh: string): boolean {
+  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+  const a = normalize(original)
+  const b = normalize(fresh)
+  if (a.length === 0 || b.length === 0) return false
+  // Duża zmiana długości (np. artykuł podmieniony na zupełnie inny) —
+  // ale NIE flagujemy samego WZROSTU długości (artykuł "rosnący", patrz
+  // GAKORI_CONTEXT.md) — tylko wyraźny SPADEK poniżej dawnej treści.
+  if (b.length < a.length * 0.6) return true
+  const wordsA = new Set(a.split(' ').filter((w) => w.length > 3))
+  const wordsB = new Set(b.split(' ').filter((w) => w.length > 3))
+  if (wordsA.size === 0) return false
+  let overlap = 0
+  for (const w of wordsA) if (wordsB.has(w)) overlap++
+  return overlap / wordsA.size < 0.5
+}
+
+async function maybeRecheckLinkFreshness(
+  supabase: ReturnType<typeof createClient>,
+  scanRow: { id: string; source_url: string | null; text_content: string | null; link_last_checked_at: string | null }
+): Promise<void> {
+  if (!scanRow.source_url || !scanRow.text_content) return
+  const lastChecked = scanRow.link_last_checked_at ? new Date(scanRow.link_last_checked_at).getTime() : 0
+  if (Date.now() - lastChecked < 24 * 60 * 60 * 1000) return
+  // Zapisujemy PRZED próbą (nie po) — żeby równoległe zapytania w tym
+  // samym oknie nie wywołały tego samowielokrotnie.
+  await supabase.from('scans').update({ link_last_checked_at: new Date().toISOString() }).eq('id', scanRow.id)
+
+  const runCheck = async () => {
+    const fresh = await fetchUrlAsText(scanRow.source_url!)
+    if (!fresh) return // strona dalej niepobieralna — zgodnie z oczekiwaniami, nic nie robimy
+    if (looksSubstantiallyDifferent(scanRow.text_content!, fresh)) {
+      // Wygląda na rozbieżność — cofamy dotychczasowe ciche potwierdzenia,
+      // treść musi na nowo zbudować zaufanie (patrz GAKORI_CONTEXT.md).
+      await supabase.from('link_view_confirmations').delete().eq('scan_id', scanRow.id)
+    }
+  }
+  // @ts-ignore — EdgeRuntime jest dostępny w środowisku Supabase Edge
+  // Functions (Deno Deploy), nie ma go w standardowych typach Deno.
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+    // @ts-ignore
+    EdgeRuntime.waitUntil(runCheck())
+  } else {
+    // Fail-open poza tym środowiskiem (np. lokalny test) — po prostu nie
+    // czekamy, błąd nigdy nie ma wpływu na odpowiedź dla użytkownika.
+    runCheck().catch(() => {})
+  }
+}
+
 // --- PDF (FAZA 2) ---
 // Strona PDF-a liczona identycznie jak obraz kosztowo — ustalone wcześniej
 // w GAKORI_CONTEXT.md ("jedna strona PDF-a ≈ jeden obraz kosztowo").
@@ -1138,7 +1231,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json()
-    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, confirmed } = body
+    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, confirmed, force_refresh } = body
+    // Punkt 5 audytu bezpieczeństwa — "Sprawdź, czy coś się zmieniło",
+    // WYŁĄCZNIE świadomy, płatny wybór użytkownika (nigdy automatyczny —
+    // patrz GAKORI_CONTEXT.md). Omija cache i ratunek z ręcznie wklejonej
+    // treści, żeby dać realną szansę na świeże, prawdziwe pobranie strony.
+    const forceRefresh = force_refresh === true
     const outputLanguage = typeof language === 'string' && LANGUAGE_NAMES[language] ? language : DEFAULT_LANGUAGE
     // Nazwa oryginalnego pliku PDF — WYŁĄCZNIE etykieta do wyświetlenia w
     // prywatnej historii użytkownika (patrz `scan_access` niżej), nigdy nie
@@ -1200,7 +1298,7 @@ Deno.serve(async (req: Request) => {
       .eq('language', outputLanguage)
       .maybeSingle()
 
-    if (existing) {
+    if (existing && !(forceRefresh && existing.is_manual_source)) {
       await supabase
         .from('scans')
         .update({ view_count: existing.view_count + 1 })
@@ -1222,10 +1320,23 @@ Deno.serve(async (req: Request) => {
           )
       }
 
+      // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md, "Zaufanie
+      // do ręcznie wklejonych linków". Dotyczy WYŁĄCZNIE wyników
+      // oznaczonych jako pochodzące z ręcznego wklejenia.
+      if (existing.is_manual_source) {
+        await logQuietConfirmation(supabase, existing.id, req)
+        await maybeRecheckLinkFreshness(supabase, existing as {
+          id: string
+          source_url: string | null
+          text_content: string | null
+          link_last_checked_at: string | null
+        })
+      }
+
       return new Response(
         // "id" pozwala frontendowi otworzyć pełny wynik jako osobną stronę
         // (scan.html?id=...) zamiast pokazywać go na tej samej stronie.
-        JSON.stringify({ cached: true, cost: 0, id: existing.id, result: existing.result }),
+        JSON.stringify({ cached: true, cost: 0, id: existing.id, result: existing.result, is_manual_source: !!existing.is_manual_source }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -1640,6 +1751,11 @@ Deno.serve(async (req: Request) => {
 
     let result: Record<string, unknown> | null = null
     let usedTranslation = false
+    // Punkt 5 audytu bezpieczeństwa — czy WYNIK tego zapytania pochodzi
+    // (bezpośrednio albo przez tłumaczenie) z ręcznie wklejonej treści,
+    // patrz sekcje "rescueExact"/"rescueOriginal" niżej i zapis do
+    // `scans.is_manual_source` w sekcji 6.
+    let sourcedFromManualPaste = false
 
     // 5a. Zanim zapłacimy za pełną analizę — czy ta sama treść była już
     // przeanalizowana w INNYM języku? Jeśli tak, dużo taniej jest przetłumaczyć
@@ -1779,17 +1895,33 @@ Deno.serve(async (req: Request) => {
               Array.isArray((row.result as { patterns?: unknown })?.patterns)
           )
 
-          if (rescueExact) {
+          if (rescueExact && !forceRefresh) {
             await supabase
               .from('scans')
               .update({ view_count: (rescueExact.view_count as number) + 1 })
               .eq('id', rescueExact.id)
+            // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,
+            // "Zaufanie do ręcznie wklejonych linków".
+            await logQuietConfirmation(supabase, rescueExact.id as string, req)
+            await maybeRecheckLinkFreshness(supabase, rescueExact as {
+              id: string
+              source_url: string | null
+              text_content: string | null
+              link_last_checked_at: string | null
+            })
             return new Response(
-              JSON.stringify({ cached: true, cost: 0, id: rescueExact.id, result: rescueExact.result }),
+              JSON.stringify({ cached: true, cost: 0, id: rescueExact.id, result: rescueExact.result, is_manual_source: true }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
           }
-          if (rescueOriginal) {
+          if (rescueOriginal && !forceRefresh) {
+            await logQuietConfirmation(supabase, rescueOriginal.id as string, req)
+            await maybeRecheckLinkFreshness(supabase, rescueOriginal as {
+              id: string
+              source_url: string | null
+              text_content: string | null
+              link_last_checked_at: string | null
+            })
             const translated = await translateResult(
               rescueOriginal.result as Record<string, unknown>,
               outputLanguage,
@@ -1800,6 +1932,7 @@ Deno.serve(async (req: Request) => {
             if (translated) {
               result = translated
               usedTranslation = true
+              sourcedFromManualPaste = true
             }
           }
 
@@ -2250,22 +2383,34 @@ Deno.serve(async (req: Request) => {
       return outageResponse(reason)
     }
 
-    // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników)
+    // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników) —
+    // `upsert` (nie zwykły `insert`) na `content_hash,language`, tak żeby
+    // "Sprawdź, czy coś się zmieniło" (POPRAWKA 2026-08-21(v), `forceRefresh`
+    // wyżej) mogło NADPISAĆ istniejący wiersz świeżym wynikiem, zamiast
+    // wywalić się na ograniczeniu unikalności. Dla zwykłego, nowego
+    // zapytania (bez konfliktu) zachowuje się identycznie jak dawny `insert`.
     const { data: newScan, error: insertError } = await supabase
       .from('scans')
-      .insert({
-        content_hash,
-        input_type,
-        language: outputLanguage,
-        is_translation: usedTranslation,
-        source_url: input_type === 'url' ? source_url : textSourceUrl,
-        text_content: input_type === 'text' ? text_content : null,
-        char_count: input_type === 'text' ? char_count : 0,
-        credits_charged: finalCost,
-        result,
-        discovered_by: user_id ?? null,
-        view_count: 1,
-      })
+      .upsert(
+        {
+          content_hash,
+          input_type,
+          language: outputLanguage,
+          is_translation: usedTranslation,
+          source_url: input_type === 'url' ? source_url : textSourceUrl,
+          text_content: input_type === 'text' ? text_content : null,
+          char_count: input_type === 'text' ? char_count : 0,
+          credits_charged: finalCost,
+          result,
+          discovered_by: user_id ?? null,
+          view_count: 1,
+          // Punkt 5 audytu bezpieczeństwa — oznacza treść, która pochodzi
+          // (bezpośrednio albo przez tłumaczenie) z ręcznego wklejenia,
+          // patrz GAKORI_CONTEXT.md, "Zaufanie do ręcznie wklejonych linków".
+          is_manual_source: sourcedFromManualPaste || (input_type === 'text' && !!textSourceUrl),
+        },
+        { onConflict: 'content_hash,language' }
+      )
       .select()
       .single()
 
@@ -2304,7 +2449,13 @@ Deno.serve(async (req: Request) => {
     if (chargeFailure) return outageResponse(chargeFailure)
 
     return new Response(
-      JSON.stringify({ cached: false, cost: finalCost, id: newScan.id, result }),
+      JSON.stringify({
+        cached: false,
+        cost: finalCost,
+        id: newScan.id,
+        result,
+        is_manual_source: sourcedFromManualPaste || (input_type === 'text' && !!textSourceUrl),
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {

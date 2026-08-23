@@ -1723,6 +1723,119 @@ zanim założysz, że działa.
         tego samego adresu URL (litera w literę) i nie wykrywa, czy treść
         strony zdążyła się zmienić od czasu ręcznego wklejenia — ten sam
         kompromis, jaki już akceptujemy w całym współdzielonym cache'u.
+    - **POPRAWKA 2026-08-21(v) — punkt 5 audytu bezpieczeństwa: "Zaufanie
+      do ręcznie wklejonych linków".** Domyka "uczciwe ograniczenie" z (c)
+      wyżej — długa rozmowa z właścicielem (patrz historia sesji), warto
+      spisać, PRZEZ CO przeszliśmy i DLACZEGO odrzuciliśmy kilka wcześniej
+      przyjętych wariantów, żeby nikt tego nie odkrywał od nowa.
+
+      **Problem**: ratunkowy cache po `source_url` (patrz (c) wyżej) ufa
+      JEDNEJ osobie na słowo — nic nie stało na przeszkodzie, żeby ktoś
+      podał prawdziwy, znany link, ale podkleił pod niego zmyśloną,
+      zmanipulowaną treść (na własną korzyść ALBO na cudzą szkodę —
+      przypisując realnej stronie coś, czego nigdy nie napisała).
+
+      **Odrzucone po drodze warianty (świadomie, z konkretnego powodu)**:
+      1. *System kar* (blokada 30 dni za wklejenie błędnej treści, pół
+         roku za fałszywe zgłoszenie) — odrzucony, bo wymagałby, żeby
+         KTOŚ (właściciel) ręcznie oceniał, kto ma rację — właściciel
+         wprost powiedział "na pewno nie chcę niczego sprawdzać ręcznie".
+         Poza tym pomyłka w takim systemie kosztowałaby bardzo dużo
+         (niesłusznie zablokowane, prawdziwe konto).
+      2. *Próg "2 niezależnych, zgodnych zgłoszeń" zanim treść w ogóle
+         trafi do wspólnego cache'u* (z porównaniem przez Gemini, bo
+         proste liczenie wspólnych słów NIE złapałoby np. usunięcia
+         jednego słowa "nie", które odwraca sens zdania — trafna uwaga
+         właściciela) — odrzucony z DWÓCH powodów: (a) dawał złudne
+         bezpieczeństwo — jeden atakujący z dwoma kontami i dwoma adresami
+         IP (oba tanie i łatwe do zdobycia) mógł sam spełnić ten warunek,
+         bo sam pisał OBA teksty tak, żeby się zgadzały; (b) mocno
+         ograniczał użyteczność — dla rzadziej udostępnianych linków
+         (czyli WŁAŚNIE tych, po które sięga się po mechanizm ratunkowy)
+         drugie, niezależne wklejenie może nigdy się nie zdarzyć.
+      3. **Uczciwy wniosek, który ostatecznie przyjęliśmy**: przy w pełni
+         otwartej, darmowej rejestracji (bez weryfikacji tożsamości) NIE
+         da się zbudować systemu w 100% odpornego na zdeterminowanego,
+         cierpliwego atakującego z wieloma kontami — dokładnie ten sam
+         kompromis, jaki już świadomie zaakceptowaliśmy przy samej
+         rejestracji (patrz "Ochrona cashflow przed nadużyciem" wyżej,
+         "świadomie POZA zakresem: ochrona przed atakiem przez wiele
+         fałszywych kont naraz"). Każda kolejna warstwa ochrony podnosi
+         PRÓG wysiłku potrzebnego do ataku, żadna go nie eliminuje w 100%
+         — udawanie inaczej byłoby niespójne z resztą projektu.
+
+      **Finalnie wdrożone (proporcjonalne do realnego ryzyka na tym etapie,
+      chroni przed przypadkowymi pomyłkami i casualowym nadużyciem, nie
+      udaje ochrony przed czymś nieproporcjonalnie kosztownym do
+      zatrzymania)**:
+      - Treść trafia do wspólnego cache'u OD RAZU po pierwszym wklejeniu
+        (appka dalej radzi sobie ze WSZYSTKIM w internecie, zgodnie z
+        pierwotnym celem tej funkcji) — oznaczona `scans.is_manual_source
+        = true`.
+      - **Stała, widoczna etykieta, KTÓRA NIGDY NIE ZNIKA** (nawet po
+        latach cichych potwierdzeń) — kluczowe ZARÓWNO dla czytelników,
+        jak i dla ochrony samego Gakori (jasne, że to treść od
+        społeczności, nie nasza redakcyjna weryfikacja). Klucz i18n
+        `manual_source_notice`.
+      - **Ciche, WEWNĘTRZNE budowanie zaufania w czasie** — każda inna,
+        zalogowana osoba, która trafi w tę treść (przez zwykłe wejście w
+        link) i NIE zgłosi problemu, liczy się jako milczące potwierdzenie
+        (tabela `link_view_confirmations`, klucz to ODCISK adresu IP —
+        `hashIp()`, SHA-256, NIGDY surowy adres — a nie konto, z tego
+        samego powodu anty-Sybil co reguły audytu bezpieczeństwa gdzie
+        indziej). **Świadomie WYŁĄCZNIE wewnętrzne — użytkownik nigdy nie
+        widzi liczby ani progu** — właściciel wprost: "nie chcę żeby
+        użytkownicy widzieli zasady potwierdzenia... skoro nie wiedzą co
+        wpływa na potwierdzenie, nie wiedzą jakie warunki spełnić" (utrudnia
+        świadome obejście).
+      - **Przycisk "Zgłoś niezgodność z treścią źródła"** (nowa funkcja
+        `report-link-mismatch/index.ts`, wymaga zalogowania, `UNIQUE
+        (scan_id, reporter_user_id)` — raz na osobę na wynik) — cofa
+        WSZYSTKIE dotychczasowe ciche potwierdzenia dla tego wyniku
+        (`DELETE FROM link_view_confirmations WHERE scan_id = ...`), bez
+        oceniania, kto ma rację. **Bez żadnych kar** — złośliwe zgłoszenie
+        jest możliwe, ale bez wielkich konsekwencji: proces potwierdzania
+        po prostu trwa dłużej, treść pozostaje darmowo widoczna cały czas,
+        traci tylko (niewidoczny i tak) wewnętrzny postęp.
+      - **Warstwa 1, darmowy bonus, gdy to możliwe** (`maybeRecheckLinkFreshness()`
+        w `analyze/index.ts`) — throttlowane (najwyżej raz na 24h na
+        wpis, żeby nie bombardować cudzych stron), URUCHAMIANE PO
+        wysłaniu odpowiedzi użytkownikowi przez `EdgeRuntime.waitUntil()`
+        (nigdy go nie spowalnia). Próbuje DARMOWEGO (bez Gemini)
+        `fetchUrlAsText()` — jeśli się uda i treść wygląda na wyraźnie
+        inną (`looksSubstantiallyDifferent()`: prosty, darmowy test
+        długości + nakładania się słów — TO NIE jest ochrona przed
+        subtelną manipulacją, tylko szansa złapania OCZYWISTYCH rozbieżności
+        za darmo) — cofa ciche potwierdzenia, tak samo jak zgłoszenie przez
+        człowieka. **Świadomie NIE łapie linków, które NIGDY nie dają się
+        pobrać automatycznie** (a to właśnie one trafiły do mechanizmu
+        ratunkowego w pierwszej kolejności!) — dlatego to WYŁĄCZNIE bonus,
+        nie jedyna ochrona (od tego jest warstwa cichych
+        potwierdzeń+zgłoszeń wyżej, która działa zawsze, także tam).
+        Ważne: NIE flaguje samego WZROSTU długości treści (artykuł
+        "rosnący" w czasie, np. relacja live) jako rozbieżności — tylko
+        wyraźny spadek/zmianę.
+      - **"Sprawdź, czy coś się zmieniło"** — przycisk w `index.html`/
+        `scan.html`, zawsze ŚWIADOMY wybór użytkownika, NIGDY automatyczny,
+        i zawsze kosztuje DOKŁADNIE tyle, ile normalna analiza linku (nie
+        drożej — właściciel wprost: "cena kredytów drugiej osobie nie
+        może wzrosnąć, tylko dlatego że system musi wykonać dodatkową
+        pracę"). Backend: nowy parametr `force_refresh` w body — pomija
+        zarówno zwykły cache, jak i skróty ratunkowe (`rescueExact`/
+        `rescueOriginal`), więc realnie próbuje pobrać stronę na nowo. Jeśli
+        automat dalej zawiedzie, użytkownik dostaje uczciwy błąd (nie
+        cichy powrót do starej treści). Zapis do `scans` zmieniony z
+        `insert` na `upsert` (`onConflict: 'content_hash,language'`) —
+        żeby świeży wynik mógł NADPISAĆ istniejący wiersz zamiast wywalić
+        się na ograniczeniu unikalności.
+
+      **Baza danych** (nowe elementy): `scans.is_manual_source` (boolean),
+      `scans.link_last_checked_at` (timestamptz); `link_view_confirmations`
+      (`scan_id`, `ip_hash`, `UNIQUE(scan_id, ip_hash)`);
+      `link_mismatch_reports` (`scan_id`, `reporter_user_id`,
+      `UNIQUE(scan_id, reporter_user_id)`). Obie nowe tabele: RLS
+      włączone, zero publicznych polityk (jak reszta tabel `system_*`) —
+      dostęp wyłącznie przez `service_role`.
     - **POPRAWKA 2026-08-21(d) — bfcache czyścił formularz ZA PÓŹNO
       (zostawał stary wklejony tekst).** Żywy przykład: po analizie i
       powrocie do menu wklejona wcześniej treść dalej "wisiała" w trybie
@@ -2117,6 +2230,23 @@ sprawdź, czy ten wyzwalacz nadal istnieje**
   - Ograniczenie unikalności: `UNIQUE (content_hash, language)` —
     **nie** samo `content_hash` (stara reguła `scans_content_hash_key`
     została usunięta i zastąpiona tą złożoną, patrz pułapki niżej).
+  - `is_manual_source` (boolean, dodane 2026-08-21, punkt 5 audytu
+    bezpieczeństwa), `link_last_checked_at` (timestamptz, nullable) —
+    patrz "Zaufanie do ręcznie wklejonych linków" wyżej po pełne
+    uzasadnienie.
+
+**`link_view_confirmations`** (dodane 2026-08-21, punkt 5 audytu
+bezpieczeństwa) — ciche potwierdzenia dla treści oznaczonej
+`is_manual_source`: `id`, `scan_id` (FK → `scans.id`, `ON DELETE CASCADE`),
+`ip_hash` (SHA-256 adresu IP, NIGDY surowy adres), `created_at`.
+`UNIQUE (scan_id, ip_hash)` — ta sama osoba wracająca wielokrotnie liczy
+się raz.
+
+**`link_mismatch_reports`** (dodane 2026-08-21, punkt 5 audytu
+bezpieczeństwa) — zgłoszenia niezgodności treści ze źródłem: `id`,
+`scan_id` (FK → `scans.id`, `ON DELETE CASCADE`), `reporter_user_id` (FK →
+`auth.users.id`, `ON DELETE CASCADE`), `created_at`. `UNIQUE (scan_id,
+reporter_user_id)` — jedno konto, jedno zgłoszenie na dany wynik.
 
 **`wallet_transactions`**:
 - `user_id`, `amount`, `type` (np. `spend`), `related_scan_id`

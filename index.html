@@ -131,6 +131,12 @@
         <div id="resultBadge" class="result-badge"></div>
         <div id="resultPatterns"></div>
         <p id="resultSummary" class="result-summary"></p>
+        <div id="resultManualSourceBox" style="display:none; margin-top:14px; font-size:13px;">
+            <p id="resultManualSourceNotice" style="color:var(--ink-soft);"></p>
+            <button id="reportMismatchBtn" type="button" style="margin-right:8px;" data-i18n="btn_report_mismatch">Zgłoś niezgodność z treścią źródła</button>
+            <button id="forceRefreshBtn" type="button" data-i18n="btn_force_refresh">Sprawdź, czy coś się zmieniło</button>
+            <p id="resultManualSourceStatus" style="margin-top:6px;"></p>
+        </div>
     </div>
 
     <div id="debug">
@@ -183,6 +189,7 @@
         // ===== KONFIGURACJA POŁĄCZENIA Z BACKENDEM =====
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
         const SUPABASE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/analyze';
+        const REPORT_MISMATCH_FUNCTION_URL = SUPABASE_URL + '/functions/v1/report-link-mismatch';
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd'; // Project Settings -> API Keys -> Publishable key
 
         // Logowanie zależy od zewnętrznej biblioteki (CDN) — jeśli się nie wczyta
@@ -1162,6 +1169,21 @@
             badge.innerText = label;
             renderPatterns(patternsEl, data.result);
             summary.innerText = data.result.summary;
+
+            // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,
+            // "Zaufanie do ręcznie wklejonych linków". `is_manual_source`
+            // oznacza treść pochodzącą z ręcznego wklejenia (bezpośrednio
+            // albo przez tłumaczenie) — stała, widoczna informacja o tym
+            // NIGDY nie znika, niezależnie od tego, ile osób już to widziało.
+            const manualBox = document.getElementById('resultManualSourceBox');
+            currentResultScanId = data.id || null;
+            document.getElementById('resultManualSourceStatus').innerText = '';
+            if (data.is_manual_source) {
+                document.getElementById('resultManualSourceNotice').innerText = t('manual_source_notice');
+                manualBox.style.display = 'block';
+            } else {
+                manualBox.style.display = 'none';
+            }
         }
 
         // 7. Wysyłka zapytania do backendu + pokazanie wyniku — WYDZIELONE do
@@ -1170,11 +1192,17 @@
         // drugi raz (z confirmed:true) po zgodzie użytkownika na ekranie
         // potwierdzenia — reszta trybów używa tej samej funkcji tylko raz.
         let pendingConfirmPayload = null;
+        // Punkt 5 audytu bezpieczeństwa — pamięta, co dokładnie wyświetla
+        // się teraz w karcie wyniku, żeby przyciski "Zgłoś niezgodność" i
+        // "Sprawdź, czy coś się zmieniło" wiedziały, czego dotyczą.
+        let currentResultScanId = null;
+        let lastAnalysisPayload = null;
         async function runAnalysisRequest(payload, imagePreviewDataUrls) {
             const statusEl = document.getElementById('status');
             const payloadEl = document.getElementById('payload-data');
             const btn = document.getElementById('analyzeBtn');
             let statusInterval = null;
+            lastAnalysisPayload = payload;
 
             try {
                 btn.disabled = true;
@@ -1375,6 +1403,45 @@
             }
 
             if (payload) runAnalysisRequest(payload, imagePreviewDataUrls);
+        });
+
+        // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md, "Zaufanie
+        // do ręcznie wklejonych linków". Zgłoszenie wymaga zalogowania (kara
+        // "raz na osobę na wynik" nie miałaby czego pilnować dla anonima).
+        document.getElementById('reportMismatchBtn').addEventListener('click', async () => {
+            const statusEl = document.getElementById('resultManualSourceStatus');
+            if (!currentResultScanId) return;
+            if (!currentSession) {
+                statusEl.innerHTML = '<span class="status-err">' + t('err_signup_required') + '</span>';
+                return;
+            }
+            try {
+                const res = await fetch(REPORT_MISMATCH_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + currentSession.access_token,
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({ scan_id: currentResultScanId })
+                });
+                const data = await res.json();
+                statusEl.innerHTML = data.ok
+                    ? '<span class="status-ok">' + t('status_mismatch_reported') + '</span>'
+                    : '<span class="status-err">' + t('result_generic_error') + '</span>';
+            } catch {
+                statusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
+            }
+        });
+
+        // "Sprawdź, czy coś się zmieniło" — zawsze świadomy, płatny wybór
+        // użytkownika (nigdy automatyczny), patrz `forceRefresh` w
+        // analyze/index.ts. Ponawia dokładnie to samo zapytanie, tylko z
+        // dopiskiem force_refresh — reszta logiki (cena, ładowanie) jest
+        // identyczna jak przy zwykłej analizie.
+        document.getElementById('forceRefreshBtn').addEventListener('click', () => {
+            if (!lastAnalysisPayload) return;
+            runAnalysisRequest({ ...lastAnalysisPayload, force_refresh: true }, null);
         });
     </script>
 </body>
