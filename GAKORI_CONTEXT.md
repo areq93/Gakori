@@ -2743,6 +2743,50 @@ komunikat w języku użytkownika, włączenie z powrotem wyłącznie ręczne.
   przyciskiem, który tylko programowo klika ukryty input
   (`imageInputTrigger` w `index.html`). Jeśli w przyszłości dojdzie kolejne
   pole plikowe — zastosuj ten sam wzorzec od razu, nie po zgłoszeniu.
+- **Pierwsze prawdziwe zadziałanie głównego wyłącznika (2026-08-23) —
+  reguła 5 (rozliczenie konta) i ukryta, nieznana wcześniej luka w
+  bazie.** Zaraz po wdrożeniu punktów 3-5 audytu bezpieczeństwa system
+  sam się zatrzymał: `disabled_reason` = "Reguła 5: saldo konta nie
+  zgadza się z historią transakcji" dla konta właściciela. Diagnoza
+  (zapytanie SQL szukające WSZYSTKICH kont z niezgodnością salda —
+  `SELECT p.id, p.wallet_balance, SUM(wt.amount)... HAVING ...`, patrz
+  wzór w historii sesji) pokazała różnicę 4382 kredytów — dokładnie
+  scenariusz, przed którym ostrzegaliśmy w opisie reguły 5: konto
+  właściciela było wielokrotnie ręcznie doładowywane w Supabase Table
+  Editor podczas testowania appki, bez odpowiadających wpisów w
+  `wallet_transactions`. **System zadziałał poprawnie** — złapał prawdziwą
+  niezgodność (nieszkodliwą, ale realną), zgodnie z zamierzeniem.
+  Naprawa: jeden wyrównujący wpis w `wallet_transactions`
+  (`type: 'manual_adjustment'`, kwota = różnica), potem ręczne włączenie
+  `system_status.analyze_enabled` z powrotem — dokładnie procedura opisana
+  w "Audyt systemowy" wyżej.
+
+  **Przy okazji złapane, osobna, prawdziwa usterka**: próba wpisania
+  `manual_adjustment` odsłoniła, że kolumna `wallet_transactions.type` ma
+  ograniczenie (`CHECK`, `wallet_transactions_type_check`) z ZAMKNIĘTĄ
+  listą dozwolonych wartości (`welcome_bonus`, `purchase`, `spend`,
+  `discovery_bonus`, `refund`) — i na tej liście od początku BRAKOWAŁO
+  `unsafe_content_penalty`, mimo że `analyze/index.ts`
+  (`respondUnsafeContent()`) od dawna próbuje wstawiać transakcje właśnie
+  tego typu! Ten błąd nigdy nie został zauważony, bo prawdziwa kara za
+  niedozwoloną treść na obrazie jeszcze się w praktyce nie zdarzyła —
+  dopiero by się ujawnił przy pierwszym realnym przypadku, i to w
+  najgorszy możliwy sposób (błąd zapisu W TRAKCIE karania kogoś za
+  złamanie zasad). Naprawione razem z dodaniem `manual_adjustment`:
+  ```sql
+  ALTER TABLE wallet_transactions DROP CONSTRAINT wallet_transactions_type_check;
+  ALTER TABLE wallet_transactions ADD CONSTRAINT wallet_transactions_type_check
+    CHECK (type = ANY (ARRAY[
+      'welcome_bonus'::text, 'purchase'::text, 'spend'::text,
+      'discovery_bonus'::text, 'refund'::text,
+      'manual_adjustment'::text, 'unsafe_content_penalty'::text
+    ]));
+  ```
+  **Wniosek na przyszłość**: każdy NOWY typ transakcji (`type`) dodawany w
+  kodzie (`analyze/index.ts` albo gdziekolwiek indziej) musi być od razu
+  dopisany też do tego ograniczenia w bazie — sam kod nie wystarczy, baza
+  ma z tyłu własną, niezależną listę dozwolonych wartości (ten sam wzorzec
+  pułapki co z RLS/regułami `.eq()` opisanymi wyżej).
 
 ## Infrastruktura — własne domeny (USTALONE 2026-08-20)
 
