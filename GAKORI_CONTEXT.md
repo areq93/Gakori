@@ -289,19 +289,23 @@ zanim założysz, że działa.
     start). Backend liczy strony LOKALNIE (`npm:pdf-lib`,
     `loadPdfDocument()`), BEZ angażowania Gemini — to musi być darmowe, bo
     dzieje się PRZED ewentualną zgodą użytkownika na koszt:
-    - **≤ `PDF_AUTO_ANALYZE_MAX_PAGES` (20) stron**: analiza rusza od razu,
-      bez pytania — tak jak tekst/obraz/link.
-    - **21-`PDF_HARD_MAX_PAGES` (80) stron**: backend NIE wywołuje
+    - **Od POPRAWKA 2026-08-23(a), punkt C10, KAŻDY PDF wymaga wprost
+      potwierdzenia kosztu, niezależnie od liczby stron** (dawniej: tylko
+      powyżej `PDF_AUTO_ANALYZE_MAX_PAGES = 20`, stała usunięta —
+      wybranie pliku samo w sobie nie jest jeszcze świadomą zgodą na
+      konkretny koszt, nawet dla małego pliku). Backend NIE wywołuje
       Gemini i NIC nie obciąża — zwraca `{ needs_confirmation: true,
       page_count, estimated_cost }`. Frontend pokazuje ekran zgody
-      (`#pdfConfirmOverlay` w `index.html`) z liczbą stron, kosztem w
-      kredytach i porównaniem "ile to jest w kawach/herbatach" (patrz
-      niżej), użytkownik klika "Tak, analizuj" → frontend wysyła TO SAMO
-      zapytanie ponownie z `confirmed: true`, dopiero wtedy leci dalej do
-      Gemini i faktycznego obciążenia.
-    - **> 80 stron**: zawsze odrzucone (`pdf_too_long`), NIE do ominięcia
-      nawet przez `confirmed: true` — bezwzględny sufit (patrz POPRAWKA
-      2026-08-19 niżej, dlaczego akurat 80, a nie pierwotnie planowane 150).
+      (`#pdfConfirmOverlay` w `index.html`, ten sam wspólny ekran obsługuje
+      od 2026-08-23 też link — patrz "Cennik" niżej) z liczbą stron,
+      kosztem w kredytach i porównaniem "ile to jest w kawach/herbatach"
+      (patrz niżej), użytkownik klika "Tak, analizuj" → frontend wysyła TO
+      SAMO zapytanie ponownie z `confirmed: true`, dopiero wtedy leci dalej
+      do Gemini i faktycznego obciążenia.
+    - **> `PDF_HARD_MAX_PAGES` (80) stron**: zawsze odrzucone
+      (`pdf_too_long`), NIE do ominięcia nawet przez `confirmed: true` —
+      bezwzględny sufit (patrz POPRAWKA 2026-08-19 niżej, dlaczego akurat
+      80, a nie pierwotnie planowane 150).
     - **Rozmiar pliku**: twardy limit `MAX_PDF_BYTES` = **10 MB** (patrz
       też POPRAWKA 2026-08-19 niżej) — świadomie mniej niż 20 MB limitu
       łącznego dla obrazów.
@@ -1836,6 +1840,180 @@ zanim założysz, że działa.
       `UNIQUE(scan_id, reporter_user_id)`). Obie nowe tabele: RLS
       włączone, zero publicznych polityk (jak reszta tabel `system_*`) —
       dostęp wyłącznie przez `service_role`.
+    - **POPRAWKA 2026-08-23(a) — duży pakiet po pierwszym żywym teście
+      punktu 5: naprawa duplikatu w cache'u ratunkowym, procentowe
+      automatyczne wycofywanie treści, przejrzystość kosztów w całej
+      aplikacji, integralność numeracji stron PDF.** Właściciel przetestował
+      punkt (v) na żywo i zgłosił konkretne błędy/luki — poniżej cały
+      pakiet odpowiedzi, w czterech punktach (A/B/C/D), tak jak był
+      przedstawiony i zatwierdzony.
+
+      **A — naprawa mechanizmu "Sprawdź, czy coś się zmieniło"**
+      1. *Błąd zgłoszony na żywo (ze zrzutami ekranu)*: kliknięcie
+         "Sprawdź, czy coś się zmieniło" dla treści wklejonej ręcznie w
+         trybie "Tekst" (z podpiętym linkiem źródła) tworzyło DRUGI,
+         zduplikowany wiersz w `scans` zamiast nadpisać oryginał — bo stary
+         `upsert(..., {onConflict:'content_hash,language'})` konfliktuje
+         po `content_hash`, a przy przejściu z trybu "Tekst" (hash z
+         WKLEJONEJ TREŚCI) na świeże pobranie linku (hash z SAMEGO ADRESU)
+         te dwa hashe nigdy się nie zgadzają. **Naprawa**: nowy parametr
+         body `refresh_scan_id` — gdy podany (zawsze razem z
+         `force_refresh:true`), backend robi `UPDATE ... WHERE id =
+         refresh_scan_id` (nadpisując też sam `content_hash` na nowy,
+         URL-owy — od tej pory wiersz jest poprawnie kluczowany po
+         adresie) zamiast `upsert` po `content_hash`. `view_count` NIE
+         wchodzi do tego nadpisania (zostaje dotychczasowy licznik — patrz
+         punkt B niżej, wzór procentowy potrzebuje ciągłości tej liczby).
+         `retracted` (patrz B) jest jawnie resetowane na `false` — dotarcie
+         do tego miejsca oznacza, że właśnie zapłacono za PRAWDZIWĄ,
+         świeżą analizę, więc zaufanie buduje się od nowa.
+      2. *Pytanie właściciela*: "a co jeśli ktoś naciśnie 'sprawdź czy się
+         zmieniło', ale link nie będzie działał? nie może wtedy przecież
+         płacić". **Odpowiedź**: dwuetapowa zgoda na koszt, dokładnie ten
+         sam wzorzec co PDF (`needs_confirmation`/`confirmed`) — patrz
+         punkt C niżej, ten sam mechanizm obsługuje teraz i zwykłą analizę
+         linku, i jego odświeżenie. Nic nie jest obciążane, dopóki
+         użytkownik nie zobaczy realnej ceny i nie potwierdzi wprost.
+      3. *Nowy, trzeci przycisk* w `resultManualSourceBox`/
+         `scanManualSourceBox`: **"Nie zgadzasz się? Wklej własną
+         treść"** — od razu przenosi na `index.html` w trybie "Tekst" z
+         już wpisanym linkiem źródła (`index.html?prefill_text_source=...`,
+         obsłużone w `DOMContentLoaded`), użytkownik musi tylko sam wkleić
+         treść. Świadomie ZAWSZE widoczny obok pozostałych dwóch
+         przycisków (nie tylko po błędzie) — to po prostu zawsze dostępna
+         alternatywa dla kogoś, kto z góry nie ufa automatycznemu pobraniu.
+      4. *Konkretniejsze komunikaty błędów* zamiast jednego uniwersalnego —
+         `scan.html` dostał własną mapę `refreshErrorMessageKeys` (ten sam
+         wzorzec co `errorMessageKeys` w `index.html`/`renderResult()`).
+
+      **B — procentowe automatyczne wycofywanie treści (przeprojektowanie
+      przycisku "Zgłoś niezgodność")**
+      - **Problem ze starym mechanizmem** ((v) wyżej): zgłoszenie
+        KASOWAŁO wszystkie ciche potwierdzenia (`link_view_confirmations`)
+        — cofało zaufanie do zera, ale nie miało żadnego trwałego skutku
+        poza tym (treść wracała, "kara" była tylko czasowa i niewidoczna).
+      - **Odrzucony wariant**: płaski próg (np. "3 zgłoszenia i już") —
+        właściciel: "za mały", **za łatwy do wywołania jednym złośliwym
+        atakiem** na popularną, całkiem uczciwą treść. Zamiast tego, na
+        sugestię właściciela ("powinien być jakiś procent w skali czasu"),
+        przyjęto **próg procentowy z minimalną próbką**: **≥50
+        wyświetleń I ≥20% z nich zgłoszonych jako niezgodne** →
+        `scans.retracted = true`, **w pełni automatycznie, bez
+        jakiegokolwiek ręcznego przeglądu** (świadoma decyzja właściciela
+        — "napewno nie chcę niczego sprawdzać ręcznie").
+      - **"Wyświetlenia" = `link_view_confirmations`, NIE `scans.view_count`**
+        — świadomy wybór: `link_view_confirmations` liczy WYŁĄCZNIE
+        różne adresy IP (`UNIQUE(scan_id, ip_hash)`), więc jest znacznie
+        trudniejsze do sztucznego napompowania niż `view_count` (rośnie
+        przy KAŻDYM trafieniu w cache, nawet z tego samego adresu). Tę samą
+        logikę odporności zastosowano do licznika zgłoszeń: `UNIQUE
+        (scan_id, reporter_user_id)` — jeden atakujący potrzebowałby
+        naprawdę wielu różnych KONT, nie tylko odświeżeń.
+      - **`link_view_confirmations` NIE JEST już kasowane przy zgłoszeniu**
+        (`report-link-mismatch/index.ts` przepisane) — oba liczniki
+        (wyświetlenia, zgłoszenia) rosną trwale i niezależnie, procent
+        liczony na bieżąco przy KAŻDYM nowym zgłoszeniu.
+      - **Skutek `retracted = true`**: treść NIE jest usuwana (dalej
+        widoczna pod swoim linkiem — `scan.html` pokazuje wyraźne
+        ostrzeżenie, klucz i18n `scan_retracted_notice`), ale przestaje
+        być serwowana jako zaufana odpowiedź nowym pytającym — WYKLUCZONA
+        zarówno ze zwykłego trafienia w cache (sekcja 2 w
+        `analyze/index.ts`), jak i z mechanizmu ratunkowego
+        (`rescueExact`/`rescueOriginal`, sekcja 5). Kolejna osoba pytająca
+        o tę samą treść dostaje pełną, nową, płatną analizę.
+      - **Darmowa, heurystyczna warstwa 1** (`maybeRecheckLinkFreshness()`,
+        (v) wyżej) — dawniej też kasowała ciche potwierdzenia po wykryciu
+        rozbieżności. **Świadomie PRZESTAŁA to robić** (kasowanie
+        psułoby teraz mianownik wzoru procentowego na podstawie samej
+        heurystyki, która może się mylić — np. legalnie skrócony
+        artykuł) — zostaje wyłącznie "szansa złapania oczywistej
+        rozbieżności za darmo", bez żadnej dalszej akcji; prawdziwa
+        ochrona to WYŁĄCZNIE zgłoszenia prawdziwych ludzi.
+      - **Widoczność w raporcie dziennym** (`daily-report/index.ts`) — nowa
+        karta "Zaufanie do linków (punkt B)": liczba wycofanych treści
+        łącznie + liczba zgłoszeń w ostatnich 24h. WYŁĄCZNIE informacyjne,
+        nie wymaga żadnej reakcji właściciela.
+      - **SQL**: `ALTER TABLE scans ADD COLUMN retracted boolean NOT NULL
+        DEFAULT false;` (patrz "Baza danych" niżej po pełną listę).
+
+      **C — przejrzystość kosztów w całej aplikacji** ("chciałbym, aby w
+      całej aplikacji zostały przeliczane koszty użytkownika za wywołanie
+      analiz, i żeby użytkownik zawsze wiedział ile płaci dokładnie za
+      analizę")
+      - **Tekst i obraz**: żywy, orientacyjny licznik kosztu w trakcie
+        wypełniania formularza (`index.html`) — aktualizuje się na
+        `input`/przy zmianie listy wybranych obrazów. Świadomie TYLKO
+        orientacyjny (stałe `FIXED_FEE`/`MULTIPLIER_PER_1000_CHARS`/
+        `IMAGE_SCAN_COST` powtórzone po stronie frontendu "na sztywno") —
+        ostateczną cenę zawsze liczy i pilnuje wyłącznie backend (reguła 4
+        audytu bezpieczeństwa).
+      - **Link — zmiana z płaskiej stawki (`URL_SCAN_COST=6`) na cenę wg
+        realnej liczby znaków**, tym samym wzorem co tekst. Wymaga to
+        NAJPIERW darmowego pobrania strony (`fetchUrlAsText()`, ta sama
+        funkcja co mechanizm ratunkowy) — jeśli się uda, cena = wzór
+        tekstowy z policzonej liczby znaków; jeśli się NIE uda (np. strona
+        wymaga JavaScriptu), zostaje stara, płaska stawka jako uczciwy
+        kompromis dla tej rzadkiej, awaryjnej ścieżki. Ten sam
+        pobrany tekst jest potem PONOWNIE UŻYTY (nie pobierany drugi raz)
+        w Etapie 5 (właściwa analiza) — hoisted zmienne `preFetchedText`/
+        `urlFetchedCharCount` na początku `Deno.serve()`.
+      - **Link — dwuetapowa zgoda na koszt** (`needs_confirmation`/
+        `confirmed`, ten sam wzorzec co PDF) — TERAZ ZAWSZE, nie tylko dla
+        odświeżenia (patrz punkt A). Samo sprawdzenie ceny liczy się jako
+        "nieudana próba" w mechanizmie ograniczania nadużyć
+        (`logFailedAttempt()`), żeby nikt nie mógł bez końca sondować
+        cudzych linków za darmo jako anonimowy proxy.
+      - **PDF — ekran zgody na koszt TERAZ ZAWSZE**, niezależnie od liczby
+        stron (dawniej: tylko powyżej `PDF_AUTO_ANALYZE_MAX_PAGES=20`,
+        stała usunięta) — wybranie pliku samo w sobie nie jest jeszcze
+        świadomą zgodą na konkretny koszt, nawet dla małego pliku.
+      - **Odrzucony pomysł właściciela**: pole "wpisz z góry, ile stron ma
+        plik", weryfikowane przez system przed analizą. Odrzucony po
+        uczciwej ocenie: nasze WŁASNE, niezależne liczenie stron
+        (pdf-lib) jest już w pełni autorytatywne i nigdy nie ufamy
+        klientowi w kwestii ceny — pole nie dodałoby żadnej realnej
+        ochrony, tylko dodatkowe tarcie ("no to nie" — właściciel).
+      - **Paragon po fakcie**: po każdej analizie (nie tylko PDF)
+        `index.html`/`scan.html` pokazują "Ta analiza kosztowała: X
+        kredytów" albo "Za darmo — z pamięci" (trafienie w cache). Ważny
+        niuans architektoniczny: rzeczywiste wyniki na `index.html`
+        ZAWSZE przekierowują na `scan.html?id=...` (nigdy nie renderują
+        się w miejscu) — więc ten "paragon" jest przekazywany przez
+        `sessionStorage` (`gakori_scan_cost_<id>`, jednorazowy odczyt, ten
+        sam wzorzec co miniatury obrazów) i pokazywany WYŁĄCZNIE osobie,
+        która przed chwilą sama uruchomiła analizę — nie jest to stały,
+        publiczny fakt widoczny dla każdego, kto później otworzy ten sam
+        link (ktoś inny mógł zobaczyć tę samą treść za darmo z cache'u).
+
+      **D — integralność numeracji stron PDF** (odkryte przy projektowaniu
+      C — ostry przykład właściciela: fragment książki, gdzie WIDOCZNE w
+      treści numery stron to np. 43-55, a sam plik ma fizycznie tylko 13
+      stron)
+      12. **Doprecyzowanie promptu do Gemini**: pole `"page"` musi ZAWSZE
+          być fizyczną pozycją strony W PRZESŁANYM PLIKU licząc od 1 —
+          Gemini ma CAŁKOWICIE IGNOROWAĆ jakikolwiek numer strony
+          wydrukowany/widoczny w samej treści dokumentu, nawet gdy
+          dokument ma własną numerację. Bez tego doprecyzowania model
+          mógłby (zgodnie z ludzką intuicją, ale błędnie dla naszych
+          potrzeb) zwrócić numer WIDOCZNY na stronie zamiast jej pozycji w
+          pliku.
+      13. **Twardy test integralności** — jeśli MIMO doprecyzowanego
+          promptu i naszego WŁASNEGO, deterministycznego przeliczenia
+          numeracji (offset fragmentu przy dzieleniu na części, patrz
+          `analyzePdfChunk()`) numer strony jakiegokolwiek wzorca
+          PRZEKRACZA rzeczywistą, niezależnie policzoną (pdf-lib) liczbę
+          stron pliku — traktowane z TĄ SAMĄ powagą co reguły 1-4
+          głównego wyłącznika: natychmiastowe zatrzymanie systemu dla
+          wszystkich, BEZ obciążenia zapytania, które to wykryło (kontrola
+          dzieje się PRZED sekcją zapisu do cache'u i odjęcia kredytów).
+      - **Odłożony, niższy priorytet pomysł** (NIE zbudowany): "miękka"
+        heurystyka rozmiar-pliku-vs-liczba-stron (tylko logowanie,
+        nieblokująca) — oceniona jako dająca ograniczoną wartość bez
+        własnej, dedykowanej infrastruktury logowania; odłożona, można
+        wrócić przy realnej potrzebie.
+
+      **Baza danych** (nowe elementy tego pakietu): `scans.retracted`
+      (boolean, `NOT NULL DEFAULT false`).
     - **POPRAWKA 2026-08-21(d) — bfcache czyścił formularz ZA PÓŹNO
       (zostawał stary wklejony tekst).** Żywy przykład: po analizie i
       powrocie do menu wklejona wcześniej treść dalej "wisiała" w trybie
@@ -2234,13 +2412,22 @@ sprawdź, czy ten wyzwalacz nadal istnieje**
     bezpieczeństwa), `link_last_checked_at` (timestamptz, nullable) —
     patrz "Zaufanie do ręcznie wklejonych linków" wyżej po pełne
     uzasadnienie.
+  - `retracted` (boolean, `NOT NULL DEFAULT false`, dodane 2026-08-23,
+    punkt B pakietu poprawek) — treść automatycznie wycofana z serwowania
+    jako zaufana (procent zgłoszeń niezgodności ≥20% przy ≥50
+    wyświetleniach, patrz POPRAWKA 2026-08-23(a) wyżej). Wyklucza wiersz z
+    normalnego trafienia w cache i z mechanizmu ratunkowego — sam wiersz
+    NIE jest kasowany, dalej widoczny pod swoim linkiem z ostrzeżeniem.
 
 **`link_view_confirmations`** (dodane 2026-08-21, punkt 5 audytu
 bezpieczeństwa) — ciche potwierdzenia dla treści oznaczonej
 `is_manual_source`: `id`, `scan_id` (FK → `scans.id`, `ON DELETE CASCADE`),
 `ip_hash` (SHA-256 adresu IP, NIGDY surowy adres), `created_at`.
 `UNIQUE (scan_id, ip_hash)` — ta sama osoba wracająca wielokrotnie liczy
-się raz.
+się raz. Od 2026-08-23 (punkt B) używane też jako mianownik ("wyświetlenia")
+wzoru procentowego automatycznego wycofania — NIE jest już kasowane przy
+zgłoszeniu niezgodności (patrz `link_mismatch_reports` niżej i POPRAWKA
+2026-08-23(a) wyżej).
 
 **`link_mismatch_reports`** (dodane 2026-08-21, punkt 5 audytu
 bezpieczeństwa) — zgłoszenia niezgodności treści ze źródłem: `id`,
@@ -2437,6 +2624,17 @@ DO CACHE'U"):
    `wallet_transactions` (np. `type: 'manual_adjustment'`) — inaczej ta
    reguła niesłusznie zatrzyma cały system.
 
+**Reguła D13 (dodana 2026-08-23, punkt D pakietu poprawek "przejrzystość
+kosztów + integralność PDF")** — TA SAMA powaga/zero tolerancji co grupa A
+wyżej, mimo że sprawdzana osobno w sekcji analizy PDF, zaraz po zebraniu
+wzorców ze wszystkich części dokumentu, PRZED zapisem do cache'u: jeśli
+numer strony (`page`) jakiegokolwiek wykrytego wzorca PRZEKRACZA
+rzeczywistą, niezależnie policzoną (pdf-lib) liczbę stron pliku —
+natychmiastowe zatrzymanie systemu, bez obciążenia zapytania, które to
+wykryło. Patrz POPRAWKA 2026-08-23(a), punkt D, po pełne uzasadnienie
+(w tym pułapkę z fragmentami książek, gdzie WIDOCZNY numer strony w treści
+nie jest tym samym co jej fizyczna pozycja w pliku).
+
 Grupa C — skala i jakość (progi liczbowe w `system_thresholds`, startowe
 zgadywanki do skorygowania na realnych danych produkcyjnych), sprawdzane w
 `logSystemIncident()`, wywoływanej OBOK (nie zamiast) istniejącego
@@ -2504,11 +2702,17 @@ komunikat w języku użytkownika, włączenie z powrotem wyłącznie ręczne.
 ## Cennik (do skalibrowania na realnych danych — na razie przybliżenia)
 
 - Tekst: `FIXED_FEE (2) + ceil(char_count / 1000) * MULTIPLIER (1)`.
-- Link: płaska stawka `URL_SCAN_COST = 6` — długości strony nie znamy
-  przed wywołaniem Gemini, więc nie da się wycenić dokładnie; analiza
-  linku wymaga zawsze konta (nie ma trybu anonimowego dla linków, żeby
-  ktoś nie wygenerował dużego kosztu API za darmo, podając link do
-  ogromnej strony).
+- **Link** (od POPRAWKA 2026-08-23(a), punkt C): TEN SAM wzór co tekst,
+  liczony od realnej liczby znaków strony — ale to wymaga NAJPIERW
+  darmowego pobrania strony (`fetchUrlAsText()`), więc cena jest znana
+  dopiero po tym kroku. Jeśli własne pobranie zawiedzie (np. strona wymaga
+  JavaScriptu), zostaje stara, płaska stawka `URL_SCAN_COST = 6` jako
+  uczciwy kompromis dla tej rzadkiej, awaryjnej ścieżki. Zawsze
+  dwuetapowa zgoda (`needs_confirmation`/`confirmed`, ten sam wzorzec co
+  PDF) — użytkownik widzi realną cenę PRZED obciążeniem. Analiza linku
+  wymaga zawsze konta (nie ma trybu anonimowego dla linków, żeby ktoś nie
+  wygenerował dużego kosztu API za darmo, podając link do ogromnej
+  strony).
 - Pierwszy skan anonimowy (tylko tryb tekstowy): darmowy do
   `ANONYMOUS_MAX_CHARS = 3000` znaków.
 - **Obraz**: stawka `IMAGE_SCAN_COST = 8` **za każdy obraz z osobna**, tak

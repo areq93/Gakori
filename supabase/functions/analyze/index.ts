@@ -53,9 +53,22 @@ const INITIAL_WALLET_BONUS = 20
 // bezpieczeństwa: "czy to, co naliczyliśmy, naprawdę zgadza się ze wzorem
 // dla tego typu treści"). Musi pozostać zsynchronizowane z gałęziami niżej
 // (image/url/pdf/text), które liczą `cost` po raz pierwszy.
-function computeExpectedCost(inputType: string, charCount: number, imageCount: number, pageCount: number): number {
+function computeExpectedCost(
+  inputType: string,
+  charCount: number,
+  imageCount: number,
+  pageCount: number,
+  urlFetchedCharCount: number | null
+): number {
   if (inputType === 'image') return IMAGE_SCAN_COST * imageCount
-  if (inputType === 'url') return URL_SCAN_COST
+  if (inputType === 'url') {
+    // POPRAWKA 2026-08-23(a) — cena linku liczona jest teraz wg prawdziwej
+    // liczby znaków pobranej strony (ten sam wzór co tekst), gdy własne
+    // darmowe pobranie się udało. Gdy zawiodło (urlFetchedCharCount===null),
+    // zostaje stara, płaska stawka — patrz gałąź "url" wyżej.
+    if (urlFetchedCharCount === null) return URL_SCAN_COST
+    return FIXED_FEE + Math.ceil(urlFetchedCharCount / 1000) * MULTIPLIER_PER_1000_CHARS
+  }
   if (inputType === 'pdf') return PDF_PAGE_COST * pageCount
   return FIXED_FEE + Math.ceil(charCount / 1000) * MULTIPLIER_PER_1000_CHARS
 }
@@ -165,9 +178,16 @@ async function maybeRecheckLinkFreshness(
     const fresh = await fetchUrlAsText(scanRow.source_url!)
     if (!fresh) return // strona dalej niepobieralna — zgodnie z oczekiwaniami, nic nie robimy
     if (looksSubstantiallyDifferent(scanRow.text_content!, fresh)) {
-      // Wygląda na rozbieżność — cofamy dotychczasowe ciche potwierdzenia,
-      // treść musi na nowo zbudować zaufanie (patrz GAKORI_CONTEXT.md).
-      await supabase.from('link_view_confirmations').delete().eq('scan_id', scanRow.id)
+      // POPRAWKA 2026-08-23(a) — dawniej ten darmowy, HEURYSTYCZNY test
+      // (prosty, bez człowieka) kasował ciche potwierdzenia. Punkt B
+      // audytu zastąpił cały mechanizm zaufania systemem procentowym
+      // opartym WYŁĄCZNIE na prawdziwych zgłoszeniach ludzi (patrz
+      // `report-link-mismatch`) — kasowanie tu psułoby ten licznik (m.in.
+      // zmniejszałoby mianownik "liczba wyświetleń" progu wycofania) na
+      // podstawie samej heurystyki, która może się mylić (np. strona
+      // legalnie skrócona). Świadomie NIC więcej tu nie robimy — to
+      // pozostaje tylko "szansa złapania oczywistej rozbieżności", prawdziwa
+      // ochrona jest w zgłoszeniach ludzi.
     }
   }
   // @ts-ignore — EdgeRuntime jest dostępny w środowisku Supabase Edge
@@ -186,11 +206,13 @@ async function maybeRecheckLinkFreshness(
 // Strona PDF-a liczona identycznie jak obraz kosztowo — ustalone wcześniej
 // w GAKORI_CONTEXT.md ("jedna strona PDF-a ≈ jeden obraz kosztowo").
 const PDF_PAGE_COST = IMAGE_SCAN_COST
-// Do tej liczby stron analiza rusza od razu, bez pytania o zgodę (tak jak
-// tekst/obraz/link). Powyżej: trzeba WPROST potwierdzić koszt (patrz sekcja
-// PDF w Deno.serve niżej) — kredytów może być sporo, a wybranie pliku samo
-// w sobie nie jest jeszcze świadomą zgodą na konkretny koszt.
-const PDF_AUTO_ANALYZE_MAX_PAGES = 20
+// POPRAWKA 2026-08-23(a), punkt C10 — dawniej analiza PDF-a ruszała od razu
+// bez pytania o zgodę do pewnej liczby stron (PDF_AUTO_ANALYZE_MAX_PAGES,
+// usunięte) i dopiero powyżej trzeba było WPROST potwierdzić koszt. Teraz,
+// w ramach ogólnej przejrzystości kosztów w całej aplikacji (patrz
+// GAKORI_CONTEXT.md), PDF ZAWSZE wymaga wprost potwierdzenia (patrz sekcja
+// PDF w Deno.serve niżej) — wybranie pliku samo w sobie nie jest jeszcze
+// świadomą zgodą na konkretny koszt, niezależnie od tego, jak mały plik.
 // POPRAWKA 2026-08-19 — świadomie OSTROŻNIEJSZE limity niż pierwotnie
 // planowane (150 stron / 20 MB), na podstawie realnych limitów Supabase
 // Edge Functions (sprawdzone na żywo): limit czasu ODPOWIEDZI to hojne
@@ -389,9 +411,9 @@ function isPdfFile(bytes: Uint8Array): boolean {
 }
 
 // Wczytuje PDF LOKALNIE (pdf-lib), bez angażowania Gemini — musi być
-// tanie/darmowe, bo wywołujemy to PRZED ewentualnym ekranem potwierdzenia
-// kosztu (patrz PDF_AUTO_ANALYZE_MAX_PAGES w Deno.serve niżej): użytkownik
-// nie zapłacił jeszcze za nic, więc nie możemy jeszcze nic wydać na Gemini.
+// tanie/darmowe, bo wywołujemy to PRZED ekranem potwierdzenia kosztu (patrz
+// punkt C10 w Deno.serve niżej, sekcja PDF): użytkownik nie zapłacił jeszcze
+// za nic, więc nie możemy jeszcze nic wydać na Gemini.
 // Zwraca cały wczytany dokument (nie tylko liczbę stron) — potrzebny
 // później też do wycinania fragmentów przy analizie w częściach (patrz
 // PDF_CHUNK_PAGES niżej), żeby nie parsować tych samych bajtów dwa razy.
@@ -1231,12 +1253,19 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json()
-    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, confirmed, force_refresh } = body
+    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, confirmed, force_refresh, refresh_scan_id } = body
     // Punkt 5 audytu bezpieczeństwa — "Sprawdź, czy coś się zmieniło",
     // WYŁĄCZNIE świadomy, płatny wybór użytkownika (nigdy automatyczny —
     // patrz GAKORI_CONTEXT.md). Omija cache i ratunek z ręcznie wklejonej
     // treści, żeby dać realną szansę na świeże, prawdziwe pobranie strony.
     const forceRefresh = force_refresh === true
+    // POPRAWKA 2026-08-23(a) — id ORYGINALNEGO wiersza `scans`, przekazywane
+    // WYŁĄCZNIE przy `forceRefresh` z "Sprawdź, czy coś się zmieniło" (patrz
+    // GAKORI_CONTEXT.md). Zamiast upsertować po `content_hash` (który po
+    // przejściu z ręcznie wklejonej treści na świeże pobranie linku jest
+    // INNY niż hash oryginalnego wiersza — stąd błąd z duplikatem wpisów w
+    // cache'u), sekcja 6 niżej NADPISZE ten dokładny wiersz.
+    const refreshScanId = forceRefresh && typeof refresh_scan_id === 'string' && refresh_scan_id ? refresh_scan_id : null
     const outputLanguage = typeof language === 'string' && LANGUAGE_NAMES[language] ? language : DEFAULT_LANGUAGE
     // Nazwa oryginalnego pliku PDF — WYŁĄCZNIE etykieta do wyświetlenia w
     // prywatnej historii użytkownika (patrz `scan_access` niżej), nigdy nie
@@ -1298,7 +1327,12 @@ Deno.serve(async (req: Request) => {
       .eq('language', outputLanguage)
       .maybeSingle()
 
-    if (existing && !(forceRefresh && existing.is_manual_source)) {
+    // POPRAWKA 2026-08-23(a), punkt B — treść automatycznie wycofana
+    // (`retracted`, patrz `report-link-mismatch`) NIGDY nie jest serwowana
+    // z cache'u za darmo, nawet gdy nie jest to odświeżenie — traktujemy to
+    // tak, jakby w cache'u jej po prostu nie było, i lecimy do pełnej,
+    // płatnej analizy niżej.
+    if (existing && !existing.retracted && !(forceRefresh && existing.is_manual_source)) {
       await supabase
         .from('scans')
         .update({ view_count: existing.view_count + 1 })
@@ -1336,7 +1370,18 @@ Deno.serve(async (req: Request) => {
       return new Response(
         // "id" pozwala frontendowi otworzyć pełny wynik jako osobną stronę
         // (scan.html?id=...) zamiast pokazywać go na tej samej stronie.
-        JSON.stringify({ cached: true, cost: 0, id: existing.id, result: existing.result, is_manual_source: !!existing.is_manual_source }),
+        JSON.stringify({
+          cached: true,
+          cost: 0,
+          id: existing.id,
+          result: existing.result,
+          is_manual_source: !!existing.is_manual_source,
+          // POPRAWKA 2026-08-23(a) — potrzebne frontendowi, żeby "Sprawdź,
+          // czy coś się zmieniło" mogło zbudować poprawne zapytanie typu
+          // "url" (z refresh_scan_id) niezależnie od tego, w jakim trybie
+          // ta treść powstała pierwotnie (patrz punkt A1, GAKORI_CONTEXT.md).
+          source_url: existing.source_url,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -1545,6 +1590,19 @@ Deno.serve(async (req: Request) => {
     let imageBytesList: Uint8Array[] = []
     let imageMimeTypes: string[] = []
     let pdfPageCount = 0
+    // Przejrzystość kosztów — POPRAWKA 2026-08-23(a), patrz GAKORI_CONTEXT.md,
+    // "Przejrzystość kosztów w całej aplikacji". Dla linku cena liczona jest
+    // teraz wg prawdziwej liczby znaków (tym samym wzorem co tekst), nie
+    // płaską stawką — ale wymaga to najpierw DARMOWEGO pobrania strony.
+    // `preFetchedText` trzymane tu (nie lokalnie w sekcji 5 niżej), żeby
+    // dwuetapowa zgoda na koszt (sprawdzenie → cena → potwierdzenie) mogła
+    // ponownie użyć już pobranej treści bez pobierania jej drugi raz w
+    // obrębie TEGO SAMEGO zapytania. `urlFetchedCharCount` = `null`, gdy
+    // własne pobranie zawiodło i zostajemy przy starej, płaskiej stawce
+    // (uczciwy kompromis dla tej rzadkiej, awaryjnej ścieżki) — patrz
+    // `computeExpectedCost()` i reguła 4 audytu bezpieczeństwa niżej.
+    let preFetchedText: string | null = null
+    let urlFetchedCharCount: number | null = null
     // Wczytany dokument PDF (pdf-lib) — ustawiany niżej w gałęzi "pdf",
     // trzymany tu, żeby sekcja 5 (wywołanie Gemini, `analyzePdfChunk()`)
     // mogła z niego wycinać fragmenty bez ponownego parsowania tych samych
@@ -1618,7 +1676,41 @@ Deno.serve(async (req: Request) => {
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      cost = URL_SCAN_COST
+      // Przejrzystość kosztów — POPRAWKA 2026-08-23(a). Zamiast płaskiej
+      // stawki URL_SCAN_COST, cena linku liczona jest teraz tak samo jak
+      // dla tekstu: wg prawdziwej liczby znaków strony. Wymaga to NAJPIERW
+      // darmowego pobrania treści (fetchUrlAsText — ta sama funkcja co
+      // sekcja 5 niżej i mechanizm ratunkowy, zero kosztu Gemini). Wynik
+      // trzymamy w hoisted `preFetchedText`, żeby sekcja 5 (już po
+      // potwierdzeniu) mogła użyć TEJ SAMEJ treści bez pobierania jej
+      // drugi raz w obrębie tego samego zapytania.
+      preFetchedText = await fetchUrlAsText(source_url)
+      if (preFetchedText) {
+        urlFetchedCharCount = preFetchedText.length
+        const blocks = Math.ceil(urlFetchedCharCount / 1000)
+        cost = FIXED_FEE + blocks * MULTIPLIER_PER_1000_CHARS
+      } else {
+        // Własne pobranie zawiodło (np. strona wymaga JavaScriptu) — nie
+        // znamy liczby znaków z góry, więc zostajemy przy starej, płaskiej
+        // stawce jako uczciwym kompromisie dla tej rzadkiej, awaryjnej
+        // ścieżki (Gemini "URL context" w sekcji 5 poniżej samo spróbuje
+        // pobrać stronę). `urlFetchedCharCount` zostaje `null` — patrz
+        // `computeExpectedCost()` i reguła 4 audytu bezpieczeństwa niżej.
+        cost = URL_SCAN_COST
+      }
+      // Dwuetapowa zgoda na koszt — dokładnie ten sam wzorzec co PDF niżej
+      // (needs_confirmation/confirmed). Samo sprawdzenie ceny NIE kosztuje
+      // Gemini (fetchUrlAsText to zwykłe, darmowe pobranie strony), ale
+      // żeby ktoś nie mógł bez końca "sondować" cudzych linków za darmo
+      // jako anonimowy proxy, liczymy to tym samym licznikiem nadużyć co
+      // sondowanie dużych PDF-ów.
+      if (confirmed !== true) {
+        await logFailedAttempt()
+        return new Response(
+          JSON.stringify({ needs_confirmation: true, estimated_cost: cost }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
     } else if (input_type === 'pdf') {
       // Tak jak link i obraz — PDF zawsze wymaga konta, nie ma darmowego
       // limitu anonimowego (nie znamy kosztu z góry, zanim policzymy strony).
@@ -1679,12 +1771,13 @@ Deno.serve(async (req: Request) => {
       }
       pdfPageCount = pageCount
       cost = PDF_PAGE_COST * pageCount
-      // Powyżej PDF_AUTO_ANALYZE_MAX_PAGES trzeba WPROST potwierdzić koszt —
+      // POPRAWKA 2026-08-23(a), punkt C10 — ZAWSZE trzeba WPROST potwierdzić
+      // koszt (dawniej tylko powyżej PDF_AUTO_ANALYZE_MAX_PAGES, usunięte) —
       // zwracamy BEZ wywoływania Gemini i BEZ obciążania konta (żadnych
       // kredytów jeszcze nie ruszamy). Frontend pokazuje ekran zgody z
       // page_count/estimated_cost i wysyła TO SAMO zapytanie ponownie z
       // confirmed:true, dopiero wtedy lecimy dalej do analizy.
-      if (pageCount > PDF_AUTO_ANALYZE_MAX_PAGES && confirmed !== true) {
+      if (confirmed !== true) {
         // POPRAWKA 2026-08-19 — "nieprzekraczalny mur" przeciw nadużyciu:
         // samo sprawdzenie kosztu nie kosztuje nas pieniędzy (liczenie stron
         // jest lokalne, za darmo), ALE zużywa realny czas procesora serwera
@@ -1823,7 +1916,10 @@ Deno.serve(async (req: Request) => {
         // w najczęstszym przypadku (zwykła strona) te 2 zapytania dają
         // wyższą jakość (zawężone kategorie) zamiast pełnej biblioteki.
         const rawTextNotice = `\n\nUWAGA: poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Skup się WYŁĄCZNIE na rzeczywistej treści artykułu/strony, ten szum wokół niej całkowicie zignoruj.`
-        const preFetchedText = await fetchUrlAsText(source_url)
+        // POPRAWKA 2026-08-23(a) — `preFetchedText` pobrane jest już WYŻEJ,
+        // w gałęzi wyceny kosztu (ten sam request, po stronie "2. WYCENA"),
+        // bo cena linku wymaga teraz znajomości liczby znaków. Nie pobieramy
+        // strony drugi raz — używamy hoisted zmiennej wprost.
 
         if (preFetchedText) {
           // Ścieżka główna (zdecydowana większość stron): mamy już tekst,
@@ -1881,10 +1977,13 @@ Deno.serve(async (req: Request) => {
           // literę) i nie wykrywa, czy treść strony zdążyła się od tamtej
           // pory zmienić — ten sam kompromis, jaki już akceptujemy w
           // całym cache'u.
+          // `retracted` (punkt B, POPRAWKA 2026-08-23(a)) wyklucza wiersz z
+          // ratunku tak samo jak z normalnego trafienia w cache wyżej.
           const { data: rescueCandidates } = await supabase
             .from('scans')
             .select('*')
             .eq('source_url', source_url)
+            .eq('retracted', false)
             .limit(5)
           const rescueExact = (rescueCandidates || []).find(
             (row: Record<string, unknown>) => row.language === outputLanguage
@@ -1910,7 +2009,7 @@ Deno.serve(async (req: Request) => {
               link_last_checked_at: string | null
             })
             return new Response(
-              JSON.stringify({ cached: true, cost: 0, id: rescueExact.id, result: rescueExact.result, is_manual_source: true }),
+              JSON.stringify({ cached: true, cost: 0, id: rescueExact.id, result: rescueExact.result, is_manual_source: true, source_url: rescueExact.source_url }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
           }
@@ -2163,7 +2262,15 @@ Deno.serve(async (req: Request) => {
           const rangeNote = isOnlyChunk
             ? ''
             : ` To jest FRAGMENT większego dokumentu — strony ${start + 1}-${end} z ${pdfPageCount}-stronicowego pliku. W polu "page" podawaj numer strony LICZĄC OD 1 W OBRĘBIE TEGO FRAGMENTU (nie oryginalnego dokumentu), czyli liczbę od 1 do ${chunkPageCount}.`
-          const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF — potraktuj go dokładnie tak samo jak tekst do analizy. Przeczytaj GO CAŁEGO, stronę po stronie, każdą stronę sprawdź tak samo uważnie jak pierwszą — nie ograniczaj się do najbardziej rzucających się w oczy fragmentów.${rangeNote} Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie szukać danego miejsca, sam cytat nie wystarczy.${CHAIN_OF_THOUGHT_INSTRUCTION}`
+          // POPRAWKA 2026-08-23(a), punkt D12 — doprecyzowanie znaczenia pola
+          // "page", żeby uniknąć fałszywych alarmów integralności (patrz
+          // D13 niżej) na dokumentach z WŁASNĄ, wydrukowaną numeracją innej
+          // niż fizyczna kolejność stron w pliku — np. fragment książki,
+          // gdzie widoczne na stronach numery to np. 43-55, a sam plik ma
+          // fizycznie tylko 13 stron. "page" MUSI zawsze być POZYCJĄ STRONY
+          // W PLIKU (licząc od 1), NIGDY numerem wydrukowanym w treści.
+          const pageFieldNote = ` W polu "page" podawaj WYŁĄCZNIE fizyczną pozycję strony W PRZESŁANYM PLIKU, licząc od 1 (pierwsza strona pliku = 1, druga = 2, itd.) — NIGDY numeru strony wydrukowanego/widocznego w treści dokumentu, nawet jeśli dokument ma własną numerację (np. fragment książki, gdzie strony pliku są ponumerowane np. 43, 44, 45...) — taki wydrukowany numer CAŁKOWICIE ZIGNORUJ, liczy się tylko fizyczna kolejność strony w tym konkretnym pliku.`
+          const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF — potraktuj go dokładnie tak samo jak tekst do analizy. Przeczytaj GO CAŁEGO, stronę po stronie, każdą stronę sprawdź tak samo uważnie jak pierwszą — nie ograniczaj się do najbardziej rzucających się w oczy fragmentów.${rangeNote} Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie szukać danego miejsca, sam cytat nie wystarczy.${pageFieldNote}${CHAIN_OF_THOUGHT_INSTRUCTION}`
           const geminiData = await callGemini(
             {
               contents: [
@@ -2218,6 +2325,26 @@ Deno.serve(async (req: Request) => {
         }
 
         const allPatterns = chunkResults.flatMap((r) => r!.patterns)
+        // POPRAWKA 2026-08-23(a), punkt D13 — integralność numeracji stron.
+        // Numer strony w "page" MUSI być pozycją w pliku (patrz doprecyzowany
+        // prompt w analyzePdfChunk wyżej — punkt D12) — nigdy wydrukowanym w
+        // treści numerem. Jeśli mimo doprecyzowanego prompta i naszego
+        // WŁASNEGO deterministycznego przeliczenia (offset fragmentu, patrz
+        // analyzePdfChunk) numer strony JEST WIĘKSZY niż faktyczna,
+        // niezależnie policzona (pdf-lib) liczba stron — to poważny sygnał
+        // integralności (model zignorował instrukcję albo halucynuje),
+        // traktowany z tą samą powagą co reguły 1-4: natychmiast zatrzymujemy
+        // system dla wszystkich, BEZ obciążania tego zapytania (żadna
+        // kolejna sekcja — cache, ładowanie kredytów — jeszcze się nie
+        // wykonała).
+        const badPagePattern = allPatterns.find(
+          (p) => typeof p.page === 'number' && (p.page as number) > pdfPageCount
+        )
+        if (badPagePattern) {
+          const reason = `Reguła D13: wzorzec wskazuje stronę ${badPagePattern.page} w ${pdfPageCount}-stronicowym pliku PDF — naruszenie integralności numeracji stron.`
+          await tripKillSwitch(reason)
+          return outageResponse(reason)
+        }
         // ETAP 2 — czyści listę zebraną z WSZYSTKICH części (duplikaty na
         // granicach sąsiednich fragmentów, słabe uzasadnienia) PRZED
         // pokazaniem jej użytkownikowi i PRZED napisaniem podsumowania
@@ -2343,7 +2470,7 @@ Deno.serve(async (req: Request) => {
       return outageResponse(reason)
     }
     if (user_id) {
-      const expectedCost = computeExpectedCost(input_type, char_count, imageBytesList.length, pdfPageCount)
+      const expectedCost = computeExpectedCost(input_type, char_count, imageBytesList.length, pdfPageCount, urlFetchedCharCount)
       if (cost !== expectedCost) {
         const reason = `Reguła 4: naliczono ${cost} kr., wzór wskazuje ${expectedCost} kr. (typ treści: ${input_type}).`
         await tripKillSwitch(reason)
@@ -2383,36 +2510,52 @@ Deno.serve(async (req: Request) => {
       return outageResponse(reason)
     }
 
-    // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników) —
-    // `upsert` (nie zwykły `insert`) na `content_hash,language`, tak żeby
-    // "Sprawdź, czy coś się zmieniło" (POPRAWKA 2026-08-21(v), `forceRefresh`
-    // wyżej) mogło NADPISAĆ istniejący wiersz świeżym wynikiem, zamiast
-    // wywalić się na ograniczeniu unikalności. Dla zwykłego, nowego
-    // zapytania (bez konfliktu) zachowuje się identycznie jak dawny `insert`.
-    const { data: newScan, error: insertError } = await supabase
-      .from('scans')
-      .upsert(
-        {
-          content_hash,
-          input_type,
-          language: outputLanguage,
-          is_translation: usedTranslation,
-          source_url: input_type === 'url' ? source_url : textSourceUrl,
-          text_content: input_type === 'text' ? text_content : null,
-          char_count: input_type === 'text' ? char_count : 0,
-          credits_charged: finalCost,
-          result,
-          discovered_by: user_id ?? null,
-          view_count: 1,
-          // Punkt 5 audytu bezpieczeństwa — oznacza treść, która pochodzi
-          // (bezpośrednio albo przez tłumaczenie) z ręcznego wklejenia,
-          // patrz GAKORI_CONTEXT.md, "Zaufanie do ręcznie wklejonych linków".
-          is_manual_source: sourcedFromManualPaste || (input_type === 'text' && !!textSourceUrl),
-        },
-        { onConflict: 'content_hash,language' }
-      )
-      .select()
-      .single()
+    // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników).
+    // POPRAWKA 2026-08-23(a) — gdy to odświeżenie konkretnego, znanego
+    // wiersza (`refreshScanId`, patrz wyżej), NADPISUJEMY DOKŁADNIE TEN
+    // WIERSZ (po `id`), zamiast `upsert` po `content_hash` — bo przy
+    // przejściu z ręcznie wklejonej treści na świeże pobranie linku nowy
+    // `content_hash` (z adresu URL) nigdy nie zgadza się ze starym (z
+    // treści), więc zwykły upsert tworzyłby DRUGI, zduplikowany wiersz
+    // zamiast nadpisać oryginał. Aktualizujemy tu też sam `content_hash`
+    // na ten nowy (URL-owy), żeby od teraz normalny cache po hashu też
+    // trafiał w ten sam wiersz. Dla zwykłego, nowego zapytania (bez
+    // odświeżenia) zachowuje się jak dawniej — `upsert` po
+    // `content_hash,language`.
+    const scanRow = {
+      content_hash,
+      input_type,
+      language: outputLanguage,
+      is_translation: usedTranslation,
+      source_url: input_type === 'url' ? source_url : textSourceUrl,
+      text_content: input_type === 'text' ? text_content : null,
+      char_count: input_type === 'text' ? char_count : 0,
+      credits_charged: finalCost,
+      result,
+      discovered_by: user_id ?? null,
+      // Punkt 5 audytu bezpieczeństwa — oznacza treść, która pochodzi
+      // (bezpośrednio albo przez tłumaczenie) z ręcznego wklejenia,
+      // patrz GAKORI_CONTEXT.md, "Zaufanie do ręcznie wklejonych linków".
+      is_manual_source: sourcedFromManualPaste || (input_type === 'text' && !!textSourceUrl),
+      // Punkt B audytu bezpieczeństwa — jeśli ten wiersz był wcześniej
+      // automatycznie wycofany (`retracted`, patrz `report-link-mismatch`),
+      // to dotarcie aż tutaj oznacza, że właśnie zapłacono za PRAWDZIWĄ,
+      // świeżą analizę tej treści (retracted wiersze nigdy nie są serwowane
+      // za darmo z cache'u/ratunku — patrz sekcja 2/5 wyżej) — czysta karta,
+      // zaufanie buduje się od nowa.
+      retracted: false,
+    }
+    // `view_count` NIE jest częścią odświeżenia — przy `refreshScanId`
+    // zachowujemy dotychczasowy licznik wyświetleń wiersza (m.in. wchodzi do
+    // wzoru procentowego automatycznego wycofania, punkt B audytu, patrz
+    // GAKORI_CONTEXT.md). Nowy wiersz startuje od 1, jak dawniej.
+    const { data: newScan, error: insertError } = refreshScanId
+      ? await supabase.from('scans').update(scanRow).eq('id', refreshScanId).select().single()
+      : await supabase
+          .from('scans')
+          .upsert({ ...scanRow, view_count: 1 }, { onConflict: 'content_hash,language' })
+          .select()
+          .single()
 
     // Jeśli zapis się nie uda, NIE kontynuujemy w ciemno (poprzednio kod
     // próbował dalej użyć newScan.id, co przy null-u wywalało się
@@ -2455,6 +2598,7 @@ Deno.serve(async (req: Request) => {
         id: newScan.id,
         result,
         is_manual_source: sourcedFromManualPaste || (input_type === 'text' && !!textSourceUrl),
+        source_url: scanRow.source_url,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

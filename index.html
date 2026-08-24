@@ -78,6 +78,7 @@
         <div class="mode-panel" id="panel-text">
             <p data-i18n="label_paste_text">Wklej tekst do analizy:</p>
             <textarea id="textInput" data-i18n-placeholder="placeholder_text_content" placeholder="Wklej treść, którą chcesz przeanalizować..."></textarea>
+            <p id="textCostEstimate" style="font-size:12px; color:var(--ink-soft); margin-top:4px;"></p>
             <p data-i18n="label_text_source_url_optional">Opcjonalnie: link do źródła (doda się do wyniku):</p>
             <input type="url" id="textSourceUrlInput" data-i18n-placeholder="placeholder_url" placeholder="https://...">
         </div>
@@ -89,6 +90,7 @@
             <div id="imagePasteDivider" style="text-align:center; color:var(--ink-soft); font-size:12px; margin:10px 0;" data-i18n="divider_or">— lub —</div>
             <div id="imagePasteZone" class="paste-zone" contenteditable="true" tabindex="0" data-i18n-content-placeholder="label_paste_image_zone" data-i18n-aria-label="label_paste_image_zone"></div>
             <div id="imageSelectionInfo"></div>
+            <p id="imageCostEstimate" style="font-size:12px; color:var(--ink-soft); margin-top:4px;"></p>
             <div id="imagePreviewList" class="image-preview-list"></div>
         </div>
 
@@ -103,17 +105,19 @@
         <div id="status" style="margin-top:10px"></div>
     </div>
 
-    <!-- Ekran zgody na koszt analizy długiego PDF-a (powyżej 20 stron) —
-         pokazywany TYLKO wtedy, gdy backend odpowie needs_confirmation:true
-         (patrz submitAnalysis() niżej). Do tego momentu NIC nie zostało
-         obciążone ani wysłane do Gemini — to czysto informacyjny krok. -->
+    <!-- Ekran zgody na koszt analizy — pokazywany TYLKO wtedy, gdy backend
+         odpowie needs_confirmation:true (patrz runAnalysisRequest() niżej).
+         POPRAWKA 2026-08-23(a) — teraz wspólny dla PDF (ZAWSZE, punkt C10)
+         i linku (ZAWSZE, punkt C9 — cena liczona wg realnej liczby znaków
+         strony). Do tego momentu NIC nie zostało obciążone ani wysłane do
+         Gemini — to czysto informacyjny krok. -->
     <div id="pdfConfirmOverlay" class="modal-overlay" style="display:none;">
         <div class="card">
             <h2 data-i18n="pdf_confirm_title">Potwierdź analizę</h2>
             <p id="pdfConfirmPages"></p>
             <p id="pdfConfirmCost"></p>
             <p id="pdfConfirmComparison" style="display:none; color:var(--ink-soft);"></p>
-            <p class="tagline" data-i18n="pdf_confirm_wait_notice">Dłuższe pliki mogą się analizować zauważalnie dłużej niż zwykle — to normalne.</p>
+            <p id="pdfConfirmWaitNotice" class="tagline" data-i18n="pdf_confirm_wait_notice">Dłuższe pliki mogą się analizować zauważalnie dłużej niż zwykle — to normalne.</p>
             <button type="button" id="pdfConfirmYes" data-i18n="btn_pdf_confirm_yes">Tak, analizuj</button>
             <div style="text-align:center; margin-top:10px;">
                 <a href="#" id="pdfConfirmNo" style="font-size:13px;" data-i18n="btn_pdf_confirm_no">Anuluj</a>
@@ -190,6 +194,23 @@
         const SUPABASE_URL = 'https://daulljwdoerclborpctb.supabase.co';
         const SUPABASE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/analyze';
         const REPORT_MISMATCH_FUNCTION_URL = SUPABASE_URL + '/functions/v1/report-link-mismatch';
+
+        // POPRAWKA 2026-08-23(a) — punkt C audytu bezpieczeństwa, przejrzystość
+        // kosztów. Te same liczby co w analyze/index.ts (FIXED_FEE,
+        // MULTIPLIER_PER_1000_CHARS, IMAGE_SCAN_COST) — świadomie "na sztywno"
+        // tu drugi raz, WYŁĄCZNIE do pokazania orientacyjnego kosztu W TRAKCIE
+        // wypełniania formularza, zanim jeszcze cokolwiek wyślemy. Prawdziwą,
+        // ostateczną cenę zawsze liczy i pilnuje wyłącznie backend (reguła 4
+        // audytu bezpieczeństwa) — jeśli kiedyś zmienimy te liczby w
+        // analyze/index.ts, trzeba zmienić je też tutaj, inaczej ten podgląd
+        // zacznie się rozjeżdżać z prawdziwą ceną (kosmetyczny błąd, nie
+        // luka bezpieczeństwa).
+        const EST_FIXED_FEE = 2;
+        const EST_MULTIPLIER_PER_1000_CHARS = 1;
+        const EST_IMAGE_SCAN_COST = 8;
+        function estimateTextCost(charCount) {
+            return EST_FIXED_FEE + Math.ceil(charCount / 1000) * EST_MULTIPLIER_PER_1000_CHARS;
+        }
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd'; // Project Settings -> API Keys -> Publishable key
 
         // Logowanie zależy od zewnętrznej biblioteki (CDN) — jeśli się nie wczyta
@@ -335,6 +356,7 @@
                 // stary tekst dalej "wisiał" w trybie Tekst). Czyścimy pola
                 // wejściowe wszystkich trybów, żeby ekran zawsze wracał czysty.
                 document.getElementById('textInput').value = ''
+                document.getElementById('textCostEstimate').innerText = ''
                 document.getElementById('urlInput').value = ''
                 selectedImageFiles = []
                 renderImagePreviewList()
@@ -764,6 +786,19 @@
                 setMode('url');
             }
 
+            // Punkt A3 audytu bezpieczeństwa — przycisk "Nie zgadzasz się?
+            // Wklej własną treść" na scan.html (patrz tamtejszy kod)
+            // przekierowuje tutaj z tym parametrem: zamiast ufać
+            // automatycznemu pobraniu linku, użytkownik od razu ląduje w
+            // trybie "Tekst" z gotowym do wypełnienia polem i już wpisanym
+            // linkiem źródła — musi tylko sam wkleić treść.
+            const prefillTextSource = params.get('prefill_text_source');
+            if (prefillTextSource && /^https?:\/\//i.test(prefillTextSource)) {
+                setMode('text');
+                document.getElementById('textSourceUrlInput').value = prefillTextSource;
+                document.getElementById('textInput').focus();
+            }
+
             receiveSharedImage(params);
         });
 
@@ -812,6 +847,19 @@
         document.querySelectorAll('.tab-btn[data-mode]').forEach(btn => {
             btn.addEventListener('click', () => setMode(btn.dataset.mode));
         });
+
+        // 3b. Przejrzystość kosztów (punkt C audytu bezpieczeństwa) — na
+        // bieżąco, w trakcie pisania/wybierania, pokazujemy orientacyjny
+        // koszt analizy tekstu i obrazów. Świadomie TYLKO orientacyjny
+        // (patrz estimateTextCost() wyżej) — ostateczną cenę zawsze
+        // wylicza i pilnuje backend.
+        const textInputEl = document.getElementById('textInput');
+        function updateTextCostEstimate() {
+            const len = textInputEl.value.length;
+            const estEl = document.getElementById('textCostEstimate');
+            estEl.innerText = len > 0 ? t('live_cost_estimate', { cost: estimateTextCost(len) }) : '';
+        }
+        textInputEl.addEventListener('input', updateTextCostEstimate);
 
         // 4. Wybór obrazów — ręcznie z pliku (przycisk, można zaznaczyć kilka
         // naraz), wklejone ze schowka (jeden na raz — tak działa wklejanie) ALBO
@@ -864,6 +912,13 @@
             const atLimit = selectedImageFiles.length >= MAX_SELECTED_IMAGES;
             pasteDivider.style.display = atLimit ? 'none' : '';
             pasteZone.style.display = atLimit ? 'none' : '';
+
+            // Punkt C audytu bezpieczeństwa — przejrzystość kosztów, patrz
+            // updateTextCostEstimate() wyżej po pełne uzasadnienie.
+            const imageCostEl = document.getElementById('imageCostEstimate');
+            imageCostEl.innerText = selectedImageFiles.length > 0
+                ? t('live_cost_estimate', { cost: EST_IMAGE_SCAN_COST * selectedImageFiles.length })
+                : '';
         }
 
         function addSelectedImageFiles(files) {
@@ -1280,6 +1335,21 @@
                             // limit miejsca w sessionStorage — pomijamy podgląd, nie blokujemy przejścia
                         }
                     }
+                    // Punkt C11 audytu bezpieczeństwa — przejrzystość kosztów.
+                    // "Ile TA analiza kosztowała TERAZ CIEBIE" to informacja
+                    // WYŁĄCZNIE dla osoby, która przed chwilą kliknęła
+                    // "Analizuj" — nie stały fakt widoczny na trwałej stronie
+                    // wyniku dla każdego, kto kiedykolwiek otworzy ten link
+                    // (ktoś inny mógł zobaczyć tę samą analizę za darmo z
+                    // cache'u, mimo że ten konkretny scan.id kosztował
+                    // pierwszą osobę kredyty). Ten sam jednorazowy mechanizm
+                    // co miniatury obrazów wyżej — scan.html odczytuje i
+                    // od razu kasuje.
+                    try {
+                        sessionStorage.setItem('gakori_scan_cost_' + data.id, JSON.stringify({ cost: data.cost, cached: !!data.cached }));
+                    } catch {
+                        // limit miejsca w sessionStorage — pomijamy "paragon", nie blokujemy przejścia
+                    }
                     // Przechodzimy w TEJ SAMEJ karcie na stronę z wynikiem
                     // (nie otwieramy nowej karty przeglądarki).
                     window.location.href = 'scan.html?id=' + encodeURIComponent(data.id);
@@ -1294,13 +1364,25 @@
             }
         }
 
-        // 7b. Ekran zgody na koszt długiego PDF-a — patrz needs_confirmation
-        // wyżej. Porównanie "ile to jest w kawach/herbatach" liczone przez
-        // costComparisonText() (i18n.js) — zwraca null, gdy koszt przekracza
-        // sensowny próg porównania (patrz tamtejszy komentarz), wtedy po
-        // prostu nie pokazujemy tej linijki.
+        // 7b. Ekran zgody na koszt — patrz needs_confirmation wyżej.
+        // POPRAWKA 2026-08-23(a) — wspólny dla PDF (zawsze podaje pageCount)
+        // i linku (pageCount === undefined, backend go nie zwraca dla trybu
+        // "url" — cena liczona wg realnej liczby znaków pobranej strony, nie
+        // stron pliku). Porównanie "ile to jest w kawach/herbatach" liczone
+        // przez costComparisonText() (i18n.js) — zwraca null, gdy koszt
+        // przekracza sensowny próg porównania (patrz tamtejszy komentarz),
+        // wtedy po prostu nie pokazujemy tej linijki.
         function showPdfConfirm(pageCount, estimatedCost, payload) {
-            document.getElementById('pdfConfirmPages').innerText = t('pdf_confirm_pages', { count: pageCount });
+            const pagesEl = document.getElementById('pdfConfirmPages');
+            if (typeof pageCount === 'number') {
+                pagesEl.innerText = t('pdf_confirm_pages', { count: pageCount });
+                pagesEl.style.display = '';
+            } else {
+                pagesEl.style.display = 'none';
+            }
+            // "Dłuższe pliki mogą się analizować dłużej" dotyczy tylko PDF-a
+            // — dla linku byłoby mylące, chwilę trwa tylko samo pobranie.
+            document.getElementById('pdfConfirmWaitNotice').style.display = typeof pageCount === 'number' ? '' : 'none';
             document.getElementById('pdfConfirmCost').innerText = t('pdf_confirm_cost', { cost: estimatedCost });
             const comparisonEl = document.getElementById('pdfConfirmComparison');
             const comparison = costComparisonText(estimatedCost, getCurrentLanguage());

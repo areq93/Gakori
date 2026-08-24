@@ -199,6 +199,34 @@ Deno.serve(async (req: Request) => {
     // statystyki miesięczne Brevo niedostępne
   }
 
+  // --- Punkt B audytu bezpieczeństwa (POPRAWKA 2026-08-23(a)) — wycofane
+  // automatycznie treści (`scans.retracted`) i zgłoszenia niezgodności w
+  // ostatnich 24h. WYŁĄCZNIE widoczność, nie wymaga żadnej reakcji — cały
+  // mechanizm jest w pełni automatyczny (patrz `report-link-mismatch`,
+  // GAKORI_CONTEXT.md), to tylko żeby właściciel miał to na oku.
+  let retractedTotal: number | null = null
+  let reports24h: number | null = null
+  try {
+    const { count, error } = await supabase
+      .from('scans')
+      .select('*', { count: 'exact', head: true })
+      .eq('retracted', true)
+    if (error) throw error
+    retractedTotal = count ?? 0
+  } catch (_err) {
+    // metryka wycofanych treści niedostępna
+  }
+  try {
+    const { count, error } = await supabase
+      .from('link_mismatch_reports')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', since(24))
+    if (error) throw error
+    reports24h = count ?? 0
+  } catch (_err) {
+    // metryka zgłoszeń niedostępna
+  }
+
   // --- Niedostarczone maile (send-auth-email nie zdołał wysłać przez
   // Brevo — np. limit dzienny) w ostatnich 24h, patrz GAKORI_CONTEXT.md,
   // "Ochrona przed limitem maili" (POPRAWKA 2026-08-21(u)) ---
@@ -272,11 +300,18 @@ Deno.serve(async (req: Request) => {
 
   const topCard = card('Najpopularniejsze analizy (top 5 na język)', topHtml)
 
+  const trustCard = card(
+    'Zaufanie do linków (punkt B)',
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(retractedTotal)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wycofanych automatycznie łącznie</span></div>
+<div style="font-size:14px;color:#374151;margin-top:6px;">zgłoszeń niezgodności w ostatnich 24h: ${fmt(reports24h)} — to działa w pełni automatycznie, nic nie musisz robić.</div>`
+  )
+
   const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto Twój dzienny przegląd Gakori — ${dateStr}.</p>
 ${registrationsCard}
 ${scansCard}
 ${creditsCard}
 ${emailsCard}
+${trustCard}
 ${topCard}
 <p style="color:#9ca3af;font-size:12px;margin-top:20px;">Ten raport wysyła się automatycznie raz dziennie. Wygenerowała go funkcja daily-report.</p>`
 

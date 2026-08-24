@@ -53,10 +53,12 @@
                 <summary id="scanTextSourceSummary"></summary>
                 <div id="scanTextSourceContent" class="scan-text-source-content"></div>
             </details>
+            <p id="scanRetractedNotice" style="display:none; color:var(--danger-text);"></p>
             <div id="scanManualSourceBox" style="display:none; margin-bottom:14px; font-size:13px;">
                 <p id="scanManualSourceNotice" style="color:var(--ink-soft);"></p>
                 <button id="scanReportMismatchBtn" type="button" style="margin-right:8px;" data-i18n="btn_report_mismatch">Zgłoś niezgodność z treścią źródła</button>
-                <button id="scanForceRefreshBtn" type="button" data-i18n="btn_force_refresh">Sprawdź, czy coś się zmieniło</button>
+                <button id="scanForceRefreshBtn" type="button" style="margin-right:8px;" data-i18n="btn_force_refresh">Sprawdź, czy coś się zmieniło</button>
+                <button id="scanPasteOwnContentBtn" type="button" data-i18n="btn_paste_own_content">Nie zgadzasz się? Wklej własną treść</button>
                 <p id="scanManualSourceStatus" style="margin-top:6px;"></p>
             </div>
             <div id="scanBadge" class="result-badge"></div>
@@ -65,6 +67,7 @@
                 <p class="summary-label" data-i18n="summary_label">Podsumowanie</p>
                 <p id="scanSummary" class="result-summary"></p>
             </div>
+            <p id="scanCostNotice" style="margin-top:10px; font-size:12px; color:var(--ink-soft);"></p>
         </div>
     </div>
 
@@ -286,7 +289,7 @@
                 showNotFound();
             } else {
                 sessionReady.then(() => sb.from('scans')
-                    .select('input_type, source_url, text_content, result, is_manual_source')
+                    .select('input_type, source_url, text_content, result, is_manual_source, retracted')
                     .eq('id', scanId)
                     .maybeSingle())
                     .then(({ data, error }) => {
@@ -328,6 +331,40 @@
                                     noticeEl.style.display = 'block';
                                 }
                             }
+                        }
+
+                        // Punkt C11 audytu bezpieczeństwa — przejrzystość kosztów.
+                        // "Paragon" zostawiony przez index.html (patrz tamtejszy
+                        // kod) — WYŁĄCZNIE dla osoby, która przed chwilą sama
+                        // uruchomiła TĘ analizę, jednorazowy odczyt (tak jak
+                        // miniatury obrazów wyżej). Ktoś inny otwierający ten sam
+                        // link później nic tu nie zobaczy — to nie jest stały,
+                        // publiczny fakt o wyniku, tylko osobisty "paragon".
+                        const costKey = 'gakori_scan_cost_' + scanId;
+                        const costRaw = sessionStorage.getItem(costKey);
+                        if (costRaw) {
+                            sessionStorage.removeItem(costKey);
+                            try {
+                                const costInfo = JSON.parse(costRaw);
+                                const costEl = document.getElementById('scanCostNotice');
+                                costEl.innerText = costInfo.cached
+                                    ? t('cost_free_cache_notice')
+                                    : t('cost_paid_notice', { cost: costInfo.cost });
+                                costEl.style.display = 'block';
+                            } catch {
+                                // uszkodzony zapis — po prostu nie pokazujemy paragonu
+                            }
+                        }
+
+                        // Punkt B audytu bezpieczeństwa — treść automatycznie
+                        // wycofana (patrz report-link-mismatch, GAKORI_CONTEXT.md).
+                        // Sam wynik nadal jest widoczny (to nie usunięcie), tylko
+                        // z wyraźnym ostrzeżeniem — backend już jej nie serwuje
+                        // jako zaufanej odpowiedzi z cache'u/ratunku nowym pytającym.
+                        if (data.retracted) {
+                            const retractedEl = document.getElementById('scanRetractedNotice');
+                            retractedEl.innerText = t('scan_retracted_notice');
+                            retractedEl.style.display = 'block';
                         }
 
                         const r = data.result;
@@ -430,45 +467,98 @@
                                 }
                             });
 
+                            // Punkt A4 audytu bezpieczeństwa — konkretne komunikaty
+                            // błędów zamiast jednego uniwersalnego, ten sam wzorzec
+                            // co errorMessageKeys w index.html (renderResult()).
+                            const refreshErrorMessageKeys = {
+                                signup_required: 'err_signup_required',
+                                insufficient_credits: 'err_insufficient_credits',
+                                url_fetch_failed: 'err_url_fetch_failed',
+                                save_failed: 'err_save_failed',
+                                system_paused: 'err_system_paused',
+                            };
+                            function showRefreshError(errorCode) {
+                                const key = refreshErrorMessageKeys[errorCode];
+                                manualStatusEl.innerHTML = '<span class="status-err">' + (key ? t(key) : t('result_generic_error')) + '</span>';
+                            }
+
                             // "Sprawdź, czy coś się zmieniło" — zawsze przez tryb
                             // "Link" na `source_url` (niezależnie od tego, czy TEN
                             // konkretny wpis jest input_type 'text' czy 'url') —
                             // to jedyny sposób, żeby realnie sprawdzić, czy strona
                             // już daje się pobrać automatycznie. Zawsze świadomy,
                             // płatny wybór (patrz `forceRefresh` w analyze/index.ts).
+                            // POPRAWKA 2026-08-23(a), punkt A — teraz DWUETAPOWO
+                            // (tak jak PDF): najpierw darmowe sprawdzenie/pobranie i
+                            // pokazanie realnej ceny, dopiero po wyraźnym "tak"
+                            // druga, płatna prośba z `confirmed:true`. `refresh_scan_id`
+                            // każe backendowi NADPISAĆ dokładnie TEN wiersz zamiast
+                            // tworzyć duplikat w cache'u (patrz analyze/index.ts).
                             if (data.source_url && /^https?:\/\//i.test(data.source_url)) {
+                                async function requestRefresh(confirmed) {
+                                    const hash = await sha256Hex(new TextEncoder().encode(data.source_url));
+                                    const authToken = currentSession ? currentSession.access_token : SUPABASE_ANON_KEY;
+                                    const body = {
+                                        input_type: 'url',
+                                        content_hash: hash,
+                                        source_url: data.source_url,
+                                        language: getCurrentLanguage(),
+                                        force_refresh: true,
+                                        refresh_scan_id: scanId,
+                                    };
+                                    if (confirmed) body.confirmed = true;
+                                    const res = await fetch(SUPABASE_FUNCTION_URL, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': 'Bearer ' + authToken,
+                                            'apikey': SUPABASE_ANON_KEY
+                                        },
+                                        body: JSON.stringify(body)
+                                    });
+                                    return res.json();
+                                }
                                 document.getElementById('scanForceRefreshBtn').addEventListener('click', async () => {
                                     manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
                                     try {
-                                        const hash = await sha256Hex(new TextEncoder().encode(data.source_url));
-                                        const authToken = currentSession ? currentSession.access_token : SUPABASE_ANON_KEY;
-                                        const res = await fetch(SUPABASE_FUNCTION_URL, {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'Authorization': 'Bearer ' + authToken,
-                                                'apikey': SUPABASE_ANON_KEY
-                                            },
-                                            body: JSON.stringify({
-                                                input_type: 'url',
-                                                content_hash: hash,
-                                                source_url: data.source_url,
-                                                language: getCurrentLanguage(),
-                                                force_refresh: true
-                                            })
-                                        });
-                                        const resData = await res.json();
-                                        if (resData.id) {
+                                        const resData = await requestRefresh(false);
+                                        if (resData.needs_confirmation) {
+                                            manualStatusEl.innerText = '';
+                                            const proceed = confirm(t('force_refresh_confirm_cost', { cost: resData.estimated_cost }));
+                                            if (!proceed) return;
+                                            manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
+                                            const confirmedData = await requestRefresh(true);
+                                            if (confirmedData.id) {
+                                                try {
+                                                    sessionStorage.setItem('gakori_scan_cost_' + confirmedData.id, JSON.stringify({ cost: confirmedData.cost, cached: !!confirmedData.cached }));
+                                                } catch {
+                                                    // limit sessionStorage — pomijamy "paragon"
+                                                }
+                                                window.location.href = 'scan.html?id=' + confirmedData.id;
+                                            } else {
+                                                showRefreshError(confirmedData.error);
+                                            }
+                                        } else if (resData.id) {
                                             window.location.href = 'scan.html?id=' + resData.id;
                                         } else {
-                                            manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
+                                            showRefreshError(resData.error);
                                         }
                                     } catch {
                                         manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
                                     }
                                 });
+
+                                // Punkt A3 audytu bezpieczeństwa — zamiast czekać na
+                                // (płatne) automatyczne sprawdzenie, użytkownik może
+                                // od razu wkleić własną, świeżą treść w trybie "Tekst"
+                                // z tym samym linkiem źródła już wpisanym — patrz
+                                // obsługa `prefill_text_source` w index.html.
+                                document.getElementById('scanPasteOwnContentBtn').addEventListener('click', () => {
+                                    window.location.href = 'index.html?prefill_text_source=' + encodeURIComponent(data.source_url);
+                                });
                             } else {
                                 document.getElementById('scanForceRefreshBtn').style.display = 'none';
+                                document.getElementById('scanPasteOwnContentBtn').style.display = 'none';
                             }
                         }
 

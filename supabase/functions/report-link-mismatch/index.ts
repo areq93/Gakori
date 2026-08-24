@@ -5,12 +5,24 @@
 // index.html/scan.html) — punkt 5 audytu bezpieczeństwa, "Zaufanie do
 // ręcznie wklejonych linków". Pełne uzasadnienie architektury (co
 // odrzuciliśmy po drodze i dlaczego — kary, próg "2 niezależnych
-// zgłoszeń" z porównaniem przez Gemini) — patrz GAKORI_CONTEXT.md.
+// zgłoszeń" z porównaniem przez Gemini, płaski próg=3 zgłoszeń) — patrz
+// GAKORI_CONTEXT.md.
 //
-// ŚWIADOMIE bez żadnych kar: zgłoszenie po prostu cofa dotychczasowe
-// "ciche potwierdzenia" zebrane dla tej treści (patrz `analyze/index.ts`,
-// `logQuietConfirmation()`) — treść musi na nowo zbudować zaufanie w
-// czasie. Nie musimy wiedzieć, kto ma rację, żeby to zadziałało.
+// POPRAWKA 2026-08-23(a) — punkt B dużego pakietu poprawek. Zgłoszenie
+// NIE kasuje już nic (dawne "ciche potwierdzenia" zostają — historia się
+// nie zeruje). Zamiast tego liczymy PROCENT: ile z osób, które faktycznie
+// obejrzały tę treść (`link_view_confirmations`, liczone bez podwójnego
+// liczenia tej samej osoby — patrz `analyze/index.ts`), zgłosiło
+// niezgodność (`link_mismatch_reports`, jedno zgłoszenie na konto). Przy
+// MINIMUM 50 wyświetleń i CO NAJMNIEJ 20% zgłoszeń treść jest automatycznie
+// oznaczana jako wycofana (`scans.retracted = true`) i znika z cache'u oraz
+// mechanizmu ratunkowego (patrz `analyze/index.ts`) — CAŁKOWICIE
+// automatycznie, bez żadnego ręcznego przeglądu (świadoma decyzja
+// właściciela — nie ma czasu na ręczne moderowanie).
+//
+// ŚWIADOMIE bez żadnych kar dla zgłaszającego ani dla wklejającego —
+// zgłoszenie to tylko sygnał, nie oskarżenie. Nie musimy wiedzieć, kto ma
+// rację, żeby to zadziałało — potrzeba realnej liczby różnych osób.
 //
 // Wymaga zalogowania (JWT z nagłówka Authorization) — inaczej zgłoszenie
 // nie miałoby do czego przypisać ograniczenia "raz na osobę na wynik"
@@ -22,6 +34,13 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Te same liczby co po stronie `analyze/index.ts` (dokumentacja w
+// GAKORI_CONTEXT.md) — świadomie "na sztywno" tu drugi raz, bo to osobna
+// funkcja wdrażana osobno; gdyby kiedyś trzeba było ją zmienić, zmienić w
+// obu miejscach.
+const RETRACTION_MIN_VIEWS = 50
+const RETRACTION_MIN_RATIO = 0.2
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -60,7 +79,7 @@ Deno.serve(async (req: Request) => {
     // ręcznego wklejenia — patrz `scans.is_manual_source`.
     const { data: scan, error: scanError } = await supabase
       .from('scans')
-      .select('id, is_manual_source')
+      .select('id, is_manual_source, retracted')
       .eq('id', scanId)
       .maybeSingle()
     if (scanError || !scan || !scan.is_manual_source) {
@@ -72,15 +91,39 @@ Deno.serve(async (req: Request) => {
 
     // UNIQUE (scan_id, reporter_user_id) w bazie — jedno konto może
     // zgłosić dany wynik tylko raz. Drugie zgłoszenie tej samej osoby po
-    // prostu nic nowego nie zmienia (traktujemy je jako sukces, nie błąd).
+    // prostu nic nowego nie zmienia (traktujemy je jako sukces, nie błąd) —
+    // stąd sprawdzamy `insertError?.code`, żeby odróżnić "już zgłoszone"
+    // (kod 23505, naruszenie unikalności) od prawdziwego błędu zapisu.
     const { error: insertError } = await supabase
       .from('link_mismatch_reports')
       .insert({ scan_id: scanId, reporter_user_id: user.id })
 
-    if (!insertError) {
-      // Nowe zgłoszenie — cofamy dotychczasowe ciche potwierdzenia, treść
-      // musi na nowo zbudować zaufanie.
-      await supabase.from('link_view_confirmations').delete().eq('scan_id', scanId)
+    if (insertError && insertError.code !== '23505') {
+      return new Response(JSON.stringify({ error: 'save_failed', details: insertError }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Procentowe automatyczne wycofanie (punkt B audytu bezpieczeństwa) —
+    // przeliczamy PRZY KAŻDYM zgłoszeniu (także powtórnym z tego samego
+    // konta, na wypadek gdyby wcześniejsze przeliczenie z jakiegoś powodu
+    // nie doszło do skutku — liczenie od zera jest tanie i bezpieczne).
+    if (!scan.retracted) {
+      const { count: viewCount } = await supabase
+        .from('link_view_confirmations')
+        .select('*', { count: 'exact', head: true })
+        .eq('scan_id', scanId)
+      const { count: reportCount } = await supabase
+        .from('link_mismatch_reports')
+        .select('*', { count: 'exact', head: true })
+        .eq('scan_id', scanId)
+
+      const views = viewCount ?? 0
+      const reports = reportCount ?? 0
+      if (views >= RETRACTION_MIN_VIEWS && reports / views >= RETRACTION_MIN_RATIO) {
+        await supabase.from('scans').update({ retracted: true }).eq('id', scanId)
+      }
     }
 
     return new Response(JSON.stringify({ ok: true }), {
