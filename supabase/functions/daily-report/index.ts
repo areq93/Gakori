@@ -242,6 +242,26 @@ Deno.serve(async (req: Request) => {
     // metryka niedostarczonych maili niedostępna
   }
 
+  // --- POPRAWKA 2026-08-25(c) — ile razy w ostatnich 24h przeglądarka
+  // sama musiała ponowić zapytanie do `analyze` po błędzie PLATFORMY
+  // (502/503/504 — Supabase/Cloudflare przerwały zapytanie w trakcie
+  // działania, nie nasz kod). WYŁĄCZNIE widoczność — pomaga ocenić, czy
+  // ponowienia (i podniesiony do 30s limit czasu Gemini) faktycznie coś
+  // dają, i orientacyjnie ile to może nas kosztować (każde ponowienie to
+  // ryzyko podwójnie/potrójnie opłaconego zapytania do Gemini, patrz
+  // GAKORI_CONTEXT.md) — nie wymaga żadnej akcji samo w sobie.
+  let edgeRetries24h: number | null = null
+  try {
+    const { count, error } = await supabase
+      .from('edge_function_retries')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', since(24))
+    if (error) throw error
+    edgeRetries24h = count ?? 0
+  } catch (_err) {
+    // metryka ponowień niedostępna
+  }
+
   // --- Budowanie treści maila ---
   const fmt = (v: number | null, unit = '') => (v === null ? 'brak danych' : `${Math.round(v * 10) / 10}${unit}`)
   const dateStr = new Date().toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' })
@@ -270,6 +290,15 @@ Deno.serve(async (req: Request) => {
   const creditsCard = card(
     'Kredyty',
     `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(creditsSpentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wydanych dziś</span></div>`
+  )
+
+  const retriesHtml =
+    edgeRetries24h && edgeRetries24h > 0
+      ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">Uwaga: ${edgeRetries24h}× w ostatnich 24h przeglądarka musiała sama ponowić zapytanie po błędzie platformy — każde takie ponowienie to ryzyko podwójnie opłaconego zapytania do Gemini. Jeśli ta liczba rośnie, warto to zbadać.</p>`
+      : ''
+  const retriesCard = card(
+    'Ponowienia po błędzie platformy',
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(edgeRetries24h)} <span style="font-size:14px;font-weight:400;color:#6b7280;">w ostatnich 24h</span></div>${retriesHtml}`
   )
 
   const emailFailuresHtml =
@@ -310,6 +339,7 @@ Deno.serve(async (req: Request) => {
 ${registrationsCard}
 ${scansCard}
 ${creditsCard}
+${retriesCard}
 ${emailsCard}
 ${trustCard}
 ${topCard}

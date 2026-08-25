@@ -1253,6 +1253,37 @@
         // "Sprawdź, czy coś się zmieniło" wiedziały, czego dotyczą.
         let currentResultScanId = null;
         let lastAnalysisPayload = null;
+
+        // POPRAWKA 2026-08-25(c) audytu bezpieczeństwa — czasem sama
+        // platforma (Supabase/Cloudflare) przerywa nasze zapytanie w
+        // trakcie działania, zanim nasz kod zdąży cokolwiek zwrócić (błąd
+        // 502/503/504 — nie nasz własny, czysty komunikat JSON, którego
+        // NIGDY nie ponawiamy, bo dałby dokładnie ten sam wynik drugi
+        // raz). Zamiast każenia użytkownikowi klikać "ponów próbę" (i
+        // ryzykować, że się zniechęci i ucieknie) — próbujemy SAMI, RAZ,
+        // po cichu w tle; użytkownik cały czas widzi te same, zmieniające
+        // się komunikaty statusu, nie wie, że coś w ogóle poszło nie tak
+        // za pierwszym razem. Świadomie TYLKO jedna dodatkowa próba (nie
+        // więcej) — każde ponowienie może nas kosztować prawdziwe
+        // pieniądze (Gemini mogło już wygenerować odpowiedź, zanim nas
+        // przerwano) — patrz GAKORI_CONTEXT.md. Logujemy każde ponowienie
+        // (fire-and-forget, nigdy nie blokuje ani nie psuje samej próby),
+        // żeby było widać w raporcie dziennym, jak często się to zdarza.
+        async function fetchAnalyzeWithRetry(url, options, inputTypeForLogging) {
+            let res;
+            try {
+                res = await fetch(url, options);
+            } catch {
+                res = null;
+            }
+            if (res && ![502, 503, 504].includes(res.status)) return res;
+            if (sb) {
+                sb.from('edge_function_retries').insert({ input_type: inputTypeForLogging || null }).then(() => {}, () => {});
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            return fetch(url, options);
+        }
+
         async function runAnalysisRequest(payload, imagePreviewDataUrls) {
             const statusEl = document.getElementById('status');
             const payloadEl = document.getElementById('payload-data');
@@ -1290,7 +1321,7 @@
                 // Niezalogowany: publiczny klucz projektu — serwer potraktuje to jak anonima.
                 const authToken = currentSession ? currentSession.access_token : SUPABASE_ANON_KEY;
 
-                const res = await fetch(SUPABASE_FUNCTION_URL, {
+                const res = await fetchAnalyzeWithRetry(SUPABASE_FUNCTION_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1298,7 +1329,7 @@
                         'apikey': SUPABASE_ANON_KEY
                     },
                     body: JSON.stringify(payload)
-                });
+                }, payload.input_type);
                 const data = await res.json();
 
                 clearInterval(statusInterval);

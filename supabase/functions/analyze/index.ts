@@ -709,7 +709,14 @@ const PDF_VERIFICATION_SCHEMA = {
   required: ['patterns'],
 }
 
-const GEMINI_TIMEOUT_MS = 20000 // 20s na pojedyncze zapytanie do Gemini
+// POPRAWKA 2026-08-25(c) — podniesione z 20s na 30s po żywym zgłoszeniu
+// błędów 502 (EDGE_FUNCTION_ERROR) przy analizie linku — realny czas
+// jednego zapytania (23,3s) w logu Supabase był bliski staremu limitowi.
+// Ostrożny, eksperymentalny krok (nie drastyczny skok, żeby nie ryzykować
+// bardzo długich pojedynczych zawieszeń) — patrz GAKORI_CONTEXT.md po
+// pełne uzasadnienie i uczciwe zastrzeżenie, że NIE MAMY pewności, że to
+// był prawdziwy powód (może to sufit samej platformy, nie ten limit).
+const GEMINI_TIMEOUT_MS = 30000 // 30s na pojedyncze zapytanie do Gemini
 const FALLBACK_FETCH_TIMEOUT_MS = 10000 // 10s na awaryjne, bezpośrednie pobranie strony
 
 // Owija fetch() twardym limitem czasu — bez tego POJEDYNCZE wolne albo

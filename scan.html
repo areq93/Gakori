@@ -95,6 +95,26 @@
             console.error(e);
         }
 
+        // POPRAWKA 2026-08-25(c) audytu bezpieczeństwa — patrz ten sam
+        // mechanizm w index.html (runAnalysisRequest) po pełne
+        // uzasadnienie. Jedna dodatkowa, cicha próba przy błędzie
+        // platformy (502/503/504/sieć), NIGDY przy naszym własnym,
+        // czystym błędzie JSON.
+        async function fetchAnalyzeWithRetry(url, options, inputTypeForLogging) {
+            let res;
+            try {
+                res = await fetch(url, options);
+            } catch {
+                res = null;
+            }
+            if (res && ![502, 503, 504].includes(res.status)) return res;
+            if (sb) {
+                sb.from('edge_function_retries').insert({ input_type: inputTypeForLogging || null }).then(() => {}, () => {});
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            return fetch(url, options);
+        }
+
         if (!sb) {
             document.getElementById('scanLoading').innerHTML =
                 '<p class="status-err">' + t('scan_load_error') + '</p>';
@@ -525,7 +545,7 @@
                                         refresh_scan_id: scanId,
                                     };
                                     if (confirmed) body.confirmed = true;
-                                    const res = await fetch(SUPABASE_FUNCTION_URL, {
+                                    const res = await fetchAnalyzeWithRetry(SUPABASE_FUNCTION_URL, {
                                         method: 'POST',
                                         headers: {
                                             'Content-Type': 'application/json',
@@ -533,7 +553,7 @@
                                             'apikey': SUPABASE_ANON_KEY
                                         },
                                         body: JSON.stringify(body)
-                                    });
+                                    }, 'url');
                                     return res.json();
                                 }
                                 document.getElementById('scanForceRefreshBtn').addEventListener('click', async () => {

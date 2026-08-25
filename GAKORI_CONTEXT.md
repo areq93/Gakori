@@ -2205,6 +2205,105 @@ zanim założysz, że działa.
       → Edge Functions → analyze → Logs), żeby zobaczyć realny powód —
       nie da się tego wiarygodnie zdiagnozować z samego kodu bez
       dostępu do logów z produkcji.
+    - **POPRAWKA 2026-08-25(c) — diagnoza błędów 502 (EDGE_FUNCTION_ERROR)
+      z prawdziwych logów + ciche automatyczne ponowienie.** Kontynuacja
+      POPRAWKI 2026-08-25(b) wyżej — właściciel przesłał prawdziwe logi z
+      Supabase Dashboard (zakładka "Invocations", nie "Logs" — ważne
+      rozróżnienie, patrz niżej).
+
+      **Ważna nauka o czytaniu logów Supabase**: zakładka "Logs" pokazuje
+      też zwykłe, techniczne zdarzenia SAMEJ PLATFORMY (uruchomienie/
+      wyłączenie instancji funkcji, `"reason": "EarlyDrop"`,
+      `cpu_time_used` rzędu pojedynczych mikrosekund) — to NIE są błędy
+      analizy, tylko rutynowe cykle "silnika" (częste zaraz po nowym
+      wdrożeniu). Prawdziwe, konkretne zapytania HTTP (z kodem
+      odpowiedzi, czasem trwania, treścią zapytania) trzeba szukać w
+      zakładce **"Invocations"**.
+
+      **Znaleziony konkretny przypadek**: `"response.status_code": "502"`,
+      `"response.headers.sb_error_code": "EDGE_FUNCTION_ERROR"`,
+      `"execution_time_ms": "23325"` (23,3s), rozmiar zapytania 269 bajtów
+      (typowy dla analizy linku — za mały na PDF/obraz). **To NIE jest
+      błąd z naszego kodu** (nasz kod zawsze grzecznie zwraca JSON, nawet
+      przy błędzie) — to sama platforma (Supabase/Cloudflare) przerwała
+      działanie funkcji w trakcie.
+
+      **Test wydajności PRZED wyciągnięciem wniosków** — zanim
+      obwiniliśmy nowe czyszczenie strony (POPRAWKA 2026-08-25), sprawdzono
+      to empirycznie: syntetyczna, bardzo "ciężka" strona (8000 elementów,
+      1,4 MB) przechodzi przez `fetchUrlAsText()` w ~75 milisekund —
+      **to WYKLUCZA czyszczenie strony jako przyczynę** tego konkretnego
+      problemu.
+
+      **Najbardziej prawdopodobne wytłumaczenie**: analiza linku to w
+      środku kilka KOLEJNYCH (sekwencyjnych) zapytań do Gemini (dobór
+      kategorii → główna analiza → czasem druga runda) — każde miało
+      limit 20s. Dwa wolniejsze zapytania z rzędu (np. 10s + 13s) łatwo
+      dają ponad 23s łącznie — a to prawdopodobnie trafia w jakiś twardy
+      sufit samej platformy (Cloudflare stoi przed Supabase,
+      `response.headers.server: cloudflare` w logu), niezależny od
+      naszych własnych limitów w kodzie. **Uczciwe zastrzeżenie: nie mamy
+      100% pewności co do dokładnego mechanizmu** — nie mamy dostępu do
+      wewnętrznej dokumentacji dokładnych limitów tego konkretnego planu
+      Supabase.
+
+      **Decyzja z właścicielem (ważna rozmowa o kosztach)**:
+      1. Właściciel odrzucił pierwszy pomysł ("skróćmy limit, żeby nasz
+         kod poddawał się szybciej i grzeczniej") — słusznie zauważył, że
+         to nie naprawia problemu, tylko szybciej się poddaje: "chcę żeby
+         to działało, a nie żeby użytkownik co chwilę klikał ponów, bo
+         się wkurzy i ucieknie".
+      2. Zamiast tego: **automatyczne, ciche ponowienie w tle** (frontend,
+         `fetchAnalyzeWithRetry()` w `index.html` i `scan.html`) — TYLKO
+         przy błędzie PLATFORMY (rzucony wyjątek sieciowy albo status
+         502/503/504), NIGDY przy naszym własnym, czystym błędzie JSON
+         (np. "brak kredytów" — to dałoby dokładnie ten sam wynik drugi
+         raz, więc ponawianie nie ma sensu). Użytkownik nic nie widzi —
+         te same, już istniejące, rotujące komunikaty statusu lecą dalej,
+         nie wie, że pierwsza próba w ogóle padła.
+      3. **Właściciel trafnie zapytał: "a koszty nam się nie zwiększają?"**
+         — i miał rację, żeby zapytać. Jeśli platforma zabija nas W
+         TRAKCIE wywołania Gemini, Google mogło już wygenerować (i
+         policzyć) odpowiedź, mimo że MY nigdy jej nie dostaliśmy —
+         ponowienie w takim wypadku oznacza REALNĄ, PODWÓJNĄ zapłatę za
+         Gemini (a przy nieudanym ponowieniu — nawet potrójną, gdyby były
+         dwie dodatkowe próby). Długi czas (23s) przed błędem silnie
+         sugeruje, że Gemini już pracowało. **Świadomie ograniczone do
+         TYLKO JEDNEJ dodatkowej próby** (nie więcej) — połowuje ryzyko
+         (×2 zamiast ×3) względem pierwotnego pomysłu.
+      4. **Co nas i tak chroni**: reguła 8 (limit kosztu pojedynczego
+         zapytania) i reguła 10 (dzienny budżet + wyłącznik) — nawet w
+         najgorszym scenariuszu strata ma twardy sufit, nie jest
+         "bez dna".
+      5. **Nowa tabela `edge_function_retries`** (`id`, `created_at`,
+         `input_type`) — frontend wstawia wiersz (fire-and-forget, nigdy
+         nie blokuje) przy KAŻDYM ponowieniu. `daily-report` liczy wiersze
+         z ostatnich 24h i pokazuje w mailu ("Ponowienia po błędzie
+         platformy") — WYŁĄCZNIE widoczność, żeby właściciel realnie
+         widział częstotliwość zjawiska (i orientacyjnie mógł ocenić
+         skalę dodatkowego kosztu), zamiast zgadywać. RLS: `INSERT`
+         dozwolony dla każdego (anon + zalogowani), zero publicznej
+         polityki `SELECT` (jak reszta tabel `system_*`) — odczyt
+         wyłącznie przez `service_role` w `daily-report`.
+      6. **`GEMINI_TIMEOUT_MS` podniesiony z 20s na 30s** (na wyraźną
+         prośbę właściciela — "może do 30 sekund") jako ostrożny,
+         eksperymentalny krok. Właściciel trafnie zapytał, czy samo
+         czekanie kosztuje nas więcej — **nie**: Gemini rozlicza się za
+         liczbę przetworzonych/wygenerowanych tokenów, nie za czas
+         oczekiwania na odpowiedź, więc wydłużenie limitu samo w sobie
+         NIE zwiększa kosztu. **Uczciwe zastrzeżenie**: to NIE jest pewna
+         naprawa — jeśli prawdziwym sufitem jest limit samej platformy
+         (nie nasz `GEMINI_TIMEOUT_MS`), podniesienie limitu nic nie da,
+         zobaczymy to po częstotliwości ponowień w kolejnych dniach
+         (patrz punkt 5 wyżej). Jeśli 502 nadal będzie się zdarzać z
+         podobną częstotliwością mimo dłuższego limitu — to potwierdzenie,
+         że to sufit platformy, i trzeba szukać innej drogi (np.
+         ograniczenia liczby sekwencyjnych wywołań Gemini w jednej
+         analizie linku).
+
+      **Baza danych** (nowe elementy): `edge_function_retries` (`id`,
+      `created_at`, `input_type`), RLS włączone, `INSERT` dla wszystkich,
+      brak publicznego `SELECT`.
     - **POPRAWKA 2026-08-21(d) — bfcache czyścił formularz ZA PÓŹNO
       (zostawał stary wklejony tekst).** Żywy przykład: po analizie i
       powrocie do menu wklejona wcześniej treść dalej "wisiała" w trybie
@@ -2646,6 +2745,13 @@ patrz "Prywatność PDF-ów" niżej):
 - `UNIQUE (scan_id, user_id)` — backend robi `upsert` z `onConflict:
   'scan_id,user_id'`, więc ponowne przesłanie tego samego pliku przez tę
   samą osobę odświeża `source_filename`/`created_at`, nie duplikuje wiersza.
+
+**`edge_function_retries`** (dodane 2026-08-25, POPRAWKA 2026-08-25(c)) —
+widoczność częstotliwości cichych automatycznych ponowień po błędzie
+platformy (502/503/504), patrz tamtejszy opis: `id`, `created_at`,
+`input_type` (text, nullable). RLS: `INSERT` dla wszystkich (anon +
+zalogowani), brak publicznej polityki `SELECT` — odczyt wyłącznie przez
+`service_role` w `daily-report`.
 
 RLS: `scans` ma publiczny odczyt dla `input_type <> 'pdf'` (używane przez
 niezalogowanych w przeglądarce publicznych analiz i na `scan.html`). Dla
