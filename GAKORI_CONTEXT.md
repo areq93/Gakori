@@ -2117,6 +2117,94 @@ zanim założysz, że działa.
       wzrost jest policzalny i na razie nie powinien być problemem przy
       obecnej skali, ale warto to mieć na uwadze przy projektowaniu punktu
       o podobieństwie treści.
+    - **POPRAWKA 2026-08-25(b) — spójność wyników: `temperature: 0` na
+      WSZYSTKICH wywołaniach Gemini + naprawa dopasowania uciętych
+      cytatów.** Żywy przykład od właściciela, bardzo poważny: ta sama
+      (albo niemal ta sama — patrz niżej) treść dała w trybie "Link" wzorzec
+      "Argument z Autorytetu", a w trybie "Tekst" zupełnie inny —
+      "Krąg Kompetencji"; ten sam mechanizm "Efekt Pewności Wstecznej"
+      wykryty w obu przypadkach, ale raz jako `pattern_type: "manipulation"`
+      (wzorzec), raz jako `"reasoning"` (obserwacja) — sprzeczna ocena tego
+      samego zjawiska. Właściciel: "ta sama treść musi dawać ten sam
+      rezultat, nieważne jakim trybem jest analizowana — to konieczność
+      naszej jakości".
+
+      **Przyczyna**: żadne z ~12 wywołań `callGemini()` w kodzie nie miało
+      ustawionej `temperature` — model działał na domyślnej wartości
+      (dość wysokiej, "kreatywnej"), więc identyczny prompt na identycznym
+      tekście mógł dać różne wyniki za każdym razem. To fundamentalna
+      cecha działania LLM-ów (nie "błąd" jako taki), ale dla narzędzia,
+      którego sensem jest POWTARZALNA, zaufana ocena tej samej treści —
+      to realny problem zaufania, nie kosmetyka.
+
+      **Naprawa**: `temperature: 0` dodane do WSZYSTKICH wywołań Gemini
+      (kategoryzacja, główna analiza, druga runda szukania wzorców,
+      weryfikacja/scalanie PDF i obrazu, każdy fragment PDF-a i każdy
+      obraz osobno, tłumaczenie, składanie podsumowań PDF/obrazu,
+      ratunkowa ścieżka "URL context") — maksymalny determinizm, jaki
+      Gemini oferuje. **Uczciwe zastrzeżenie**: `temperature: 0` znacząco
+      ZMNIEJSZA (nie eliminuje w 100%) losowość — infrastruktura
+      wykonawcza dużych modeli (równoległość na wielu maszynach,
+      zaokrąglenia zmiennoprzecinkowe) może w rzadkich przypadkach nadal
+      dać drobne różnice. To najlepsze dostępne narzędzie, nie gwarancja
+      matematyczna.
+
+      **Druga, powiązana przyczyna różnic — nieidentyczny tekst wejściowy**:
+      właściciel sam zauważył, że treść w obu trybach była "minimalnie
+      różna ze względu na dłuższe klamry w jednym przypadku" — ręcznie
+      wklejony tekst i automatycznie pobrany+oczyszczony tekst linku (patrz
+      POPRAWKA 2026-08-25 wyżej) nie są sobie gwarantowane być bajt w bajt
+      identyczne (różny zakres wycinka, różne miejsce ucięcia). To osobna
+      przyczyna od samej losowości modelu — `temperature: 0` jej nie
+      rozwiązuje, bo różny tekst wejściowy to świadomie różne dane
+      wejściowe, nie błąd. Jeśli po tej poprawce rozjazdy między trybami
+      nadal będą się zdarzać dla tekstów różniących się nawet w niewielkim
+      zakresie — to sygnał do dalszej pracy nad odpornością modelu na małe
+      zmiany tekstu (temat na przyszłość, patrz backlog "Wzmocnić
+      wykrywanie wzorców").
+
+      **Naprawa dopasowania uciętych cytatów** (`scan.html`,
+      `findQuoteRange()`) — osobny, mniejszy błąd zgłoszony przy okazji:
+      "Pokaż pełny tekst źródłowy" nie podświetlał wcale cytatu dla
+      wzorca "Efekt Pewności Wstecznej", mimo że tekst realnie w nim był.
+      Przyczyna: pole "quote" zwrócone przez Gemini bywało UCIĘTE
+      wielokropkiem na końcu ("...") zamiast być pełnym, dosłownym
+      fragmentem — sam wielokropek nigdy nie występuje w oryginalnym
+      tekście, więc dopasowanie (dokładne i przybliżone) zawodziło
+      całkowicie. Naprawione dwutorowo: (a) `findQuoteRange()` próbuje
+      teraz dopasować cytat jako PREFIKS po odcięciu końcowego
+      wielokropka; (b) `buildSystemPrompt()` (sekcja WIERNOŚĆ CYTATU)
+      wprost zabrania kończenia cytatu wielokropkiem — model ma wybrać
+      krótszy, w pełni kompletny fragment zamiast ucinać dłuższy.
+
+      **Ograniczenie rozmiaru surowego HTML-a przed czyszczeniem**
+      (`fetchUrlAsText()`, `MAX_RAW_HTML_CHARS = 800000`) — dodane
+      ostrożnościowo przy okazji zgłoszenia "analiza czasem trwa bardzo
+      długo (nawet ponad minutę) i pierwsza próba czasem się nie udaje,
+      też przy PDF-ie". Kilka nowych przebiegów regex w `fetchUrlAsText()`
+      (wycinanie `<article>`, usuwanie szumu, zachowanie akapitów, patrz
+      POPRAWKA 2026-08-25 wyżej) kosztuje procesor proporcjonalnie do
+      długości strony — dla bardzo dużych, nietypowych stron ucinamy
+      surowy HTML z góry, PRZED czyszczeniem, żeby chronić ostry limit
+      czasu PROCESORA Supabase Edge Functions (patrz "Wąskie gardło to
+      limit CZASU PROCESORA" przy `PDF_HARD_MAX_PAGES` wyżej — to samo
+      ograniczenie platformy dotyczy KAŻDEGO zapytania, nie tylko PDF-a).
+      **Uczciwe zastrzeżenie — TO NIE JEST pełna diagnoza zgłoszonej
+      powolności**: architektura analizy to zawsze była sekwencja WIELU
+      wywołań Gemini (kategoryzacja → główna analiza → czasem druga runda
+      → dla PDF/obrazu jeszcze więcej), z limitem `GEMINI_TIMEOUT_MS =
+      20000` (20s) NA KAŻDE POJEDYNCZE wywołanie — kilka wolnych wywołań z
+      rzędu może się realnie złożyć na ponad minutę łącznego czasu, co nie
+      jest nowym zjawiskiem tej poprawki. Dodatkowo od POPRAWKA
+      2026-08-23(a) każda ŚWIEŻA analiza linku wymaga TERAZ DWÓCH
+      osobnych zapytań (darmowe sprawdzenie ceny + właściwa, potwierdzona
+      analiza) — to architektura zamierzona (przejrzystość kosztów), ale
+      podwaja liczbę potrzebnych pobrań strony. Błąd "analiza się nie
+      udała" przy PIERWSZEJ próbie (bez zmian w kodzie PDF-a w tej
+      poprawce) wymaga zajrzenia do prawdziwych logów (Supabase Dashboard
+      → Edge Functions → analyze → Logs), żeby zobaczyć realny powód —
+      nie da się tego wiarygodnie zdiagnozować z samego kodu bez
+      dostępu do logów z produkcji.
     - **POPRAWKA 2026-08-21(d) — bfcache czyścił formularz ZA PÓŹNO
       (zostawał stary wklejony tekst).** Żywy przykład: po analizie i
       powrocie do menu wklejona wcześniej treść dalej "wisiała" w trybie

@@ -218,6 +218,21 @@
                 let idx = normFullLower.indexOf(lowerNormQuote);
                 if (idx !== -1) return toOriginal(idx, idx + lowerNormQuote.length);
 
+                // POPRAWKA 2026-08-25 — model czasem ucina długi cytat
+                // wielokropkiem NA KOŃCU ("...", "…") zamiast podać go w
+                // całości — sam wielokropek nigdy nie występuje dosłownie w
+                // oryginalnym tekście, więc dopasowanie zawodziło całkowicie
+                // (zgłoszone na żywo: cytat w karcie wzorca widoczny, ale
+                // NIC nie podświetlone w źródle). Usuwamy końcowy
+                // wielokropek i próbujemy dopasować to, co zostało, jako
+                // PREFIKS — nie musi się kończyć dokładnie w tym miejscu w
+                // oryginale.
+                const trailingEllipsis = lowerNormQuote.match(/^(.*?)[.…]{1,3}\s*$/);
+                if (trailingEllipsis && trailingEllipsis[1].length >= 15) {
+                    idx = normFullLower.indexOf(trailingEllipsis[1]);
+                    if (idx !== -1) return toOriginal(idx, idx + trailingEllipsis[1].length);
+                }
+
                 const words = lowerNormQuote.split(' ');
                 for (let skip = 1; skip <= 3 && skip < words.length; skip++) {
                     const shortened = words.slice(skip).join(' ');

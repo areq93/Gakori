@@ -353,6 +353,7 @@ ${contentPrompt}`
   const requestBody: Record<string, unknown> = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
+      temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
       responseMimeType: 'application/json',
       responseSchema: CATEGORY_RESPONSE_SCHEMA,
     },
@@ -492,7 +493,7 @@ BEZPIECZEŃSTWO: Tekst po etykiecie "TEKST DO ANALIZY" (albo treść pobrana spo
 
 KTO NAPRAWDĘ TWIERDZI, ŻE COŚ SIĘ WYDARZYŁO (KRYTYCZNIE WAŻNE): Zanim uznasz, że autor opisuje SWOJE prawdziwe przeżycie (i na tej podstawie np. rozpoznasz Efekt Halo, odwołanie do emocji albo autorytet osobistego doświadczenia) — sprawdź, kto w zdaniu jest faktycznym podmiotem twierdzenia. Zdania typu "z reklamy dowiedziałem się, że rzekomo...", "reklama/oszust twierdziła, że...", "podszywali się pode mnie i pisali, że..." oznaczają, że autor RELACJONUJE cudze (fałszywe) twierdzenie na swój temat — nie dzieli się prawdziwym doświadczeniem, tylko demaskuje kłamstwo. W takim wypadku wzorcem manipulacji jest samo DZIAŁANIE OSZUSTÓW opisane w tekście (np. fałszywa reklama wykorzystująca czyjś wizerunek/nazwisko) — NIGDY nie nazywaj tego "wykorzystaniem trudnych przeżyć autora", skoro autor wprost pisze, że nic takiego się nie wydarzyło. Pomylenie relacji o cudzym kłamstwie z prawdziwym wyznaniem to poważny błąd, który obraca ofiarę oszustwa w rzekomego manipulatora — czytaj uważnie.
 
-WIERNOŚĆ CYTATU (KRYTYCZNIE WAŻNE, ZASADA NADRZĘDNA): Nie masz prawa w żaden sposób zmieniać treści źródła, gdy się do niej odwołujesz. Pole "quote" to NIE Twoja redakcja ani parafraza — to fragment wycięty dosłownie z analizowanego tekstu, litera w literę, taki jaki tam naprawdę jest. Zabronione jest: zmienianie wielkości liter (także pierwszej litery, żeby "ładniej" zaczynało zdanie), ucinanie lub dodawanie choćby jednego słowa, poprawianie interpunkcji, "wygładzanie" niezręcznych sformułowań. Jeśli fragment w oryginale zaczyna się małą literą po spójniku (np. "i", "a", "ale") — Twój cytat też musi zacząć się dokładnie tak, małą literą. Czytelnik musi mieć możliwość odnaleźć Twój cytat jako dosłowny fragment analizowanego tekstu — każda, nawet najmniejsza zmiana łamie tę zasadę i podważa wiarygodność całej analizy.
+WIERNOŚĆ CYTATU (KRYTYCZNIE WAŻNE, ZASADA NADRZĘDNA): Nie masz prawa w żaden sposób zmieniać treści źródła, gdy się do niej odwołujesz. Pole "quote" to NIE Twoja redakcja ani parafraza — to fragment wycięty dosłownie z analizowanego tekstu, litera w literę, taki jaki tam naprawdę jest. Zabronione jest: zmienianie wielkości liter (także pierwszej litery, żeby "ładniej" zaczynało zdanie), ucinanie lub dodawanie choćby jednego słowa, poprawianie interpunkcji, "wygładzanie" niezręcznych sformułowań. Jeśli fragment w oryginale zaczyna się małą literą po spójniku (np. "i", "a", "ale") — Twój cytat też musi zacząć się dokładnie tak, małą literą. NIGDY nie kończ cytatu wielokropkiem ("...") jako skrótem dłuższej wypowiedzi — jeśli fragment jest zbyt długi (limit 200 znaków, patrz niżej), wybierz krótszy, w pełni kompletny fragment, który sam w sobie oddaje mechanizm (zdanie albo jego spójna część), zamiast ucinać dłuższy w połowie. Czytelnik musi mieć możliwość odnaleźć Twój cytat jako dosłowny fragment analizowanego tekstu — każda, nawet najmniejsza zmiana łamie tę zasadę i podważa wiarygodność całej analizy.
 
 MIKRO-KROK (KRYTYCZNIE WAŻNE): Pole "tip" to NIGDY zadanie, projekt ani lista kroków — to JEDNA malutka czynność, którą czytelnik wykona od razu, w kilkanaście sekund, bez wysiłku i bez żadnej wiedzy specjalistycznej. Test na to, czy podpowiedź jest wystarczająco mała: jeśli zawiera więcej niż jedno polecenie (np. dwie czynności połączone słowem "i"/"oraz" albo przecinkiem) — jest za duża, uprość ją do jednej rzeczy. Złe przykłady (za duże, brzmią jak praca): "zweryfikuj wiarygodność źródła i porównaj z innymi doniesieniami", "sprawdź metodologię badania oraz kompetencje autora". Dobre przykłady (jeden mały krok, da się zrobić od ręki): "wpisz to zdanie w wyszukiwarkę i zobacz, kto jeszcze o tym pisze", "sprawdź datę pod artykułem", "poszukaj tej samej informacji w jeszcze jednym miejscu". Czytelnik nie może poczuć, że czeka go trudne zadanie — ma poczuć, że może to zrobić od razu, jednym kliknięciem albo jednym spojrzeniem.
 
@@ -797,6 +798,7 @@ ${JSON.stringify(result)}`
     {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
+        temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
         responseMimeType: 'application/json',
         responseSchema,
       },
@@ -868,6 +870,7 @@ ${originalContent}`
     {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
+        temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
         responseMimeType: 'application/json',
         responseSchema: ADDITIONAL_PATTERNS_SCHEMA,
       },
@@ -929,6 +932,7 @@ ${JSON.stringify(patterns)}`
     {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
+        temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
         responseMimeType: 'application/json',
         responseSchema: PDF_VERIFICATION_SCHEMA,
       },
@@ -972,7 +976,12 @@ q_score: ${qScore}
 Wykryte wzorce:
 ${compactList}`
 
-  const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] }, geminiKey, GEMINI_TIMEOUT_MS, costTracker)
+  const data = await callGemini(
+    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } },
+    geminiKey,
+    GEMINI_TIMEOUT_MS,
+    costTracker
+  )
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   return typeof text === 'string' && text.trim() ? text.trim() : ''
 }
@@ -1009,6 +1018,7 @@ ${JSON.stringify(patterns)}`
     {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
+        temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
         responseMimeType: 'application/json',
         responseSchema: IMAGE_VERIFICATION_SCHEMA,
       },
@@ -1047,7 +1057,12 @@ q_score: ${qScore}
 Wykryte wzorce:
 ${compactList}`
 
-  const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] }, geminiKey, GEMINI_TIMEOUT_MS, costTracker)
+  const data = await callGemini(
+    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } },
+    geminiKey,
+    GEMINI_TIMEOUT_MS,
+    costTracker
+  )
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
   return typeof text === 'string' && text.trim() ? text.trim() : ''
 }
@@ -1164,6 +1179,18 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     )
     if (!res.ok) return null
     let html = await res.text()
+    // POPRAWKA 2026-08-25 — ochrona limitu czasu procesora Supabase Edge
+    // Function (patrz PDF_HARD_MAX_PAGES wyżej — to samo ograniczenie
+    // platformy: tylko kilka sekund REALNEJ pracy procesora na całe
+    // zapytanie). Kilka kolejnych przebiegów regex niżej (wycinanie
+    // <article>, usuwanie szumu, zachowanie akapitów) kosztuje procesor
+    // proporcjonalnie do długości strony — dla bardzo dużych,
+    // nietypowych stron (setki KB-MB surowego HTML-a) ucinamy z góry,
+    // zanim zaczniemy czyścić. Finalny tekst i tak jest ograniczony do
+    // 20000 znaków niżej — treść artykułu prawie zawsze mieści się dużo
+    // wcześniej niż ten limit surowego HTML-a.
+    const MAX_RAW_HTML_CHARS = 800_000
+    if (html.length > MAX_RAW_HTML_CHARS) html = html.slice(0, MAX_RAW_HTML_CHARS)
 
     html = html
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -2059,6 +2086,7 @@ Deno.serve(async (req: Request) => {
                 },
               ],
               generationConfig: {
+                temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
                 responseMimeType: 'application/json',
                 responseSchema: DETECTION_RESPONSE_SCHEMA,
               },
@@ -2171,6 +2199,7 @@ Deno.serve(async (req: Request) => {
                 ],
                 tools: [{ urlContext: {} }],
                 generationConfig: {
+                  temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
                   responseMimeType: 'application/json',
                   responseSchema: DETECTION_RESPONSE_SCHEMA,
                 },
@@ -2237,6 +2266,7 @@ Deno.serve(async (req: Request) => {
                 },
               ],
               generationConfig: {
+                temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
                 responseMimeType: 'application/json',
                 responseSchema: IMAGE_CHUNK_SCHEMA,
               },
@@ -2397,6 +2427,7 @@ Deno.serve(async (req: Request) => {
                 },
               ],
               generationConfig: {
+                temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
                 responseMimeType: 'application/json',
                 responseSchema: PDF_DETECTION_RESPONSE_SCHEMA,
               },
@@ -2497,6 +2528,7 @@ Deno.serve(async (req: Request) => {
           {
             contents: [{ parts: [{ text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nTEKST DO ANALIZY:\n${text_content}` }] }],
             generationConfig: {
+              temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
               responseMimeType: 'application/json',
               responseSchema: DETECTION_RESPONSE_SCHEMA,
             },
