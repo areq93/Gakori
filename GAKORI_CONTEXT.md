@@ -2304,6 +2304,63 @@ zanim założysz, że działa.
       **Baza danych** (nowe elementy): `edge_function_retries` (`id`,
       `created_at`, `input_type`), RLS włączone, `INSERT` dla wszystkich,
       brak publicznego `SELECT`.
+    - **POPRAWKA 2026-08-25(d) — naprawa niespójności wyników: ratunek po
+      `source_url` sprawdzany TERAZ ZAWSZE, nie tylko gdy własne pobranie
+      zawiedzie.** Najpoważniejsze znalezisko z całej serii testów
+      "spójność analiz" — realny błąd, nie kosmetyka.
+
+      **Żywy przykład błędu**: właściciel wkleił tekst artykułu + link do
+      niego w trybie "Tekst" (dostał wynik A: wzorce "Framing" +
+      "Efekt Halo", 35/100). Potem wkleił TEN SAM link w trybie "Link" —
+      zamiast dostać z powrotem wynik A za darmo (to dokładnie po to
+      istnieje mechanizm ratunkowy, patrz POPRAWKA 2026-08-21(v)), dostał
+      **zupełnie inny wynik B** (wzorce "Framing" — inny cytat! — +
+      "Argument z Autorytetu", 45/100) i **zapłacił za to kredytami**.
+
+      **Prawdziwa przyczyna**: kod ratunkowy (`rescueExact`/
+      `rescueOriginal` po `source_url`) żył WYŁĄCZNIE w gałęzi "własne
+      pobranie strony zawiodło" (sekcja 5, `else` przy `if
+      (preFetchedText)`) — czyli sprawdzał się TYLKO wtedy, gdy
+      `fetchUrlAsText()` nie dawało rady pobrać strony. Zanim POPRAWKA
+      2026-08-25 (oczyszczanie stron) znacząco podniosła skuteczność
+      własnego pobierania, ta ścieżka i tak była rzadko używana — ale im
+      lepiej fetchUrlAsText() sobie radzi, tym RZADZIEJ ratunek w ogóle
+      się uruchamiał, mimo że mechanizm miał być właśnie dla tego rodzaju
+      przypadków (ta sama treść, inny tryb wejścia). Efekt uboczny
+      poprawy jednej rzeczy (jakość pobierania) ujawnił defekt w innej
+      (spójność cache'u) — klasyczny przykład, dlaczego trzeba patrzeć na
+      system jako całość, nie punktowo.
+
+      **Naprawa**: sprawdzenie ratunku przeniesione z sekcji 5 do
+      NAJWCZEŚNIEJSZEGO możliwego miejsca w gałęzi "url" — zaraz po
+      sprawdzeniu `!user_id`, PRZED jakimkolwiek własnym pobraniem strony
+      czy wyceną kosztu. Jeśli ratunek istnieje — użytkownik dostaje go
+      OD RAZU, za darmo, **bez ekranu zgody na koszt w ogóle** (bo nie ma
+      czego wyceniać — to trafienie w cache, nie nowa analiza). Dopiero
+      brak ratunku (albo świadome `forceRefresh` z "Sprawdź, czy coś się
+      zmieniło") prowadzi dalej do darmowego sprawdzenia ceny i
+      ewentualnej płatnej analizy. `geminiKey` (potrzebny do
+      `translateResult()` przy `rescueOriginal`) przeniesiony wyżej w
+      funkcji z tego samego powodu. Zdublowana logika ratunku w sekcji 5
+      usunięta — gdyby kod tam dotarł, ratunek na pewno już nie istnieje
+      (albo `forceRefresh`), więc jedyne, co zostaje, to awaryjna próba
+      pobrania przez samo narzędzie Gemini "URL context".
+
+      **Właściciel wprost o stawce**: "nie możemy przyjąć, że ten sam
+      tekst daje dwa modele, bo tak stracimy wiarygodność u odbiorców co
+      do naszej jakości. to musi zostać dobrze poprawione" — ta reguła
+      (jedna treść → jeden, spójny wynik, niezależnie od trybu wejścia)
+      jest teraz architektonicznie wymuszona dla linku, nie tylko
+      deklarowana.
+
+      **Odłożone na dalszy namysł** (świadomie NIE zbudowane teraz,
+      właściciel: "jeżeli będzie trzeba, może zmodyfikujemy jaśniej naszą
+      bazę modeli, żeby lepiej wyjaśniała, jak działają — ale to tylko
+      jedna koncepcja"): dalsze doprecyzowanie biblioteki modeli
+      mentalnych/promptu, gdyby MIMO tej naprawy (i `temperature: 0` z
+      POPRAWKI 2026-08-25(b)) nadal zdarzały się rozjazdy dla tekstów
+      różniących się w niewielkim zakresie — do oceny po tym, jak te dwie
+      poprawki się "ułożą" w praktyce.
     - **POPRAWKA 2026-08-21(d) — bfcache czyścił formularz ZA PÓŹNO
       (zostawał stary wklejony tekst).** Żywy przykład: po analizie i
       powrocie do menu wklejona wcześniej treść dalej "wisiała" w trybie

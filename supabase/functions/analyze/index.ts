@@ -1730,6 +1730,17 @@ Deno.serve(async (req: Request) => {
       return null
     }
 
+    // Model: gemini-3.5-flash-lite (~$0,30/$2,50 za mln tokenów, sprawdzone
+    // 13.08.2026). Generacja 2.5 Flash już nie odpowiada przez API.
+    // Flash-Lite to świadomy wybór, nie kompromis: nasze zadanie to prosta
+    // klasyfikacja tekstu, nie potrzebuje droższego "pełnego" Flash (3.6,
+    // $1,50/$7,50 - 5x drożej, zoptymalizowanego pod kodowanie i zadania
+    // agentowe). POPRAWKA 2026-08-25(d) — przeniesione tu (dawniej dopiero
+    // w sekcji 5) — potrzebne już wcześniej, w gałęzi "url" niżej, do
+    // ewentualnego tłumaczenia wyniku ratunkowego (rescueOriginal) PRZED
+    // wyceną kosztu, patrz uzasadnienie tam.
+    const geminiKey = Deno.env.get('GEMINI_API_KEY')
+
     let cost: number
     let imageBytesList: Uint8Array[] = []
     let imageMimeTypes: string[] = []
@@ -1819,6 +1830,81 @@ Deno.serve(async (req: Request) => {
           JSON.stringify({ error: 'signup_required', message: 'Załóż konto, aby analizować linki.' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+      }
+      // POPRAWKA 2026-08-25(d) — punkt spójności audytu bezpieczeństwa.
+      // Żywy błąd, który to wymusił: użytkownik wkleił tekst+link w
+      // trybie "Tekst" (dostał wynik A), potem wkleił TEN SAM link w
+      // trybie "Link" i dostał ZUPEŁNIE INNĄ analizę (wynik B) — bo
+      // ratunek po `source_url` (patrz niżej) był sprawdzany WYŁĄCZNIE,
+      // gdy własne pobranie strony zawiodło. Od POPRAWKI 2026-08-25
+      // (oczyszczanie stron) własne pobranie udaje się dużo częściej, więc
+      // ratunek prawie nigdy nie był już sprawdzany — a dwie różne analizy
+      // TEJ SAMEJ treści niszczą zaufanie do jakości Gakori ("to musi
+      // zostać dobrze poprawione" — właściciel). Dlatego sprawdzamy
+      // ratunek TERAZ, ZAWSZE, ZANIM w ogóle pomyślimy o własnym pobraniu
+      // czy cenie — jeśli ktoś już wcześniej ręcznie wkleił treść tej
+      // samej strony, oddajemy JEJ wynik od razu, za darmo, BEZ ekranu
+      // zgody na koszt. `forceRefresh` to jedyny, świadomy, płatny
+      // wyjątek — "Sprawdź, czy coś się zmieniło" ma prawo pominąć to i
+      // spróbować naprawdę świeżego pobrania.
+      if (!forceRefresh) {
+        const { data: rescueCandidates } = await supabase
+          .from('scans')
+          .select('*')
+          .eq('source_url', source_url)
+          .eq('retracted', false)
+          .limit(5)
+        const rescueExact = (rescueCandidates || []).find(
+          (row: Record<string, unknown>) => row.language === outputLanguage
+        )
+        const rescueOriginal = (rescueCandidates || []).find(
+          (row: Record<string, unknown>) =>
+            row.is_translation === false &&
+            Array.isArray((row.result as { patterns?: unknown })?.patterns)
+        )
+        if (rescueExact) {
+          await supabase
+            .from('scans')
+            .update({ view_count: (rescueExact.view_count as number) + 1 })
+            .eq('id', rescueExact.id)
+          // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,
+          // "Zaufanie do ręcznie wklejonych linków".
+          await logQuietConfirmation(supabase, rescueExact.id as string, req)
+          await maybeRecheckLinkFreshness(supabase, rescueExact as {
+            id: string
+            source_url: string | null
+            text_content: string | null
+            link_last_checked_at: string | null
+          })
+          return new Response(
+            JSON.stringify({ cached: true, cost: 0, id: rescueExact.id, result: rescueExact.result, is_manual_source: true, source_url: rescueExact.source_url }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        if (rescueOriginal) {
+          await logQuietConfirmation(supabase, rescueOriginal.id as string, req)
+          await maybeRecheckLinkFreshness(supabase, rescueOriginal as {
+            id: string
+            source_url: string | null
+            text_content: string | null
+            link_last_checked_at: string | null
+          })
+          const translated = await translateResult(
+            rescueOriginal.result as Record<string, unknown>,
+            outputLanguage,
+            geminiKey!,
+            RESPONSE_SCHEMA,
+            costTracker
+          )
+          if (translated) {
+            return new Response(
+              JSON.stringify({ cached: true, cost: 0, id: rescueOriginal.id, result: translated, is_manual_source: true, source_url: rescueOriginal.source_url }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          // Tłumaczenie się nie udało — spadamy do normalnej ścieżki
+          // niżej (własne pobranie / płatna analiza), bez błędu.
+        }
       }
       // Przejrzystość kosztów — POPRAWKA 2026-08-23(a). Zamiast płaskiej
       // stawki URL_SCAN_COST, cena linku liczona jest teraz tak samo jak
@@ -1984,12 +2070,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 5. WYWOŁANIE GEMINI (wymuszony JSON wg schematu)
-    // Model: gemini-3.5-flash-lite (~$0,30/$2,50 za mln tokenów, sprawdzone 13.08.2026).
-    // Generacja 2.5 Flash już nie odpowiada przez API. Flash-Lite to świadomy
-    // wybór, nie kompromis: nasze zadanie to prosta klasyfikacja tekstu, nie
-    // potrzebuje droższego "pełnego" Flash (3.6, $1,50/$7,50 - 5x drożej,
-    // zoptymalizowanego pod kodowanie i zadania agentowe).
-    const geminiKey = Deno.env.get('GEMINI_API_KEY')
+    // `geminiKey` przeniesiony wyżej (POPRAWKA 2026-08-25(d)) — patrz tam.
 
     let result: Record<string, unknown> | null = null
     let usedTranslation = false
@@ -2108,90 +2189,19 @@ Deno.serve(async (req: Request) => {
           secondPassText = preFetchedText
           secondPassSystemPrompt = `${systemPrompt}${rawTextNotice}`
         } else {
-          // POPRAWKA 2026-08-21(c) — zanim w ogóle sięgniemy po (płatną)
-          // próbę pobrania przez Gemini "URL context", sprawdzamy coś
-          // zupełnie innego, darmowego: czy ktoś inny nie przeanalizował
-          // już DOKŁADNIE tej samej strony w trybie "Tekst" (ręcznie
-          // wklejając jej treść razem z TYM SAMYM linkiem jako źródło —
-          // patrz opcjonalne pole linku w panelu tekstowym `index.html`,
-          // bo np. jemu też nie udało się automatyczne pobranie). Jeśli
-          // tak — oddajemy ten gotowy wynik od razu, za darmo (to
-          // realnie trafienie w cache, tylko po `source_url` zamiast po
-          // `content_hash` — te dwa nie są tym samym wierszem, bo tryb
-          // linku hashuje SAM ADRES, a tryb tekstu hashuje WKLEJONĄ
-          // TREŚĆ). To naturalne rozszerzenie efektu skali
-          // współdzielonego cache'u (patrz GAKORI_CONTEXT.md) na strony,
-          // których nasza automatyka fizycznie nie potrafi pobrać — jedna
-          // osoba "ratuje" analizę dla wszystkich kolejnych. Uczciwe
-          // ograniczenie: wymaga DOKŁADNIE tego samego adresu (litera w
-          // literę) i nie wykrywa, czy treść strony zdążyła się od tamtej
-          // pory zmienić — ten sam kompromis, jaki już akceptujemy w
-          // całym cache'u.
-          // `retracted` (punkt B, POPRAWKA 2026-08-23(a)) wyklucza wiersz z
-          // ratunku tak samo jak z normalnego trafienia w cache wyżej.
-          const { data: rescueCandidates } = await supabase
-            .from('scans')
-            .select('*')
-            .eq('source_url', source_url)
-            .eq('retracted', false)
-            .limit(5)
-          const rescueExact = (rescueCandidates || []).find(
-            (row: Record<string, unknown>) => row.language === outputLanguage
-          )
-          const rescueOriginal = (rescueCandidates || []).find(
-            (row: Record<string, unknown>) =>
-              row.is_translation === false &&
-              Array.isArray((row.result as { patterns?: unknown })?.patterns)
-          )
-
-          if (rescueExact && !forceRefresh) {
-            await supabase
-              .from('scans')
-              .update({ view_count: (rescueExact.view_count as number) + 1 })
-              .eq('id', rescueExact.id)
-            // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,
-            // "Zaufanie do ręcznie wklejonych linków".
-            await logQuietConfirmation(supabase, rescueExact.id as string, req)
-            await maybeRecheckLinkFreshness(supabase, rescueExact as {
-              id: string
-              source_url: string | null
-              text_content: string | null
-              link_last_checked_at: string | null
-            })
-            return new Response(
-              JSON.stringify({ cached: true, cost: 0, id: rescueExact.id, result: rescueExact.result, is_manual_source: true, source_url: rescueExact.source_url }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
-          }
-          if (rescueOriginal && !forceRefresh) {
-            await logQuietConfirmation(supabase, rescueOriginal.id as string, req)
-            await maybeRecheckLinkFreshness(supabase, rescueOriginal as {
-              id: string
-              source_url: string | null
-              text_content: string | null
-              link_last_checked_at: string | null
-            })
-            const translated = await translateResult(
-              rescueOriginal.result as Record<string, unknown>,
-              outputLanguage,
-              geminiKey!,
-              RESPONSE_SCHEMA,
-              costTracker
-            )
-            if (translated) {
-              result = translated
-              usedTranslation = true
-              sourcedFromManualPaste = true
-            }
-          }
-
-          // Ratunek się nie udał (nikt jeszcze nie wkleił tej strony
-          // ręcznie) — dopiero teraz ścieżka awaryjna sprzed tej poprawki:
-          // pełna biblioteka, Gemini samo próbuje pobrać stronę swoim
-          // narzędziem "URL context". Jeśli i to zawiedzie, poddajemy się
-          // i zwracamy błąd (z prawdziwym powodem w "details" — widocznym
-          // tylko w panelu debugowania ?debug=1).
-          if (!result) {
+          // POPRAWKA 2026-08-25(d) — sprawdzenie ratunku po `source_url`
+          // (rescueExact/rescueOriginal) przeniesione WYŻEJ, do gałęzi
+          // wyceny kosztu ("2. WYCENA"), i uruchamiane TERAZ ZAWSZE (nie
+          // tylko gdy własne pobranie zawiedzie) — patrz tamtejszy
+          // obszerny komentarz po pełne uzasadnienie. Jeśli dotarliśmy aż
+          // tutaj, ratunek na pewno nie istnieje dla tego adresu (albo to
+          // świadome `forceRefresh`) — jedyne, co zostaje, to ścieżka
+          // awaryjna sprzed tamtej poprawki: pełna biblioteka, Gemini samo
+          // próbuje pobrać stronę swoim narzędziem "URL context". Jeśli i
+          // to zawiedzie, poddajemy się i zwracamy błąd (z prawdziwym
+          // powodem w "details" — widocznym tylko w panelu debugowania
+          // ?debug=1).
+          {
             const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
             geminiData = await callGemini(
               {
