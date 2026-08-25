@@ -1073,6 +1073,72 @@ ${compactList}`
 // zwykłym wejściu na stronę, żeby przejść przez tę węższą kategorię
 // zabezpieczeń. Nie pomoże to stronom wymagającym JS (patrz wyżej) — to
 // świadomie ograniczona, ale zero-kosztowa i zero-zależnościowa poprawka.
+// --- Oczyszczanie pobranej strony z szumu (POPRAWKA 2026-08-25) ---
+// Żywy przykład, który to wymusił: artykuł polityczny dostał aż 90/100 i
+// ZERO wykrytych wzorców, mimo że ten sam tekst wklejony ręcznie w trybie
+// "Tekst" dał 75/100 i 4 prawdziwe wzorce — bo automatyczne pobranie
+// zaciągnęło do treści niepowiązany fragment z panelu bocznego strony
+// ("WIDEO: Fatalne skutki pożaru..."). Ten sam szum zawyżał też cenę
+// (płacimy za KAŻDY znak, patrz cennik w GAKORI_CONTEXT.md). Poniższe
+// funkcje czyszczą stronę PRZED policzeniem znaków/wysłaniem do analizy —
+// patrz GAKORI_CONTEXT.md po pełne uzasadnienie i przykład realnej strony
+// (polsatnews.pl), na podstawie którego to zaprojektowano.
+
+// Pojedyncze, całe "słowa" (tokeny) klasy/id, które niemal zawsze oznaczają
+// szum, nie treść artykułu. ŚWIADOMIE dopasowanie CAŁEGO tokenu (nie
+// podciągu) — inaczej np. polskie "adres" zostałoby błędnie potraktowane
+// jako reklama ("ad"). Nie jest to lista wyczerpująca (każda strona nazywa
+// to nieco inaczej) — pokrywa zdecydowaną większość typowych przypadków.
+const NOISE_CLASS_TOKENS = new Set([
+  'ad', 'ads', 'advert', 'advertisement', 'banner', 'cookie', 'cookies',
+  'consent', 'gdpr', 'newsletter', 'subscribe', 'subscription', 'comment',
+  'comments', 'related', 'recommended', 'sponsor', 'sponsored', 'promo',
+  'promotion', 'popup', 'share', 'social',
+])
+function hasNoiseClass(openTagHtml: string): boolean {
+  const tokens: string[] = []
+  for (const m of openTagHtml.matchAll(/(?:class|id)="([^"]*)"/gi)) {
+    tokens.push(...m[1].toLowerCase().split(/[\s_-]+/))
+  }
+  return tokens.some((tok) => NOISE_CLASS_TOKENS.has(tok))
+}
+
+// Usuwa z fragmentu HTML wszystkie elementy o podanych nazwach tagów (np.
+// "nav" albo "div|section|aside|ul|figure") RAZEM z całą ich zawartością —
+// poprawnie licząc zagnieżdżenie tego samego tagu (np. <div> w <div>), bo
+// prosty regex "od otwarcia do pierwszego napotkanego zamknięcia" ucinałby
+// zawartość w połowie przy takim zagnieżdżeniu. `shouldRemove(openTag)`
+// decyduje per KONKRETNY tag (po jego atrybutach), czy go usunąć — inne
+// wystąpienia tego samego typu tagu, które nie pasują, zostają nietknięte.
+function stripElementsByTag(html: string, tagNames: string, shouldRemove: (openTag: string) => boolean): string {
+  const tagRe = new RegExp(`<(${tagNames})\\b[^>]*>|<\\/(${tagNames})>`, 'gi')
+  let result = ''
+  let cursor = 0
+  let depth = 0
+  let removeTagName = ''
+  let match: RegExpExecArray | null
+  while ((match = tagRe.exec(html))) {
+    const isClosing = !!match[2]
+    const tagName = (match[1] || match[2]).toLowerCase()
+    if (depth === 0) {
+      if (!isClosing && shouldRemove(match[0])) {
+        result += html.slice(cursor, match.index)
+        depth = 1
+        removeTagName = tagName
+        cursor = tagRe.lastIndex
+      }
+    } else if (tagName === removeTagName) {
+      if (!isClosing) depth++
+      else {
+        depth--
+        if (depth === 0) cursor = tagRe.lastIndex
+      }
+    }
+  }
+  result += html.slice(cursor)
+  return result
+}
+
 async function fetchUrlAsText(url: string): Promise<string | null> {
   try {
     const res = await fetchWithTimeout(
@@ -1097,13 +1163,57 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
       FALLBACK_FETCH_TIMEOUT_MS
     )
     if (!res.ok) return null
-    const html = await res.text()
-    const text = html
+    let html = await res.text()
+
+    html = html
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+
+    // Jeśli strona oznacza swoją główną treść znacznikiem <article>
+    // (bardzo częste na dużych portalach, m.in. ze względów SEO) — bierzemy
+    // TYLKO to, co jest w środku. Jednym ruchem wyrzuca to menu strony,
+    // stopkę i panel boczny, bo one z definicji żyją POZA <article>.
+    const articleMatch = html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)
+    if (articleMatch) html = articleMatch[1]
+
+    // Pasek "udostępnij"/nawigacja W OBRĘBIE treści — zawsze szum, nigdy
+    // sama treść artykułu, więc usuwamy KAŻDE wystąpienie <nav>, bez
+    // sprawdzania klasy.
+    html = stripElementsByTag(html, 'nav', () => true)
+    // Reklamy, baner cookie, newsletter, komentarze, "czytaj też" itp. —
+    // rozpoznawane po typowych, powtarzalnych nazwach klas/id (patrz
+    // NOISE_CLASS_TOKENS wyżej). ŚWIADOMIE NIE usuwamy <header>/<footer>/
+    // <aside> "w ciemno" po samym typie tagu — żywy przykład: `<header
+    // class="news_header">` W OBRĘBIE <article> bywa właściwym
+    // nagłówkiem/leadem artykułu, nie szumem całej strony (ten drugi,
+    // "śmieciowy" wariant i tak już odpadł przy wycięciu <article> wyżej).
+    html = stripElementsByTag(html, 'div|section|aside|ul|figure', hasNoiseClass)
+
+    // Zachowujemy podział na akapity — koniec bloku (akapit, nagłówek,
+    // wiersz listy, złamanie linii, wiersz tabeli) zamieniamy na pustą
+    // linię w tekście, ZANIM usuniemy resztę znaczników. Bez tego cała
+    // treść zlewała się w jedną, nieczytelną "ścianę tekstu" (zgłoszone na
+    // żywo przez właściciela) — to WYŁĄCZNIE kwestia białych znaków,
+    // NIGDY nie zmienia ani jednego słowa treści (ważne dla dopasowania
+    // cytatów w `scan.html`, patrz `buildHighlightedText()`/
+    // `normalizeWithMap()` tam — one już i tak traktują dowolny ciąg
+    // białych znaków jako pojedynczą spację przy szukaniu cytatu).
+    html = html
+      .replace(/<\/(p|div|li|h[1-6]|tr|blockquote)>/gi, '\n\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+
+    const text = html
       .replace(/<[^>]+>/g, ' ')
       .replace(/&nbsp;/g, ' ')
-      .replace(/\s+/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#0?39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
       .trim()
     // Zbyt krótki wynik to zwykle strona-zaślepka (np. "włącz obsługę
     // JavaScript"), nie prawdziwa treść — traktujemy to jak porażkę.
@@ -1707,7 +1817,12 @@ Deno.serve(async (req: Request) => {
       if (confirmed !== true) {
         await logFailedAttempt()
         return new Response(
-          JSON.stringify({ needs_confirmation: true, estimated_cost: cost }),
+          // `char_count` — POPRAWKA 2026-08-25 — właściciel chciał widzieć
+          // na ekranie zgody, NA JAKIEJ PODSTAWIE (ile znaków) wyliczona
+          // jest cena, nie tylko sam wynik. `null`, gdy własne pobranie
+          // zawiodło i cena wróciła do starej, płaskiej stawki (patrz
+          // wyżej) — wtedy po prostu nie ma z góry znanej liczby znaków.
+          JSON.stringify({ needs_confirmation: true, estimated_cost: cost, char_count: urlFetchedCharCount }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -2528,8 +2643,17 @@ Deno.serve(async (req: Request) => {
       language: outputLanguage,
       is_translation: usedTranslation,
       source_url: input_type === 'url' ? source_url : textSourceUrl,
-      text_content: input_type === 'text' ? text_content : null,
-      char_count: input_type === 'text' ? char_count : 0,
+      // POPRAWKA 2026-08-25 — dla linku zapisujemy TERAZ też oczyszczoną
+      // treść pobraną z `preFetchedText` (patrz `fetchUrlAsText()` wyżej),
+      // dokładnie tę, którą naprawdę zobaczył Gemini — pozwala to
+      // `scan.html` pokazać "Pokaż pełny tekst źródłowy" (z podświetlonymi
+      // cytatami) dla linków, tak samo jak dla ręcznie wklejonego tekstu.
+      // `null`, gdy własne pobranie zawiodło i poszliśmy ścieżką awaryjną
+      // (Gemini "URL context") — wtedy po prostu nie mamy własnej kopii
+      // tekstu do pokazania, sekcja się nie wyświetli, zgodnie z
+      // dotychczasowym zachowaniem tej sekcji dla brakującej treści.
+      text_content: input_type === 'text' ? text_content : input_type === 'url' ? preFetchedText : null,
+      char_count: input_type === 'text' ? char_count : input_type === 'url' ? (urlFetchedCharCount ?? 0) : 0,
       credits_charged: finalCost,
       result,
       discovered_by: user_id ?? null,

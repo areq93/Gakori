@@ -22,7 +22,6 @@
         <h1 class="gakori-wordmark">
             <span class="gakori-shine-text">Gakori</span>
         </h1>
-        <p class="gakori-tagline gakori-shine-text" data-i18n="tagline">Najważniejszą zasadą przetrwania jest wiedza</p>
     </header>
 
     <a id="userMenuBtn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
@@ -115,8 +114,10 @@
         <div class="card">
             <h2 data-i18n="pdf_confirm_title">Potwierdź analizę</h2>
             <p id="pdfConfirmPages"></p>
+            <p id="pdfConfirmCharCount" style="display:none; color:var(--ink-soft); font-size:13px;"></p>
             <p id="pdfConfirmCost"></p>
             <p id="pdfConfirmComparison" style="display:none; color:var(--ink-soft);"></p>
+            <p id="pdfConfirmCleanNotice" style="display:none; color:var(--ink-soft); font-size:12.5px;"></p>
             <p id="pdfConfirmWaitNotice" class="tagline" data-i18n="pdf_confirm_wait_notice">Dłuższe pliki mogą się analizować zauważalnie dłużej niż zwykle — to normalne.</p>
             <button type="button" id="pdfConfirmYes" data-i18n="btn_pdf_confirm_yes">Tak, analizuj</button>
             <div style="text-align:center; margin-top:10px;">
@@ -1310,7 +1311,7 @@
                 // gotowy wynik (patrz pdfConfirmYes/pdfConfirmNo niżej).
                 if (data.needs_confirmation) {
                     btn.disabled = false;
-                    showPdfConfirm(data.page_count, data.estimated_cost, payload);
+                    showPdfConfirm(data.page_count, data.estimated_cost, payload, data.char_count);
                     return;
                 }
 
@@ -1372,7 +1373,7 @@
         // przez costComparisonText() (i18n.js) — zwraca null, gdy koszt
         // przekracza sensowny próg porównania (patrz tamtejszy komentarz),
         // wtedy po prostu nie pokazujemy tej linijki.
-        function showPdfConfirm(pageCount, estimatedCost, payload) {
+        function showPdfConfirm(pageCount, estimatedCost, payload, charCount) {
             const pagesEl = document.getElementById('pdfConfirmPages');
             if (typeof pageCount === 'number') {
                 pagesEl.innerText = t('pdf_confirm_pages', { count: pageCount });
@@ -1383,6 +1384,23 @@
             // "Dłuższe pliki mogą się analizować dłużej" dotyczy tylko PDF-a
             // — dla linku byłoby mylące, chwilę trwa tylko samo pobranie.
             document.getElementById('pdfConfirmWaitNotice').style.display = typeof pageCount === 'number' ? '' : 'none';
+            // Punkt C audytu bezpieczeństwa — na wyraźną prośbę: pokazujemy NA
+            // JAKIEJ PODSTAWIE (ile znaków) wyliczona jest cena linku, nie tylko
+            // sam wynik. Tylko dla trybu "url" (pageCount undefined) i tylko gdy
+            // znamy liczbę znaków (własne pobranie się udało — patrz
+            // `urlFetchedCharCount` w analyze/index.ts; przy awaryjnej, płaskiej
+            // stawce jej po prostu nie ma).
+            const charCountEl = document.getElementById('pdfConfirmCharCount');
+            const cleanNoticeEl = document.getElementById('pdfConfirmCleanNotice');
+            if (typeof pageCount !== 'number' && typeof charCount === 'number') {
+                charCountEl.innerText = t('url_confirm_char_count', { count: charCount });
+                charCountEl.style.display = '';
+                cleanNoticeEl.innerText = t('url_confirm_clean_notice');
+                cleanNoticeEl.style.display = '';
+            } else {
+                charCountEl.style.display = 'none';
+                cleanNoticeEl.style.display = 'none';
+            }
             document.getElementById('pdfConfirmCost').innerText = t('pdf_confirm_cost', { cost: estimatedCost });
             const comparisonEl = document.getElementById('pdfConfirmComparison');
             const comparison = costComparisonText(estimatedCost, getCurrentLanguage());

@@ -207,10 +207,6 @@ h2 {
     font-size: 2.5rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
     margin: 0;
 }
-.gakori-tagline {
-    margin: 8px 0 0 0; font-size: 12.5px; font-weight: 700; line-height: 1.5;
-    text-align: center; text-transform: uppercase; letter-spacing: 0.09em;
-}
 /* "Gra świateł" wpisana w same litery (nie tylko w karty/przyciski) —
    gradient przycięty do kształtu tekstu (`background-clip: text`).
    Współdzielone przez nagłówek marki, hasło pod nim i nagłówki sekcji (`h2`

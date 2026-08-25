@@ -2014,6 +2014,109 @@ zanim założysz, że działa.
 
       **Baza danych** (nowe elementy tego pakietu): `scans.retracted`
       (boolean, `NOT NULL DEFAULT false`).
+    - **POPRAWKA 2026-08-25 — oczyszczanie pobranej strony z szumu,
+      "Pokaż pełny tekst źródłowy" też dla linku, usunięcie sloganu pod
+      logo.** Żywy przykład od właściciela, który to wymusił: ten sam
+      artykuł polityczny dał **90/100 i ZERO wykrytych wzorców** przez
+      "Link", ale **75/100 i 4 prawdziwe wzorce** przez ręczne wklejenie
+      tego samego tekstu w trybie "Tekst" — bo automatyczne pobranie
+      zaciągnęło do treści niepowiązany fragment z panelu bocznego strony
+      ("WIDEO: Fatalne skutki pożaru..."). Ten sam szum zawyżał też cenę
+      (płacimy za każdy znak). Właściciel trafnie zauważył: "to nie mogą
+      być dwa osobne problemy — to jeden i ten sam problem: automatyczne
+      pobranie strony jest brudne".
+
+      **Oczyszczanie strony** (`fetchUrlAsText()` w `analyze/index.ts`,
+      używane WSZĘDZIE tam, gdzie pobieramy stronę — wycena, analiza,
+      sprawdzanie świeżości, ratunek — jedna zmiana, korzyść wszędzie):
+      1. Jeśli strona oznacza swoją główną treść znacznikiem `<article>`
+         (bardzo częste na dużych portalach ze względów SEO) — bierzemy
+         TYLKO to, co jest w środku. Jednym ruchem wyrzuca menu strony,
+         stopkę, panel boczny (żyją POZA `<article>`).
+      2. Usuwamy każde wystąpienie `<nav>` (paski "udostępnij" itp.) —
+         zawsze szum, nigdy treść artykułu.
+      3. Usuwamy elementy (`div`/`section`/`aside`/`ul`/`figure`), których
+         **CAŁY token** klasy/id (nie podciąg!) pasuje do typowej listy
+         szumu: reklama, cookie/zgoda/RODO, newsletter, komentarze,
+         "czytaj też"/polecane, sponsor, promo, udostępnianie. Dopasowanie
+         CAŁEGO tokenu (rozdzielonego spacją/myślnikiem/podkreślnikiem),
+         żeby np. polskie "adres" nie zostało błędnie potraktowane jak
+         reklama ("ad").
+      4. **Świadomie NIE usuwamy `<header>`/`<footer>`/`<aside>` "w
+         ciemno" po samym typie tagu** — żywy przykład właściciela
+         (zrzuty ekranu z narzędzi deweloperskich, polsatnews.pl):
+         `<header class="news_header">` W OBRĘBIE `<article>` bywa
+         właściwym nagłówkiem/leadem artykułu, nie szumem całej strony
+         (ten "śmieciowy" wariant nagłówka strony i tak już odpada przy
+         wycięciu `<article>` w kroku 1).
+      5. Zachowujemy podział na akapity — koniec bloku (`</p>`, `</div>`,
+         `</li>`, `</h1>`-`</h6>`, `<br>`, `</tr>`, `</blockquote>`)
+         zamieniamy na pustą linię PRZED usunięciem reszty znaczników.
+         Wcześniej cała treść zlewała się w jedną nieczytelną "ścianę
+         tekstu" — WYŁĄCZNIE kwestia białych znaków, nigdy nie zmienia ani
+         jednego słowa treści (dopasowanie cytatów w `scan.html`
+         `buildHighlightedText()`/`normalizeWithMap()` już wcześniej
+         traktowało dowolny ciąg białych znaków jak jedną spację).
+      Realizowane przez dwie nowe funkcje pomocnicze bez żadnej
+      zewnętrznej biblioteki/DOM-a (czysty regex + ręczne liczenie
+      zagnieżdżenia tagów, żeby bezpiecznie usuwać np. `<div>` w `<div>`,
+      czego samym regexem "od otwarcia do pierwszego zamknięcia" nie da
+      się zrobić poprawnie): `stripElementsByTag()` i `hasNoiseClass()`.
+      Sprawdzone na przykładzie zbliżonym do realnej struktury
+      polsatnews.pl przed wdrożeniem — działa zgodnie z oczekiwaniami.
+
+      **"Pokaż pełny tekst źródłowy" też dla linku** — dawniej WYŁĄCZNIE
+      dla ręcznie wklejonego tekstu (`scans.text_content` było zawsze
+      `null` dla `input_type: 'url'`). Teraz backend zapisuje tam
+      oczyszczoną treść pobraną ze strony (`preFetchedText`) — DOKŁADNIE
+      to, co naprawdę zobaczył Gemini. `scan.html` pokazuje ją identycznie
+      jak dla tekstu (ten sam komponent podświetlania cytatów), warunek
+      rozszerzony z `input_type === 'text'` na sam fakt posiadania
+      `text_content`. `null`, gdy własne pobranie zawiodło i poszliśmy
+      ścieżką awaryjną (Gemini "URL context") — wtedy po prostu nie mamy
+      własnej kopii tekstu do pokazania. Cel (właściciel): transparentność
+      (widać, co faktycznie trafiło do analizy) i większe zaangażowanie
+      użytkowników w aplikacji.
+
+      **Liczba znaków na ekranie zgody na koszt** — backend zwraca teraz
+      `char_count` w odpowiedzi `needs_confirmation` dla trybu "url"
+      (`urlFetchedCharCount`, `null` przy awaryjnej płaskiej stawce).
+      `index.html` (`showPdfConfirm()`) i `scan.html` (dialog
+      potwierdzenia "Sprawdź, czy coś się zmieniło") pokazują to razem z
+      notatką, że cena już uwzględnia oczyszczenie strony z szumu — na
+      wyraźną prośbę właściciela: "użytkownik musi wiedzieć, ze względu na
+      ile znaków [jest cena], jako punkt wyjścia".
+
+      **Usunięty slogan pod logo** ("Najważniejszą zasadą przetrwania jest
+      wiedza") — na prośbę właściciela, z 4 stron (`index.html`,
+      `scan.html`, `historia.html`, `account.html`) razem z nieużywaną już
+      regułą CSS `.gakori-tagline` i kluczem i18n `tagline` (wszystkie 10
+      języków).
+
+      **Odłożone na później (świadomie NIE zbudowane w tej paczce)** —
+      **cache na podstawie podobieństwa treści** (pomysł właściciela: gdy
+      ktoś prześle treść bardzo podobną, ale nie identyczną, do już
+      przeanalizowanej, serwować/wykorzystać istniejący wynik zamiast
+      płacić za analizę od zera). Świadomie odłożone jako osobny, duży
+      temat do spokojnego zaprojektowania — realne trudności do
+      rozwiązania: (a) nie ma taniego sposobu sprawdzenia "podobieństwa"
+      bez płacenia za AI za każdym razem ALBO bez ryzyka prostej,
+      zawodnej heurystyki serwującej komuś nieaktualny/niepasujący wynik
+      pod przykrywką "to ten sam artykuł" (podobne ryzyko, jakie już raz
+      odrzuciliśmy przy "2 niezależnych zgłoszeniach", patrz POPRAWKA
+      2026-08-21(v) wyżej); (b) właściciel zwrócił uwagę, że trzeba to
+      zaprojektować tak, żeby nie "zapychać pojemności naszych magazynów"
+      (rozrost bazy danych) i rozważyć jakąś automatyzację — do
+      przemyślenia przy projektowaniu, np. czy przechowywać pełne
+      odciski/fingerprinty treści, czy coś tańszego. Uwaga na przyszłość:
+      zapis pełnej oczyszczonej treści strony dla KAŻDEJO linku (patrz
+      wyżej, "Pokaż pełny tekst źródłowy") już sam w sobie zwiększa zużycie
+      miejsca w bazie w porównaniu do stanu sprzed tej poprawki (do tej
+      pory tylko PDF/obraz/tekst coś tam trzymały, link — nic) — ograniczone
+      z góry limitem 20000 znaków na wpis (`fetchUrlAsText()`), więc
+      wzrost jest policzalny i na razie nie powinien być problemem przy
+      obecnej skali, ale warto to mieć na uwadze przy projektowaniu punktu
+      o podobieństwie treści.
     - **POPRAWKA 2026-08-21(d) — bfcache czyścił formularz ZA PÓŹNO
       (zostawał stary wklejony tekst).** Żywy przykład: po analizie i
       powrocie do menu wklejona wcześniej treść dalej "wisiała" w trybie

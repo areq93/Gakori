@@ -22,7 +22,6 @@
         <h1 class="gakori-wordmark">
             <span class="gakori-shine-text">Gakori</span>
         </h1>
-        <p class="gakori-tagline gakori-shine-text" data-i18n="tagline">Najważniejszą zasadą przetrwania jest wiedza</p>
     </header>
 
     <!-- Ten sam górny pasek co index.html/account.html — TYLKO gdy ktoś jest
@@ -417,11 +416,15 @@
                                 });
                         }
 
-                        // Tekst wklejony ręcznie: pokazujemy go w całości, zwinięty,
+                        // Pełna analizowana treść: pokazujemy ją w całości, zwiniętą,
                         // z delikatnie podświetlonymi fragmentami odpowiadającymi
                         // cytatom omówionym niżej — dokładnie w miejscu, gdzie
                         // faktycznie występują w oryginale (patrz buildHighlightedText).
-                        if (data.input_type === 'text' && typeof data.text_content === 'string' && data.text_content) {
+                        // POPRAWKA 2026-08-25 — dawniej WYŁĄCZNIE dla ręcznie wklejonego
+                        // tekstu; od teraz też dla linku (backend zapisuje tam oczyszczoną
+                        // treść pobraną ze strony, patrz analyze/index.ts) — pozwala
+                        // sprawdzić, co dokładnie zobaczył Gemini, w obu trybach tak samo.
+                        if (typeof data.text_content === 'string' && data.text_content) {
                             const quoteEntries = Array.isArray(r.patterns)
                                 ? r.patterns
                                     .filter((p) => p.quote)
@@ -524,7 +527,14 @@
                                         const resData = await requestRefresh(false);
                                         if (resData.needs_confirmation) {
                                             manualStatusEl.innerText = '';
-                                            const proceed = confirm(t('force_refresh_confirm_cost', { cost: resData.estimated_cost }));
+                                            // Punkt C audytu bezpieczeństwa — pokazujemy też, na jakiej
+                                            // podstawie (ile znaków) wyliczona jest cena, ten sam wzorzec
+                                            // co w index.html (showPdfConfirm).
+                                            let confirmMsg = t('force_refresh_confirm_cost', { cost: resData.estimated_cost });
+                                            if (typeof resData.char_count === 'number') {
+                                                confirmMsg = t('url_confirm_char_count', { count: resData.char_count }) + '\n' + confirmMsg;
+                                            }
+                                            const proceed = confirm(confirmMsg);
                                             if (!proceed) return;
                                             manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
                                             const confirmedData = await requestRefresh(true);

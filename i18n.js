@@ -26,7 +26,6 @@ const RTL_LANGUAGES = ['ar'];
 
 const TRANSLATIONS = {
     pl: {
-        tagline: "Najważniejszą zasadą przetrwania jest wiedza",
         tab_login: "Zaloguj", tab_signup: "Zarejestruj",
         placeholder_email: "e-mail", placeholder_password: "hasło (min. 6 znaków)",
         btn_login: "Zaloguj się", btn_signup: "Zarejestruj się",
@@ -107,6 +106,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "Zgłoś niezgodność z treścią źródła", btn_force_refresh: "Sprawdź, czy coś się zmieniło",
         status_mismatch_reported: "Dziękujemy za zgłoszenie — sprawdzimy to.",
         live_cost_estimate: "Szacowany koszt: {cost} kredytów", cost_paid_notice: "Ta analiza kosztowała: {cost} kredytów", cost_free_cache_notice: "Za darmo — z pamięci",
+        url_confirm_char_count: "Do analizy: {count} znaków", url_confirm_clean_notice: "Cena uwzględnia oczyszczenie strony z menu, reklam i innych elementów niezwiązanych z treścią artykułu.",
         btn_paste_own_content: "Nie zgadzasz się? Wklej własną treść",
         force_refresh_confirm_cost: "Sprawdzenie i ponowna analiza będzie kosztować {cost} kredytów. Kontynuować?",
         scan_retracted_notice: "Ta treść została automatycznie wycofana — wiele osób zgłosiło, że nie zgadza się już z aktualną treścią źródła. Wynik nadal jest widoczny, ale nie jest już serwowany jako aktualny innym osobom.",
@@ -115,7 +115,6 @@ const TRANSLATIONS = {
         scan_load_error: "Nie udało się wczytać analizy (sprawdź połączenie z internetem i odśwież stronę).",
     },
     en: {
-        tagline: "Knowledge is the most important rule of survival",
         tab_login: "Log in", tab_signup: "Sign up",
         placeholder_email: "email", placeholder_password: "password (min. 6 characters)",
         btn_login: "Log in", btn_signup: "Sign up",
@@ -196,6 +195,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "Report mismatch with source content", btn_force_refresh: "Check if something changed",
         status_mismatch_reported: "Thanks for reporting — we'll take a look.",
         live_cost_estimate: "Estimated cost: {cost} credits", cost_paid_notice: "This analysis cost: {cost} credits", cost_free_cache_notice: "Free — from cache",
+        url_confirm_char_count: "To analyze: {count} characters", url_confirm_clean_notice: "The price already accounts for cleaning the page of menus, ads, and other elements unrelated to the article content.",
         btn_paste_own_content: "Don't agree? Paste your own content",
         force_refresh_confirm_cost: "Checking and re-analyzing will cost {cost} credits. Continue?",
         scan_retracted_notice: "This content has been automatically retracted — many people reported that it no longer matches the current source content. The result is still visible, but it's no longer served as current to other people.",
@@ -204,7 +204,6 @@ const TRANSLATIONS = {
         scan_load_error: "Couldn't load the analysis (check your connection and reload the page).",
     },
     es: {
-        tagline: "El conocimiento es la regla más importante de la supervivencia",
         tab_login: "Iniciar sesión", tab_signup: "Registrarse",
         placeholder_email: "correo electrónico", placeholder_password: "contraseña (mín. 6 caracteres)",
         btn_login: "Iniciar sesión", btn_signup: "Registrarse",
@@ -285,6 +284,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "Reportar discrepancia con el contenido original", btn_force_refresh: "Comprobar si algo ha cambiado",
         status_mismatch_reported: "Gracias por avisar — lo revisaremos.",
         live_cost_estimate: "Costo estimado: {cost} créditos", cost_paid_notice: "Este análisis costó: {cost} créditos", cost_free_cache_notice: "Gratis — desde la memoria",
+        url_confirm_char_count: "A analizar: {count} caracteres", url_confirm_clean_notice: "El precio ya tiene en cuenta la limpieza de la página de menús, anuncios y otros elementos no relacionados con el contenido del artículo.",
         btn_paste_own_content: "¿No estás de acuerdo? Pega tu propio contenido",
         force_refresh_confirm_cost: "Comprobar y volver a analizar costará {cost} créditos. ¿Continuar?",
         scan_retracted_notice: "Este contenido se ha retirado automáticamente — muchas personas informaron que ya no coincide con el contenido actual de la fuente. El resultado sigue siendo visible, pero ya no se ofrece como actual a otras personas.",
@@ -293,7 +293,6 @@ const TRANSLATIONS = {
         scan_load_error: "No se pudo cargar el análisis (revisa tu conexión y recarga la página).",
     },
     de: {
-        tagline: "Wissen ist die wichtigste Regel des Überlebens",
         tab_login: "Anmelden", tab_signup: "Registrieren",
         placeholder_email: "E-Mail", placeholder_password: "Passwort (mind. 6 Zeichen)",
         btn_login: "Anmelden", btn_signup: "Registrieren",
@@ -374,6 +373,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "Abweichung vom Quellinhalt melden", btn_force_refresh: "Prüfen, ob sich etwas geändert hat",
         status_mismatch_reported: "Danke für den Hinweis — wir schauen es uns an.",
         live_cost_estimate: "Geschätzte Kosten: {cost} Credits", cost_paid_notice: "Diese Analyse kostete: {cost} Credits", cost_free_cache_notice: "Kostenlos — aus dem Speicher",
+        url_confirm_char_count: "Zu analysieren: {count} Zeichen", url_confirm_clean_notice: "Der Preis berücksichtigt bereits die Bereinigung der Seite von Menüs, Werbung und anderen Elementen, die nichts mit dem Artikelinhalt zu tun haben.",
         btn_paste_own_content: "Nicht einverstanden? Eigenen Inhalt einfügen",
         force_refresh_confirm_cost: "Die Prüfung und erneute Analyse kostet {cost} Credits. Fortfahren?",
         scan_retracted_notice: "Dieser Inhalt wurde automatisch zurückgezogen — viele Personen haben gemeldet, dass er nicht mehr mit dem aktuellen Quellinhalt übereinstimmt. Das Ergebnis ist weiterhin sichtbar, wird aber anderen Personen nicht mehr als aktuell angezeigt.",
@@ -382,7 +382,6 @@ const TRANSLATIONS = {
         scan_load_error: "Analyse konnte nicht geladen werden (Verbindung prüfen und Seite neu laden).",
     },
     fr: {
-        tagline: "Le savoir est la règle la plus importante de la survie",
         tab_login: "Connexion", tab_signup: "Inscription",
         placeholder_email: "e-mail", placeholder_password: "mot de passe (min. 6 caractères)",
         btn_login: "Se connecter", btn_signup: "S'inscrire",
@@ -463,6 +462,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "Signaler une différence avec le contenu source", btn_force_refresh: "Vérifier si quelque chose a changé",
         status_mismatch_reported: "Merci pour votre signalement — nous allons vérifier.",
         live_cost_estimate: "Coût estimé : {cost} crédits", cost_paid_notice: "Cette analyse a coûté : {cost} crédits", cost_free_cache_notice: "Gratuit — depuis la mémoire",
+        url_confirm_char_count: "À analyser : {count} caractères", url_confirm_clean_notice: "Le prix tient déjà compte du nettoyage de la page (menus, publicités et autres éléments sans rapport avec le contenu de l'article).",
         btn_paste_own_content: "Pas d'accord ? Collez votre propre contenu",
         force_refresh_confirm_cost: "La vérification et la nouvelle analyse coûteront {cost} crédits. Continuer ?",
         scan_retracted_notice: "Ce contenu a été retiré automatiquement — de nombreuses personnes ont signalé qu'il ne correspond plus au contenu actuel de la source. Le résultat reste visible, mais n'est plus présenté comme actuel aux autres personnes.",
@@ -471,7 +471,6 @@ const TRANSLATIONS = {
         scan_load_error: "Impossible de charger l'analyse (vérifiez votre connexion et rechargez la page).",
     },
     ru: {
-        tagline: "Знание — важнейшее правило выживания",
         tab_login: "Войти", tab_signup: "Регистрация",
         placeholder_email: "эл. почта", placeholder_password: "пароль (мин. 6 символов)",
         btn_login: "Войти", btn_signup: "Зарегистрироваться",
@@ -552,6 +551,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "Сообщить о несоответствии с источником", btn_force_refresh: "Проверить, не изменилось ли что-то",
         status_mismatch_reported: "Спасибо за сообщение — мы проверим.",
         live_cost_estimate: "Примерная стоимость: {cost} кредитов", cost_paid_notice: "Этот анализ стоил: {cost} кредитов", cost_free_cache_notice: "Бесплатно — из памяти",
+        url_confirm_char_count: "Для анализа: {count} символов", url_confirm_clean_notice: "Цена уже учитывает очистку страницы от меню, рекламы и других элементов, не связанных с содержанием статьи.",
         btn_paste_own_content: "Не согласны? Вставьте свой текст",
         force_refresh_confirm_cost: "Проверка и повторный анализ будут стоить {cost} кредитов. Продолжить?",
         scan_retracted_notice: "Этот контент был автоматически отозван — многие сообщили, что он больше не соответствует текущему содержанию источника. Результат по-прежнему виден, но больше не предоставляется другим как актуальный.",
@@ -560,7 +560,6 @@ const TRANSLATIONS = {
         scan_load_error: "Не удалось загрузить анализ (проверьте подключение и обновите страницу).",
     },
     zh: {
-        tagline: "知识是生存最重要的法则",
         tab_login: "登录", tab_signup: "注册",
         placeholder_email: "电子邮箱", placeholder_password: "密码（至少6个字符）",
         btn_login: "登录", btn_signup: "注册",
@@ -641,6 +640,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "举报与原文不符", btn_force_refresh: "检查是否有变化",
         status_mismatch_reported: "感谢举报——我们会核查。",
         live_cost_estimate: "预估费用：{cost} 积分", cost_paid_notice: "本次分析花费：{cost} 积分", cost_free_cache_notice: "免费——来自缓存",
+        url_confirm_char_count: "待分析：{count} 个字符", url_confirm_clean_notice: "价格已包含清理页面中与文章内容无关的菜单、广告等元素的成本。",
         btn_paste_own_content: "不同意？粘贴你自己的内容",
         force_refresh_confirm_cost: "检查并重新分析将花费 {cost} 积分。是否继续？",
         scan_retracted_notice: "此内容已被自动撤回——许多人报告它与当前来源内容不再一致。结果仍然可见，但不再作为最新内容提供给其他人。",
@@ -649,7 +649,6 @@ const TRANSLATIONS = {
         scan_load_error: "无法加载分析结果（请检查网络连接并刷新页面）。",
     },
     ja: {
-        tagline: "生き抜くための最も大切な法則は知識だ",
         tab_login: "ログイン", tab_signup: "新規登録",
         placeholder_email: "メールアドレス", placeholder_password: "パスワード（6文字以上）",
         btn_login: "ログイン", btn_signup: "登録する",
@@ -730,6 +729,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "元のページと異なる内容を報告する", btn_force_refresh: "変更がないか確認する",
         status_mismatch_reported: "報告ありがとうございます — 確認します。",
         live_cost_estimate: "概算費用: {cost} クレジット", cost_paid_notice: "この分析にかかった費用: {cost} クレジット", cost_free_cache_notice: "無料 — キャッシュから",
+        url_confirm_char_count: "分析対象: {count} 文字", url_confirm_clean_notice: "この価格には、メニューや広告など記事内容と関係のない要素をページから取り除く処理がすでに含まれています。",
         btn_paste_own_content: "納得できない場合は、自分で内容を貼り付ける",
         force_refresh_confirm_cost: "確認と再分析には {cost} クレジットかかります。続けますか?",
         scan_retracted_notice: "このコンテンツは自動的に撤回されました — 多くの人が、現在の元コンテンツと一致しなくなったと報告しています。結果は引き続き表示されますが、他の人には最新の内容として提供されなくなります。",
@@ -738,7 +738,6 @@ const TRANSLATIONS = {
         scan_load_error: "分析結果を読み込めませんでした（接続を確認してページを再読み込みしてください）。",
     },
     hi: {
-        tagline: "ज्ञान ही जीवित रहने का सबसे महत्वपूर्ण नियम है",
         tab_login: "लॉग इन करें", tab_signup: "साइन अप करें",
         placeholder_email: "ईमेल", placeholder_password: "पासवर्ड (कम से कम 6 अक्षर)",
         btn_login: "लॉग इन करें", btn_signup: "साइन अप करें",
@@ -819,6 +818,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "स्रोत सामग्री से बेमेल की रिपोर्ट करें", btn_force_refresh: "जांचें कि कुछ बदला तो नहीं",
         status_mismatch_reported: "रिपोर्ट के लिए धन्यवाद — हम इसे देखेंगे।",
         live_cost_estimate: "अनुमानित लागत: {cost} क्रेडिट", cost_paid_notice: "इस विश्लेषण की लागत: {cost} क्रेडिट", cost_free_cache_notice: "मुफ़्त — मेमोरी से",
+        url_confirm_char_count: "विश्लेषण के लिए: {count} अक्षर", url_confirm_clean_notice: "कीमत में पहले से ही पृष्ठ को मेनू, विज्ञापनों और लेख की सामग्री से असंबंधित अन्य तत्वों से साफ़ करना शामिल है।",
         btn_paste_own_content: "सहमत नहीं हैं? अपनी खुद की सामग्री पेस्ट करें",
         force_refresh_confirm_cost: "जाँच और पुनः विश्लेषण की लागत {cost} क्रेडिट होगी। जारी रखें?",
         scan_retracted_notice: "इस सामग्री को स्वचालित रूप से वापस ले लिया गया है — कई लोगों ने बताया कि यह अब मूल स्रोत सामग्री से मेल नहीं खाती। परिणाम अभी भी दिखाई देता है, लेकिन अब इसे दूसरों को वर्तमान के रूप में नहीं दिखाया जाता।",
@@ -827,7 +827,6 @@ const TRANSLATIONS = {
         scan_load_error: "विश्लेषण लोड नहीं हो सका (कनेक्शन जांचें और पेज रीलोड करें)।",
     },
     ar: {
-        tagline: "أهم قاعدة للبقاء هي المعرفة",
         tab_login: "تسجيل الدخول", tab_signup: "إنشاء حساب",
         placeholder_email: "البريد الإلكتروني", placeholder_password: "كلمة المرور (6 أحرف على الأقل)",
         btn_login: "تسجيل الدخول", btn_signup: "إنشاء حساب",
@@ -908,6 +907,7 @@ const TRANSLATIONS = {
         btn_report_mismatch: "الإبلاغ عن تعارض مع محتوى المصدر", btn_force_refresh: "تحقق مما إذا تغيّر شيء",
         status_mismatch_reported: "شكرًا على الإبلاغ — سنتحقق من ذلك.",
         live_cost_estimate: "التكلفة التقديرية: {cost} رصيد", cost_paid_notice: "تكلفة هذا التحليل: {cost} رصيد", cost_free_cache_notice: "مجانًا — من الذاكرة",
+        url_confirm_char_count: "للتحليل: {count} حرفًا", url_confirm_clean_notice: "يأخذ السعر في الاعتبار بالفعل تنظيف الصفحة من القوائم والإعلانات والعناصر الأخرى غير المتعلقة بمحتوى المقال.",
         btn_paste_own_content: "لا توافق؟ الصق المحتوى الخاص بك",
         force_refresh_confirm_cost: "سيكلف التحقق وإعادة التحليل {cost} رصيد. هل تريد المتابعة؟",
         scan_retracted_notice: "تم سحب هذا المحتوى تلقائيًا — أبلغ العديد من الأشخاص أنه لم يعد يتطابق مع محتوى المصدر الحالي. لا تزال النتيجة مرئية، لكنها لم تعد تُقدَّم للآخرين على أنها حديثة.",
