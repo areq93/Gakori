@@ -288,9 +288,10 @@ const DEFAULT_LANGUAGE = 'en'
 // jeśli zmieniasz jedno, zaktualizuj drugie, żeby się nie rozjechały.
 // Celowo tylko nazwa + jedno zdanie opisu (bez przykładów) — to trzyma koszt
 // tokenów promptu pod kontrolą. Podział na kategorie (obiekt, nie jeden
-// płaski string) pozwala wysyłać do właściwej analizy TYLKO kategorie
-// wybrane wcześniej przez tani etap kategoryzacji — patrz
-// pickRelevantCategories() i buildMentalModelsLibrary() niżej.
+// płaski string) porządkuje bibliotekę tematycznie — patrz
+// buildMentalModelsLibrary() niżej (POPRAWKA 2026-08-26: zawsze cała
+// biblioteka, bez wstępnego zawężania — patrz uzasadnienie przy tej
+// funkcji).
 const MENTAL_MODELS_BY_CATEGORY: Record<string, string> = {
   'LOGIKA I MYŚLENIE': 'LOGIKA I MYŚLENIE: Brzytwa Ockhama (najprostsze wyjaśnienie zwykle poprawne); Brzytwa Hanlona (nie przypisuj złej woli temu, co tłumaczy błąd/głupota); Zasady Pierwsze (rozbicie problemu na podstawowe prawdy zamiast analogii); Mapa to nie Terytorium (model rzeczywistości to nie sama rzeczywistość); Krąg Kompetencji (mówienie poza obszarem realnej wiedzy); Inwersja (patrzenie na problem od końca — czego unikać); Prawdopodobieństwo Bayesowskie (aktualizacja oceny w miarę nowych dowodów); Eksperyment Myślowy (testowanie konsekwencji w wyobraźni); Myślenie II Rzędu (pomijanie skutków skutków działania).',
   FIZYKA: 'FIZYKA: Entropia (układy dążą do nieładu bez dopływu energii/pracy); Względność (ocena zależy od punktu widzenia obserwatora); Bezwładność (organizacje trwają w obecnym stanie, opór wobec zmiany); Masa Krytyczna (próg wielkości potrzebny, by coś się utrzymało); Prędkość vs Szybkość (tempo działania mylone z tempem w dobrym kierunku); Zasada Dźwigni (mała zmiana w kluczowym miejscu daje wielki efekt); Tarcie (celowe utrudnienia blokujące łatwe działanie, np. rezygnację).',
@@ -310,65 +311,26 @@ const MENTAL_MODELS_BY_CATEGORY: Record<string, string> = {
 }
 const MENTAL_MODEL_CATEGORIES = Object.keys(MENTAL_MODELS_BY_CATEGORY)
 
-// Buduje fragment promptu z biblioteką modeli — TYLKO z wybranych kategorii
-// (patrz pickRelevantCategories()). Pusta/nieprawidłowa lista kategorii to
-// bezpieczny fallback: pełna biblioteka wszystkich 15 kategorii, dokładnie
-// jak przed wprowadzeniem etapu kategoryzacji.
-function buildMentalModelsLibrary(categories: string[]): string {
-  const valid = categories.filter((c) => MENTAL_MODELS_BY_CATEGORY[c])
-  const chosen = valid.length > 0 ? valid : MENTAL_MODEL_CATEGORIES
-  return chosen.map((c) => MENTAL_MODELS_BY_CATEGORY[c]).join('\n')
-}
-
-const CATEGORY_RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    categories: { type: 'array', items: { type: 'string' } },
-  },
-  required: ['categories'],
-}
-
-// ETAP 1 (tani, "sitowy") kaskady: zanim zapłacimy za pełną analizę z całą
-// biblioteką 100 modeli, tanim zapytaniem pytamy Gemini, do których z 15
-// KATEGORII prawdopodobnie pasują wzorce w tej treści — bez analizowania
-// szczegółów. Etap 2 (buildSystemPrompt) dostanie już tylko przefiltrowaną,
-// dużo mniejszą bibliotekę z wybranych kategorii, więc łączny koszt obu
-// zapytań wychodzi podobny do dawnego pojedynczego zapytania z całą
-// biblioteką — nie podwaja się. Realną "ceną" tego etapu jest dodatkowy
-// czas oczekiwania na wynik (jedno zapytanie więcej), nie koszt.
-// contentPrompt to fragment identyczny z tym, co pójdzie do etapu 2 (link
-// albo tekst do analizy) — useUrlContext decyduje, czy Gemini ma sam
-// pobrać stronę (tylko dla trybu url, ścieżka główna).
-async function pickRelevantCategories(
-  contentPrompt: string,
-  useUrlContext: boolean,
-  geminiKey: string,
-  costTracker?: CostTracker
-): Promise<string[]> {
-  const prompt = `Poniżej jest treść do wstępnego rozpoznania. Twoje zadanie: oceń dopasowanie KAŻDEJ z poniższych 15 kategorii modeli mentalnych do tej treści Z OSOBNA, a potem wybierz WSZYSTKIE kategorie, które faktycznie pasują do wzorców widocznych w tej treści (manipulacja, błędy poznawcze, albo trafne, wartościowe rozumowanie) — NIE analizuj jeszcze żadnych szczegółów, nie szukaj cytatów, na tym etapie oceniasz tylko dopasowanie kategorii. NIE ma sztywnego limitu liczby kategorii do wybrania — czasem pasuje tylko jedna, czasem kilka naraz (np. artykuł finansowy może jednocześnie pasować do EKONOMIA, MATEMATYKA I STATYSTYKA, PSYCHOLOGIA i STRATEGIA). Nie ograniczaj się z góry do jednej, najbardziej oczywistej kategorii (np. samej psychologii/perswazji), jeśli treść realnie porusza wątki z kilku dziedzin naraz. Lista kategorii (dokładnie w tym brzmieniu):
-${MENTAL_MODEL_CATEGORIES.join(', ')}
-
-${contentPrompt}`
-
-  const requestBody: Record<string, unknown> = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
-      responseMimeType: 'application/json',
-      responseSchema: CATEGORY_RESPONSE_SCHEMA,
-    },
-  }
-  if (useUrlContext) requestBody.tools = [{ urlContext: {} }]
-
-  const data = await callGemini(requestBody, geminiKey, GEMINI_TIMEOUT_MS, costTracker)
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) return []
-  try {
-    const parsed = JSON.parse(text)
-    return Array.isArray(parsed.categories) ? parsed.categories : []
-  } catch {
-    return []
-  }
+// POPRAWKA 2026-08-26 — pełna biblioteka WSZYSTKICH 15 kategorii, zawsze.
+// Dawniej (ETAP 1, "tani, sitowy" — pickRelevantCategories(), usunięte)
+// osobne, wcześniejsze zapytanie oceniało, do których kategorii pasuje
+// treść, i DOPIERO wybrany podzbiór szedł do właściwej analizy. Żywy
+// problem: to wstępne zawężanie samo potrafiło (zwłaszcza przy granicznych
+// przypadkach) ROZJECHAĆ SIĘ między dwiema analizami TEJ SAMEJ treści —
+// właściciel zgłosił artykuł analizowany raz jako link, raz jako wklejony
+// tekst, gdzie dwa NIEZALEŻNE etapy kategoryzacji wybrały inny zestaw
+// kategorii, więc właściwa analiza w ogóle nie miała szansy znaleźć tego
+// samego wzorca za drugim razem — bezpośrednie zagrożenie dla spójności
+// jakości ("ten sam tekst musi dawać ten sam wynik"). Naprawa: żadnego
+// wstępnego zawężania — KAŻDA analiza dostaje całą bibliotekę. Koszt: w
+// praktyce NEUTRALNY/TAŃSZY, nie wyższy — dawniej treść i tak szła do
+// Gemini DWA razy (kategoryzacja + główna analiza), teraz idzie raz, a
+// biblioteka (nawet cała) to tylko ok. 7,5 tys. znaków, dużo mniej niż
+// typowy artykuł. Ryzyko pominięcia którejś z 15 kategorii w jednym, dużym
+// zapytaniu łagodzi wymuszony checklist na starcie CHAIN_OF_THOUGHT_INSTRUCTION
+// niżej — patrz tam po pełne uzasadnienie.
+function buildMentalModelsLibrary(): string {
+  return MENTAL_MODEL_CATEGORIES.map((c) => MENTAL_MODELS_BY_CATEGORY[c]).join('\n')
 }
 
 // Rozpoznaje PRAWDZIWY typ obrazu po pierwszych bajtach pliku (tzw.
@@ -425,6 +387,30 @@ async function loadPdfDocument(bytes: Uint8Array): Promise<PDFDocument | null> {
   } catch {
     return null
   }
+}
+
+// POPRAWKA 2026-08-26 — odcisk palca (SHA-256) treści liczony PO STRONIE
+// SERWERA, z treści która NAPRAWDĘ poszła do analizy — zero zaufania do
+// `content_hash` przysłanego przez klienta w body (ten sam wzorzec co przy
+// `user_id` — patrz GAKORI_CONTEXT.md, zero zaufania do tożsamości/danych z
+// requestu, które klient mógłby podać dowolnie). Bezpośredni powód: dla
+// trybu "url" przeglądarka liczyła hash z SAMEGO ADRESU URL, a dla trybu
+// "tekst" — z WKLEJONEGO TEKSTU. Te dwie wartości są całkowicie różne nawet
+// dla IDENTYCZNEJ treści (link, a potem wklejenie skopiowanej z niego
+// treści w trybie "Tekst") — więc system w ogóle nie rozpoznawał, że to ta
+// sama treść, i uruchamiał dla niej DRUGĄ, NIEZALEŻNĄ analizę (żywy
+// problem: dwa różne wzorce dla tej samej treści — właściciel: "nie możemy
+// przyjąć, że ten sam tekst daje dwa modele"). Naprawa: liczymy hash sami,
+// z prawdziwej analizowanej treści (patrz `effectiveContentHash` w
+// Deno.serve niżej) — identyczna treść zawsze trafia w ten sam wiersz
+// `scans`, niezależnie od tego, czy przyszła jako link czy jako wklejony
+// tekst.
+async function sha256Hex(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 // Koduje bajty do base64 w kawałkach — bezpieczny sposób w Deno dla
@@ -563,7 +549,24 @@ const DETECTION_RESPONSE_SCHEMA = {
   required: ['reasoning_steps', 'q_score', 'patterns', 'summary'],
 }
 
-const CHAIN_OF_THOUGHT_INSTRUCTION = `\n\nMYŚLENIE KROK PO KROKU (CHAIN OF THOUGHT, KRYTYCZNIE WAŻNE): Zanim wypełnisz pole "patterns", NAJPIERW wypełnij pole "reasoning_steps" — rozpisz tam krótkimi notatkami, akapit po akapicie / twierdzenie po twierdzeniu, swój tok myślenia: co zauważasz w tym fragmencie, czy pasuje do jakiegoś modelu z biblioteki (do którego dokładnie), i czy to dopasowanie jest pewne czy wątpliwe (jakie jest ryzyko pomyłki/naciągania). Dopiero NA PODSTAWIE tego rozpisania wypełnij ostateczne pole "patterns" — tylko tymi wzorcami, które po tym namyśle uznajesz za trafne. Pole "reasoning_steps" to Twój wewnętrzny brudnopis, nikt go nie zobaczy — pisz w nim swobodnie, nie musi być "ładne", ma być systematyczne.`
+// POPRAWKA 2026-08-26 — sekcja "PRZEGLĄD KATEGORII" dopisana PRZED
+// dotychczasowym przeglądem akapit-po-akapicie. Powód: usunęliśmy osobny,
+// wcześniejszy etap kategoryzacji (patrz buildMentalModelsLibrary()) — teraz
+// KAŻDA analiza dostaje od razu całą, 15-kategoriową bibliotekę w jednym
+// zapytaniu, co zwiększa (niewielkie, ale realne) ryzyko, że model "zjedzie"
+// po kilku najbardziej oczywistych kategoriach i przez nieuwagę pominie
+// resztę. To nie jest matematyczna gwarancja (żadna instrukcja tekstowa nią
+// nie jest) — prawdziwą gwarancję dałoby tylko osobne zapytanie na każdą
+// kategorię (świadomie odłożone, patrz GAKORI_CONTEXT.md, "15+1"), ale to
+// tania, prawie darmowa poprawka w TYM SAMYM zapytaniu, więc wymuszamy ją
+// zawsze: model musi jawnie, jedną linijką na kategorię, zaznaczyć
+// pasuje/nie pasuje dla WSZYSTKICH 15, zanim w ogóle zacznie iść akapit po
+// akapicie — nie ma jak "przeoczyć" kategorii, której nawet nie ocenił.
+const CHAIN_OF_THOUGHT_INSTRUCTION = `\n\nPRZEGLĄD KATEGORII (KRYTYCZNIE WAŻNE, RÓB TO ZAWSZE JAKO PIERWSZY KROK): Zanim zaczniesz analizować tekst akapit po akapicie, na samym początku pola "reasoning_steps" przejdź PO KOLEI przez WSZYSTKIE 15 kategorii biblioteki (dokładnie w tej kolejności, jedna krótka linijka na każdą — "KATEGORIA: pasuje" albo "KATEGORIA: nie pasuje"):
+${MENTAL_MODEL_CATEGORIES.join(', ')}
+Rób to nawet wtedy, gdy odpowiedź wydaje się oczywista — to wymusza świadome sprawdzenie każdej kategorii, zamiast pominięcia którejś przez przeoczenie. Dopiero PO tej liście przejdź do szczegółowego przeglądu tekstu.
+
+MYŚLENIE KROK PO KROKU (CHAIN OF THOUGHT, KRYTYCZNIE WAŻNE): Po przeglądzie kategorii wyżej, w DALSZEJ części pola "reasoning_steps" rozpisz krótkimi notatkami, akapit po akapicie / twierdzenie po twierdzeniu, swój tok myślenia: co zauważasz w tym fragmencie, czy pasuje do jakiegoś modelu z biblioteki (do którego dokładnie), i czy to dopasowanie jest pewne czy wątpliwe (jakie jest ryzyko pomyłki/naciągania). Dopiero NA PODSTAWIE całego pola "reasoning_steps" (przeglądu kategorii i przeglądu akapitów) wypełnij ostateczne pole "patterns" — tylko tymi wzorcami, które po tym namyśle uznajesz za trafne. Pole "reasoning_steps" to Twój wewnętrzny brudnopis, nikt go nie zobaczy — pisz w nim swobodnie, nie musi być "ładne", ma być systematyczne.`
 
 // Kategorie niedozwolonej treści na obrazie — patrz moderacja niżej
 // (Deno.serve, gałąź "image"). Trzymane jako lista stałych wartości (nie
@@ -1526,6 +1529,21 @@ Deno.serve(async (req: Request) => {
         ? source_url
         : null
 
+    // POPRAWKA 2026-08-26 — patrz uzasadnienie przy sha256Hex() wyżej. Dla
+    // trybu "tekst" znamy prawdziwą treść OD RAZU (już jest w body), więc
+    // liczymy prawdziwy hash już teraz — obejmuje to też WCZESNE
+    // sprawdzenie cache'u niżej (sekcja 2). Dla trybu "url" prawdziwej
+    // (oczyszczonej) treści strony jeszcze nie mamy w tym miejscu — na razie
+    // zostaje przysłany przez klienta hash z adresu URL, a NADPISUJEMY go
+    // prawdziwym hashem treści zaraz po własnym pobraniu strony (`gałąź
+    // "url"` niżej, po `fetchUrlAsText()`), zanim dojdzie do zapisu wyniku
+    // czy sprawdzenia tłumaczeń między językami. Dla obrazu/PDF-a zostaje
+    // hash od klienta bez zmian — nie dotyczy dzisiejszego problemu.
+    let effectiveContentHash =
+      input_type === 'text' && typeof text_content === 'string'
+        ? await sha256Hex(text_content)
+        : content_hash
+
     if (input_type !== 'text' && input_type !== 'url' && input_type !== 'image' && input_type !== 'pdf') {
       return new Response(
         JSON.stringify({
@@ -1564,7 +1582,7 @@ Deno.serve(async (req: Request) => {
     const { data: existing } = await supabase
       .from('scans')
       .select('*')
-      .eq('content_hash', content_hash)
+      .eq('content_hash', effectiveContentHash)
       .eq('language', outputLanguage)
       .maybeSingle()
 
@@ -2016,6 +2034,11 @@ Deno.serve(async (req: Request) => {
         urlFetchedCharCount = preFetchedText.length
         const blocks = Math.ceil(urlFetchedCharCount / 1000)
         cost = FIXED_FEE + blocks * MULTIPLIER_PER_1000_CHARS
+        // POPRAWKA 2026-08-26 — od teraz liczymy odcisk palca z PRAWDZIWEJ,
+        // oczyszczonej treści strony, nie z adresu URL — patrz sha256Hex()
+        // wyżej po pełne uzasadnienie (ten sam artykuł wklejony ręcznie w
+        // trybie "Tekst" musi trafić w ten sam wiersz cache'u).
+        effectiveContentHash = await sha256Hex(preFetchedText)
       } else {
         // Własne pobranie zawiodło (np. strona wymaga JavaScriptu) — nie
         // znamy liczby znaków z góry, więc zostajemy przy starej, płaskiej
@@ -2187,7 +2210,7 @@ Deno.serve(async (req: Request) => {
     const { data: originalCandidates } = await supabase
       .from('scans')
       .select('*')
-      .eq('content_hash', content_hash)
+      .eq('content_hash', effectiveContentHash)
       .eq('is_translation', false)
       .limit(5)
     const original = (originalCandidates || []).find(
@@ -2232,16 +2255,16 @@ Deno.serve(async (req: Request) => {
         // zero kosztu Gemini). Jeśli się uda (normalna strona, nie
         // wymagająca JavaScriptu do pokazania treści — fetchUrlAsText sama
         // odróżnia to po długości wyciągniętego tekstu, próg 200 znaków),
-        // mamy tekst od razu w ręku i robimy dokładnie taką samą, tanią
-        // kategoryzację jak przy zwykłym tekście (pickRelevantCategories) —
-        // bez ŻADNEGO dodatkowego pobierania strony. Dopiero jeśli WŁASNE
-        // pobranie zawiedzie (podejrzenie JavaScriptu), sięgamy po
-        // wbudowane narzędzie Gemini "URL context" jako "cięższą
-        // artylerię" — pełna biblioteka, bez zawężania, dokładnie tak jak
-        // działało to w POPRAWKA 2026-08-19(f). Najgorszy przypadek to
-        // nadal maks. 2 zapytania do Gemini — nie gorzej niż wcześniej, ale
-        // w najczęstszym przypadku (zwykła strona) te 2 zapytania dają
-        // wyższą jakość (zawężone kategorie) zamiast pełnej biblioteki.
+        // mamy tekst od razu w ręku i analizujemy go dokładnie tak samo jak
+        // przy zwykłym tekście (POPRAWKA 2026-08-26: bez etapu
+        // kategoryzacji, zawsze cała biblioteka — patrz
+        // buildMentalModelsLibrary()) — bez ŻADNEGO dodatkowego pobierania
+        // strony. Dopiero jeśli WŁASNE pobranie zawiedzie (podejrzenie
+        // JavaScriptu), sięgamy po wbudowane narzędzie Gemini "URL context"
+        // jako "cięższą artylerię", też z pełną biblioteką. Najgorszy
+        // przypadek to 1 zapytanie do Gemini (ścieżka główna) albo 1
+        // zapytanie (ścieżka awaryjna) — plus wspólna "druga runda
+        // szukania" (Etap 3) na ścieżce głównej.
         const rawTextNotice = `\n\nUWAGA: poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Skup się WYŁĄCZNIE na rzeczywistej treści artykułu/strony, ten szum wokół niej całkowicie zignoruj.`
         // POPRAWKA 2026-08-23(a) — `preFetchedText` pobrane jest już WYŻEJ,
         // w gałęzi wyceny kosztu (ten sam request, po stronie "2. WYCENA"),
@@ -2250,15 +2273,11 @@ Deno.serve(async (req: Request) => {
 
         if (preFetchedText) {
           // Ścieżka główna (zdecydowana większość stron): mamy już tekst,
-          // więc dokładnie ten sam dwuetapowy wzorzec co przy zwykłym
-          // tekście — patrz gałąź "text" niżej.
-          const categories = await pickRelevantCategories(
-            `${rawTextNotice}\n\nTEKST DO ANALIZY:\n${preFetchedText}`,
-            false,
-            geminiKey!,
-            costTracker
-          )
-          const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
+          // więc dokładnie ten sam wzorzec co przy zwykłym tekście — patrz
+          // gałąź "text" niżej (POPRAWKA 2026-08-26: bez etapu
+          // kategoryzacji, zawsze cała biblioteka — patrz
+          // buildMentalModelsLibrary()).
+          const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary())
           geminiData = await callGemini(
             {
               contents: [
@@ -2299,7 +2318,7 @@ Deno.serve(async (req: Request) => {
           // powodem w "details" — widocznym tylko w panelu debugowania
           // ?debug=1).
           {
-            const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+            const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary())
             geminiData = await callGemini(
               {
                 contents: [
@@ -2354,7 +2373,7 @@ Deno.serve(async (req: Request) => {
         // Bez taniego etapu kategoryzacji jak przy tekście/linku — pełna
         // biblioteka 100 modeli w każdym zapytaniu (patrz uzasadnienie przy
         // gałęzi "pdf" niżej, ten sam powód).
-        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary())
 
         // ETAP 1 — analizuje JEDEN obraz, zwraca q_score, informację o
         // niedozwolonej treści i wzorce (bez image_index — dopisujemy go
@@ -2478,7 +2497,7 @@ Deno.serve(async (req: Request) => {
         // z góry (tak jak przy obrazie) — nie mamy z góry żadnego
         // wyciągniętego tekstu, po którym dałoby się zgrubnie dobrać
         // kategorie.
-        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary([]))
+        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary())
 
         const chunkRanges: Array<{ start: number; end: number }> = []
         for (let start = 0; start < pdfPageCount; start += PDF_CHUNK_PAGES) {
@@ -2635,9 +2654,9 @@ Deno.serve(async (req: Request) => {
         // jeden JSON" go już nie dotyczy (patrz `if (!result)` niżej).
         result = { q_score: pdfQScore, patterns: verifiedPatterns, summary: pdfSummary }
       } else {
-        // ETAP 1 (tani) + ETAP 2 — patrz komentarz w gałęzi "url" wyżej.
-        const categories = await pickRelevantCategories(`TEKST DO ANALIZY:\n${text_content}`, false, geminiKey!, costTracker)
-        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary(categories))
+        // POPRAWKA 2026-08-26: bez etapu kategoryzacji — patrz komentarz
+        // przy buildMentalModelsLibrary() i w gałęzi "url" wyżej.
+        const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary())
         geminiData = await callGemini(
           {
             contents: [{ parts: [{ text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nTEKST DO ANALIZY:\n${text_content}` }] }],
@@ -2776,15 +2795,17 @@ Deno.serve(async (req: Request) => {
     // wiersza (`refreshScanId`, patrz wyżej), NADPISUJEMY DOKŁADNIE TEN
     // WIERSZ (po `id`), zamiast `upsert` po `content_hash` — bo przy
     // przejściu z ręcznie wklejonej treści na świeże pobranie linku nowy
-    // `content_hash` (z adresu URL) nigdy nie zgadza się ze starym (z
-    // treści), więc zwykły upsert tworzyłby DRUGI, zduplikowany wiersz
-    // zamiast nadpisać oryginał. Aktualizujemy tu też sam `content_hash`
-    // na ten nowy (URL-owy), żeby od teraz normalny cache po hashu też
-    // trafiał w ten sam wiersz. Dla zwykłego, nowego zapytania (bez
-    // odświeżenia) zachowuje się jak dawniej — `upsert` po
-    // `content_hash,language`.
+    // `content_hash` nigdy nie zgadza się ze starym (z treści), więc zwykły
+    // upsert tworzyłby DRUGI, zduplikowany wiersz zamiast nadpisać oryginał.
+    // Aktualizujemy tu też sam `content_hash` na nowy, żeby od teraz
+    // normalny cache po hashu też trafiał w ten sam wiersz. Dla zwykłego,
+    // nowego zapytania (bez odświeżenia) zachowuje się jak dawniej —
+    // `upsert` po `content_hash,language`.
+    // POPRAWKA 2026-08-26 — zapisujemy `effectiveContentHash` (prawdziwy
+    // odcisk analizowanej treści, patrz sha256Hex() wyżej), NIE surowego
+    // `content_hash` od klienta — patrz uzasadnienie tam.
     const scanRow = {
-      content_hash,
+      content_hash: effectiveContentHash,
       input_type,
       language: outputLanguage,
       is_translation: usedTranslation,

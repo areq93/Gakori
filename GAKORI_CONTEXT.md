@@ -2361,6 +2361,109 @@ zanim założysz, że działa.
       POPRAWKI 2026-08-25(b)) nadal zdarzały się rozjazdy dla tekstów
       różniących się w niewielkim zakresie — do oceny po tym, jak te dwie
       poprawki się "ułożą" w praktyce.
+    - **POPRAWKA 2026-08-26 — odcisk palca treści liczony przez serwer (nie
+      klienta) + usunięcie etapu kategoryzacji (zawsze cała biblioteka) +
+      wymuszony przegląd 15 kategorii w brudnopisie AI.** Duża, wielogodzinna
+      rozmowa z właścicielem o jakości analiz, wywołana żywym przykładem:
+      link przeanalizowany w trybie "Link" dał wzorzec Framing (95/100), a
+      DOKŁADNIE TA SAMA treść, wklejona z "Pokaż pełny tekst źródłowy" do
+      trybu "Tekst", dała Efekt Halo (90/100) — mimo `temperature: 0` z
+      POPRAWKI 2026-08-25(b). Właściciel: "mamy problem z jakością jaką
+      oferujemy użytkownikowi... analizy muszą być absolutnie najwyższej
+      jakości, a takie sytuacje absolutnie nie mogą występować."
+
+      **Diagnoza (znaleziona w kodzie, nie zgadywana):**
+      1. Odcisk palca treści (`content_hash`) do dziś liczyła PRZEGLĄDARKA i
+         przysyłała gotowy w body zapytania — dla trybu "url" liczony z
+         SAMEGO ADRESU URL, dla trybu "tekst" z WKLEJONEGO TEKSTU. Dwie
+         całkowicie różne wartości dla identycznej treści → system w ogóle
+         nie rozpoznawał, że to ten sam artykuł, i uruchamiał DWIE
+         niezależne, osobne analizy zamiast oddać ten sam, zapisany wynik.
+      2. Każda z tych dwóch niezależnych analiz przechodziła NAJPIERW przez
+         osobny, "tani" etap kategoryzacji (`pickRelevantCategories()`) —
+         Gemini oceniało, do których z 15 kategorii pasuje treść, i
+         WYŁĄCZNIE ten podzbiór szedł do właściwej analizy. Dwa niezależne
+         wywołania tego etapu (dla dwóch "różnych" — bo różny hash —
+         zapytań) mogły (i w tym przypadku najwyraźniej dały) wybrać nieco
+         inny zestaw kategorii, więc druga, właściwa analiza w ogóle nie
+         miała szansy znaleźć tego samego wzorca za drugim razem.
+
+      **Naprawa, część A — `effectiveContentHash` liczony przez serwer.**
+      Nowa funkcja `sha256Hex()` (Web Crypto, ten sam algorytm co dawniej w
+      przeglądarce) liczy prawdziwy odcisk PO STRONIE SERWERA, z treści,
+      która NAPRAWDĘ poszła do analizy — zero zaufania do `content_hash` z
+      body (ten sam wzorzec zero-zaufania co przy `user_id`/JWT). Dla trybu
+      "tekst": liczony od razu z `text_content` (już znanego w całości).
+      Dla trybu "url": na starcie zostaje hash z URL-a (przydatny do
+      wczesnego sprawdzenia cache'u, zanim jeszcze pobierzemy stronę), a
+      zaraz PO `fetchUrlAsText()` zostaje NADPISANY prawdziwym hashem
+      oczyszczonej treści strony — to ten hash trafia do zapisanego wiersza
+      `scans` i do sprawdzenia tłumaczeń między językami. Efekt: artykuł
+      przeanalizowany jako link, a POTEM wklejony ręcznie (dokładnie ten sam
+      tekst) w trybie "Tekst", trafi teraz w TEN SAM wiersz cache'u — jeden
+      wynik, nie dwa. Dla obrazu/PDF-a zostaje hash od klienta bez zmian
+      (poza zakresem dzisiejszego problemu). Powtórna analiza TEGO SAMEGO
+      URL-a nadal działa bez zmian — obsługuje to już niezależny mechanizm
+      ratunku po `source_url` z POPRAWKI 2026-08-25(d), nie ten hash.
+
+      **Naprawa, część B1 — koniec zawężania kategorii.** Usunięte:
+      `pickRelevantCategories()`, `CATEGORY_RESPONSE_SCHEMA`, cały etap
+      "tania kategoryzacja". `buildMentalModelsLibrary()` (bez argumentów)
+      zwraca teraz ZAWSZE pełną bibliotekę wszystkich 15 kategorii, dla
+      KAŻDEJ analizy (tekst, link, obraz, PDF — obraz/PDF już i tak
+      dostawały pełną bibliotekę, więc dla nich nic się nie zmienia).
+      **Uczciwe wyliczenie kosztu** (patrz też rozmowa z właścicielem, pełna
+      matematyka omówiona ustnie): dawniej treść szła do Gemini DWA razy na
+      analizę (kategoryzacja + główna analiza), teraz RAZ — a sama
+      biblioteka (nawet cała, ~7,4 tys. znaków) jest krótsza niż większość
+      analizowanych artykułów. W praktyce zmiana jest NEUTRALNA kosztowo
+      albo TAŃSZA, nie droższa, zgodnie z wyliczeniem: 2 wysłania treści
+      zamiast 3 (kategoryzacja + główna + "druga runda szukania" →
+      główna + "druga runda szukania").
+
+      **Naprawa, część "checklist" — wymuszony przegląd 15 kategorii.**
+      Ponieważ jedno duże zapytanie z całą biblioteką TEORETYCZNIE zwiększa
+      ryzyko, że model "zjedzie" po kilku najbardziej oczywistych
+      kategoriach i przez nieuwagę pominie resztę, `CHAIN_OF_THOUGHT_INSTRUCTION`
+      dostała nową, obowiązkową sekcję "PRZEGLĄD KATEGORII" na samym
+      początku brudnopisu (`reasoning_steps`) — model musi jedną linijką na
+      kategorię (wszystkie 15, po kolei) zaznaczyć pasuje/nie pasuje, ZANIM
+      w ogóle zacznie iść akapit po akapicie. To NIE jest matematyczna
+      gwarancja (żadna instrukcja tekstowa nią nie jest) — ale to prawie
+      darmowa poprawka w TYM SAMYM zapytaniu (kilka dodatkowych zdań w
+      brudnopisie, który i tak nigdy nie trafia do użytkownika), więc
+      wymuszamy ją zawsze, jako dodatkowe zabezpieczenie obok samego
+      usunięcia zawężania.
+
+      **Świadomie odłożone na później (opisane właścicielowi, z pełną
+      matematyką kosztu i realnym sprawdzeniem limitów Google — patrz
+      niżej): "15+1"** — prawdziwe, mechaniczne rozbicie na 15 osobnych
+      zapytań (po jednym na kategorię, równolegle) + 1 zapytanie scalające,
+      analogicznie do już działającego dzielenia PDF-ów na części
+      (`PDF_CHUNK_PAGES`). To JEDYNY sposób na 100% gwarancję (nie tylko
+      instrukcję) pokrycia wszystkich kategorii — ale kosztuje realnie
+      więcej (treść wysyłana ~16 razy zamiast ~2), więc właściciel
+      rozważa dla niego OSOBNY, droższy cennik (np. 10 kredytów zamiast 5),
+      żeby marża została chroniona nawet przy najtańszym (hurtowym)
+      pakiecie kredytów klienta. **Blokująca sprawa sprawdzona na żywo**:
+      konto Google AI działało na darmowym poziomie (15 zapytań/minutę, 500
+      zapytań/DZIEŃ dla Gemini 3.5 Flash Lite — łącznie dla całej
+      aplikacji!) — jedna analiza 40-stronicowego PDF-a przy podziale
+      "15+1 na kawałek" (10 kawałków × 16 = 160 zapytań) sama zjadłaby
+      prawie 1/3 dziennego limitu CAŁEJ aplikacji. Właściciel sprawdził
+      płatne poziomy w konsoli Google: Tier 1 ≈ 4 005 RPM / 150 000 RPD,
+      Tier 2 ≈ 10 005 RPM / 350 000 RPD, Tier 3 ≈ 30 005 RPM / bez limitu
+      dziennego — każdy z nich z ogromnym zapasem na "15+1", więc **włączenie
+      płatności w Google AI Studio jest warunkiem wstępnym** przed
+      wdrożeniem "15+1" (a i tak, niezależnie od tej funkcji, dobrym
+      pomysłem już teraz — darmowy limit 500 zapytań/dzień jest bardzo
+      ciasny nawet dla dzisiejszego ruchu). Ustalone też: NIE łączyć osi
+      "podział po stronach" (PDF) z osią "podział po kategoriach" w jednym
+      mnożeniu bez realnej potrzeby (40 stron × 16 kategorii = 160 zapytań
+      to inny scenariusz niż zwykły tekst/link × 16 = tylko 16) — najpierw
+      wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
+      na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
+      PDF z ustalonym górnym limitem stron dla tego droższego trybu.
     - **POPRAWKA 2026-08-25(g) — filtrowanie akapitów-zapowiedzi
       "ZOBACZ:"/"Czytaj więcej" w treści linku.** Kontynuacja (f) — te same
       dwa żywe przykłady artykułów pokazały jeszcze jeden rodzaj szumu:
