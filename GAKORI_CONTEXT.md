@@ -3877,6 +3877,58 @@ komunikat w języku użytkownika, włączenie z powrotem wyłącznie ręczne.
   pakietu Małego, patrz tabela niżej) — bo to właśnie duże, mocno
   zrabatowane pakiety najbardziej obniżają cenę za kredyt (do $0,00556),
   więc to na nich rosnący koszt AI najmocniej "zjada" marżę.
+- **USTALONE 2026-08-26 — docelowy poziom marży: 88-95%.** Odpowiedź na
+  notatkę wyżej — po przeliczeniu okazało się, że kierunek problemu jest
+  ODWROTNY niż się wydawało: to nie rosnące koszty AI zagrażają marży (te
+  zostają w granicach grosza nawet przy planowanej hierarchii dla PDF-a,
+  patrz niżej), tylko **PDF jest dziś przeceniony dla użytkownika**
+  względem realnego kosztu — 160-stronicowy PDF kosztuje klienta 1280
+  kredytów (ok. $7-13), a realny koszt AI to ~$0,25, czyli marża
+  96-98%. Właściciel wprost: "wydaje mi się po prostu że 1280 to za
+  dużo" — ustalił **88-95% jako docelowy, akceptowalny poziom marży**
+  (nie sufit do maksymalnego wykorzystania na koszty architektury, tylko
+  punkt odniesienia przy ustalaniu CEN dla użytkownika — im niższa cena
+  w tym przedziale marży, tym lepiej dla klienta, ale nie schodzimy
+  poniżej niego).
+
+  **Konkretna decyzja dla PDF-a**: nowa cena celuje w ok. **400 kredytów
+  za 160-stronicowy PDF** (zamiast dzisiejszych 1280) — to nie przypadkowa
+  liczba, tylko w przybliżeniu to, co dałby TEN SAM wzór co dla tekstu
+  (`FIXED_FEE + znaki/1000 × MULTIPLIER`) przy typowej gęstości ~2500
+  znaków/stronę. Przy koszcie ~$0,25 to wciąż 88,7-93,8% marży, zależnie
+  od pakietu — mieści się w ustalonym przedziale.
+
+  **Nie zaimplementowane jeszcze** — to ustalony KIERUNEK i docelowa
+  liczba, wymaga jeszcze: (1) sprawdzenia, czy da się realnie policzyć
+  liczbę znaków w PDF-ie LOKALNIE (bez Gemini), zanim policzymy cenę —
+  dziś `pdf-lib` służy do liczenia STRON, nie ekstrakcji tekstu, więc
+  trzeba sprawdzić, czy/jak wyciągnąć prawdziwą liczbę znaków (albo
+  zostać przy przybliżeniu opartym o liczbę stron, np. ustaloną, niższą
+  stawkę kredytów/stronę zamiast dzisiejszego `PDF_PAGE_COST = 8`,
+  odziedziczonego po cenie zdjęcia — realnego związku z kosztem PDF-a
+  jako tekstu nigdy nie miało), (2) decyzji, czy stawka ma być płaska
+  (kredyty/strona) czy oparta o rzeczywistą liczbę znaków jak w tekście.
+
+  **Sprawdzone 2026-08-26 (testy w Node.js, poza produkcyjnym kodem) —
+  wynik ekstrakcji tekstu z PDF-a lokalnie**: biblioteka `unpdf`
+  (kandydatka, deklaruje zgodność z Deno/edge) poprawnie wyciągnęła
+  prosty, wygenerowany programowo tekst angielski/ASCII i poprawną
+  liczbę stron. **Nierozstrzygnięte, świadomie NIE potwierdzone**: (a)
+  polskie znaki diakrytyczne (ą/ć/ę...) — test w tym kierunku natrafił
+  na osobny problem przy TWORZENIU testowego PDF-a (standardowy font
+  Helvetica nie umie ich zapisać), więc odczyt polskich znaków wciąż
+  jest niezweryfikowany, nie potwierdzony jako działający; (b) zgodność
+  z prawdziwym środowiskiem Deno (test był w Node.js, sandbox nie ma
+  dostępu do żywego Supabase); (c) prawdziwe, "brudne" PDF-y (skany,
+  wielokolumnowy tekst, PDF-y z Worda) — testowano tylko czysty tekst;
+  (d) wydajność/czas przy dużych (100+ stron) plikach. **Decyzja
+  właściciela**: przy niepewności dotyczącej cashflow/cennika zawsze
+  sprawdzać/pytać, nie zgadywać (ustalone wprost 2026-08-26, patrz
+  "Zasady współpracy" niżej) — dlatego na razie REKOMENDACJA to płaska,
+  niższa stawka kredytów/stronę (bez nowej zależności, zero ryzyka
+  błędnej ekstrakcji zaniżającej cenę), a prawdziwą ekstrakcję znaków
+  przetestować dopiero na realnym, polskim PDF-ie od właściciela, zanim
+  cokolwiek wdrożymy na tej podstawie.
 - Tekst: `FIXED_FEE (2) + ceil(char_count / 1000) * MULTIPLIER (1)`.
 - **Link** (od POPRAWKA 2026-08-23(a), punkt C): TEN SAM wzór co tekst,
   liczony od realnej liczby znaków strony — ale to wymaga NAJPIERW
@@ -4263,6 +4315,19 @@ zupełnie inna liczba, i to ta druga jest poprawna.
 
 ## Zasady współpracy w tym projekcie
 
+- **DOKŁADNOŚĆ PRZY CASHFLOW — SPRAWDZAJ LUB PYTAJ, NIGDY NIE ZGADUJ
+  (ustalone wprost 2026-08-26).** Cytat wprost: "jak musisz coś bardzo
+  dokładnie zweryfikować dla cashflow żeby nie popełnić błędu
+  księgowości, to sprawdzaj lub pytaj, a ręcznie wykonam pracę i razem
+  dojdziemy do złotego punktu." W praktyce: przy każdej liczbie, która
+  wpływa na realny przychód/koszt/cennik (nie tylko architekturę) —
+  zanim się na niej oprze rekomendację, albo (1) zweryfikować ją realnym
+  testem/sprawdzeniem (tak jak test biblioteki do ekstrakcji tekstu z
+  PDF-a, patrz "Cennik" niżej — sprawdzone, co działa, a co pozostaje
+  niepewne, zamiast zakładać), albo (2) jawnie zapytać właściciela,
+  zamiast przyjmować przybliżenie jako pewnik. Właściciel deklaruje
+  gotowość do wspólnej, ręcznej weryfikacji (np. przesłania realnego
+  pliku do przetestowania) — z tego korzystać zamiast zgadywać.
 - **PODEJŚCIE ETAPOWE/HIERARCHICZNE JAKO STANDARD JAKOŚCI (ustalone wprost
   2026-08-26), dopóki nie znajdziemy lepszego.** Właściciel, po rozmowie o
   różnicach między architekturą tekstu/linku a PDF/obrazu, ustalił wprost:
