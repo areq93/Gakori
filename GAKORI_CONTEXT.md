@@ -2464,26 +2464,101 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
-    - **POPRAWKA 2026-08-26(r) — celowane przykłady w bibliotece modeli
-      mentalnych, tylko dla PAR, które już się realnie pomyliły.**
-      Kontynuacja POPRAWKI (n)/(n2) — właściciel zapytał, czy uboga
-      biblioteka (nazwa + jedno zdanie, bez przykładów) utrudnia
-      modelowi rozróżnianie podobnych modeli, powołując się na żywy
-      przypadek "Bodziec" vs "Wąskie Gardło" dla tego samego cytatu.
-      Sprawdzone: osobny plik `MODELE_MENTALNE.md` ma już przykłady, ale
-      tylko dla 53 ze 100 modeli. Rekomendacja (zaakceptowana): NIE
-      dokładać przykładów do wszystkich 100 na raz (biblioteka i tak
-      leci w całości w każdym zapytaniu od POPRAWKI B1 — więcej
-      przykładów = wyższy koszt KAŻDEJ analizy), tylko do konkretnych,
-      już potwierdzonych na żywo mylących się par. Na razie jedna taka
-      para: dopisano krótkie rozróżnienie wprost w opisie obu modeli w
-      `MENTAL_MODELS_BY_CATEGORY` — "Wąskie Gardło" oznaczone jako
-      element TECHNICZNY/STRUKTURALNY (przykład: szybki komputer, ale
-      wolny internet), "Bodźce" jako czyjś interes/MOTYWACJA (przykład:
-      doradca poleca fundusz, bo ma z niego prowizję) — z wyraźnym "NIE
-      chodzi o..." w obu, żeby model miał jasny sygnał, kiedy wybrać
-      które. Kolejne pary dokładamy tylko wtedy, gdy realnie zobaczymy
-      kolejną pomyłkę na żywo — nie z góry, spekulacyjnie.
+    - **POPRAWKA 2026-08-26(s) — nowa funkcja `weekly-model-report`, mail co
+      piątek 11:00 z materiałem do wspólnego przeglądu modeli mentalnych.**
+      Odpowiedź na pytanie właściciela o "automatykę" budującą bibliotekę
+      z realnych przykładów. Świadomie ODRZUCONA pełna automatyzacja (system
+      sam decydujący, co jest dobrym przykładem) — samo to, że model
+      CZĘSTO przypisuje coś do "modelu X" nie znaczy, że robi to
+      POPRAWNIE; bez człowieka pośrodku moglibyśmy tylko utrwalać
+      systematyczny błąd zamiast go naprawiać. Zamiast tego: nowa Edge
+      Function (ten sam wzorzec co `daily-report` — pg_cron, Brevo,
+      REPORT_RECIPIENT_EMAIL, WYŁĄCZONA weryfikacja JWT, własny sekret w
+      nagłówku, REUŻYWA istniejącego `CRON_REPORT_SECRET`) wysyła RAZ W
+      TYGODNIU mailem (po polsku) listę realnych cytatów przypisanych w
+      ostatnich 7 dniach do każdego modelu (do 3 różnych cytatów na
+      model, z linkiem do pełnej analizy), posortowaną wg częstości. Cel:
+      raz w tygodniu właściciel razem z Claude ręcznie ocenia, które
+      przykłady są trafne, i DOPIERO WTEDY dopisuje je do
+      `MENTAL_MODELS_BY_CATEGORY` — żaden zapis do kodu nie dzieje się
+      automatycznie.
+
+      **Świadome ograniczenie zakresu (uczciwie zaznaczone w kodzie)**:
+      raport liczy WYŁĄCZNIE oryginalne (`is_translation = false`)
+      analizy w języku polskim — bo (1) biblioteka modeli ma nazwy po
+      polsku, więc tylko polskie `name` da się bezpośrednio dopasować do
+      klucza w bibliotece, (2) pole `quote` nigdy nie jest tłumaczone, więc
+      w wynikach-tłumaczeniach cytat byłby w innym języku niż reszta
+      polskiego maila. Analizy w innych językach w ogóle nie są ujęte —
+      akceptowalne uproszczenie na start, bo większość testowania i tak
+      dzieje się po polsku.
+
+      **Bezpieczeństwo**: cytaty to fragmenty dowolnych stron internetowych
+      wybrane przez AI — traktowane jako niezaufana treść, wstawiane do
+      HTML maila przez nową funkcję `escapeHtml()` (nie istniała wcześniej
+      w `daily-report`, który wstawia `result.summary` bez takiego
+      escapowania — świadomie NIE naprawiane teraz, bo poza zakresem tej
+      zmiany, ale warto o tym pamiętać przy następnej okazji).
+
+      **Wdrożenie (wymaga Twojej ręcznej akcji w Supabase)**: (1) wklej i
+      wdróż nowy plik `supabase/functions/weekly-model-report/index.ts`
+      (jak zawsze), (2) w Settings tej funkcji wyłącz "Verify JWT with
+      legacy secret" (tak jak przy `daily-report`), (3) w SQL Editor
+      uruchom harmonogram — sekrety (`CRON_REPORT_SECRET` itd.) są już
+      skonfigurowane dla `daily-report`, więc nic dodatkowego tu nie
+      trzeba ustawiać:
+      ```sql
+      select cron.schedule('gakori-weekly-model-report', '0 9 * * 5', $$
+        select net.http_post(
+          url:='https://<TWÓJ-PROJEKT>.supabase.co/functions/v1/weekly-model-report',
+          headers:=jsonb_build_object('x-cron-secret', '<TWÓJ CRON_REPORT_SECRET>'),
+          body:='{}'::jsonb
+        )
+      $$);
+      ```
+      **Uwaga na strefę czasową (ta sama pułapka co przy `daily-report`)**:
+      `0 9 * * 5` to piątek 09:00 UTC = piątek 11:00 czasu polskiego LATEM
+      (CEST, UTC+2, tak jak teraz w sierpniu) — zimą (CET, UTC+1) ten sam
+      harmonogram dostarczy mail o 10:00 czasu polskiego, chyba że ktoś
+      ręcznie przestawi cron przy zmianie czasu. Świadomie zaakceptowane
+      jako drobna niedogodność, tak jak przy `daily-report`.
+    - **POPRAWKA 2026-08-26(r) — przykłady dla WSZYSTKICH modeli mentalnych
+      w bibliotece (nie tylko mylących się par).** Kontynuacja POPRAWKI
+      (n)/(n2) — właściciel zapytał, czy uboga biblioteka (nazwa + jedno
+      zdanie, bez przykładów) utrudnia modelowi rozróżnianie podobnych
+      modeli, powołując się na żywy przypadek "Bodziec" vs "Wąskie Gardło"
+      dla tego samego cytatu. Pierwsza rekomendacja (dodać przykłady TYLKO
+      do potwierdzonych, mylących się par, żeby nie podnosić kosztu każdej
+      analizy) — świadomie ODRZUCONA przez właściciela: "uważam że każdy
+      model powinien mieć dobrze dopasowane przykłady kluczowe dla
+      rozpoznania tego modelu w różnych sytuacjach." Zrobione: WSZYSTKIE
+      103 modele (patrz niżej, dlaczego 103 nie 100) w
+      `MENTAL_MODELS_BY_CATEGORY` mają teraz krótki przykład "np. ..." —
+      dla 53 modeli opartych na przykładach z `MODELE_MENTALNE.md`
+      (skrócone do jednej linijki), dla pozostałych 50 (w tym Wąskie
+      Gardło/Bodźce z wcześniejszej poprawki) — nowo napisane, zwięzłe
+      przykłady dobrane tak, żeby jak najlepiej oddawały MECHANIZM danego
+      modelu i odróżniały go od modeli podobnych.
+
+      **Uczciwy koszt (świadomie zaakceptowany)**: biblioteka urosła z ok.
+      7,4 tys. do ok. 15,2 tys. znaków kodu — mniej więcej DWUKROTNIE,
+      wysyłana w całości przy KAŻDEJ analizie (od POPRAWKI B1). Przy tak
+      taniej klasie modelu jak Flash-Lite to nadal niewielki koszt w
+      liczbach bezwzględnych, ale to realny, trwały wzrost kosztu każdego
+      zapytania — świadoma decyzja właściciela, jakość ważniejsza niż ta
+      różnica.
+
+      **Żywe, uboczne odkrycie przy tej okazji**: biblioteka w kodzie ma w
+      rzeczywistości **103 modele, nie 100** — kategoria PSYCHOLOGIA ma 4
+      dodatkowe modele (Fałszywa Pilność, Sztuczny Niedobór, Argument z
+      Autorytetu, Strach przed Utratą/FOMO), których w ogóle nie ma w
+      `MODELE_MENTALNE.md`. To NIE jest coś zepsute przez tę poprawkę —
+      to najwyraźniej rozjazd sprzed tej sesji, mimo komentarza w kodzie
+      "jeśli zmieniasz jedno, zaktualizuj drugie". `MODELE_MENTALNE.md`
+      (plik "dla ludzi") NIE został zaktualizowany o te 4 modele ani o
+      nowe przykłady dla pozostałych — świadomie odłożone na później,
+      niski priorytet (nie wpływa na jakość analiz, tylko na dokumentację
+      dla człowieka).
     - **POPRAWKA 2026-08-26(q) — konto właściciela samo się zablokowało po
       intensywnym testowaniu "Sprawdź, czy coś się zmieniło".** Żywe
       zgłoszenie: po serii testów tej funkcji na wielu linkach WSZYSTKIE
