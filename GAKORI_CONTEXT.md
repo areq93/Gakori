@@ -3767,6 +3767,21 @@ komunikat w języku użytkownika, włączenie z powrotem wyłącznie ręczne.
 
 ## Cennik (do skalibrowania na realnych danych — na razie przybliżenia)
 
+- **DO ROZWAŻENIA przy następnym przeglądzie cennika (zanotowane
+  2026-08-26, właściciel poprosił zapisać na później, NIE decydować
+  teraz)**: rosnące koszty AI (POPRAWKA (r) — biblioteka modeli mentalnych
+  urosła ~102%, z realnym wpływem na marżę rzędu ~10% przychodu na
+  najtańszych, minimalnych analizach — patrz wyliczenia w rozmowie
+  2026-08-26; do tego dochodzi ewentualna nowa weryfikacja wyboru modelu)
+  — właściciel wprost: "musimy określić czy nie podnieść stawki obecnych
+  kosztów kredytowych za analizy ze względu na rosnące koszty, oraz
+  mniejsze rabaty na pakietach, bo mocno nas trafiają." Czyli przy
+  następnym ustalaniu wartości kredytów/cennika rozważyć: (1) podniesienie
+  `FIXED_FEE`/`MULTIPLIER_PER_1000_CHARS` (obecnie 2 i 1), (2) zmniejszenie
+  rabatów na pakiecie Średnim/Dużym (obecnie -24%/-44,4% względem
+  pakietu Małego, patrz tabela niżej) — bo to właśnie duże, mocno
+  zrabatowane pakiety najbardziej obniżają cenę za kredyt (do $0,00556),
+  więc to na nich rosnący koszt AI najmocniej "zjada" marżę.
 - Tekst: `FIXED_FEE (2) + ceil(char_count / 1000) * MULTIPLIER (1)`.
 - **Link** (od POPRAWKA 2026-08-23(a), punkt C): TEN SAM wzór co tekst,
   liczony od realnej liczby znaków strony — ale to wymaga NAJPIERW
