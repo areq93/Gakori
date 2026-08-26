@@ -2464,6 +2464,49 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(t) — scalanie wyników przy "Sprawdź, czy coś się
+      zmieniło" zamiast bezwarunkowego zastąpienia.** Żywe zgłoszenie:
+      właściciel wykonał tę akcję dwa razy pod rząd na tej samej stronie i
+      dostał RÓŻNĄ liczbę wzorców (raz mniej, raz więcej) — mimo że strona
+      w praktyce się nie zmieniła. Propozycja wprost od właściciela: "nie
+      możemy wykorzystywać drugi raz tych samych treści, jeżeli się
+      powtarzają, chyba że zniknęły... nie usuwamy wyników z modelu, jeżeli
+      ten cytat dalej znajduje się w treści po ponownym sprawdzeniu."
+
+      Rozróżnienie dwóch przypadków w kodzie: (1) strona w praktyce
+      niezmieniona (podobieństwo ≥ progu, patrz POPRAWKA (j),
+      `SHINGLE_SIMILARITY_THRESHOLD`) — to już od dawna zwraca STARY wynik
+      za darmo, bez pytania Gemini drugi raz, więc TU niespójność w ogóle
+      nie mogła powstać; (2) strona zmieniła się realnie (poniżej progu) —
+      TU właśnie był problem: szliśmy do pełnej, nowej analizy Gemini, która
+      CAŁKOWICIE zastępowała stary wynik, mimo że część starych cytatów
+      wciąż fizycznie była w nowo pobranej treści — a samo rozumowanie
+      Gemini nie jest w 100% deterministyczne między niezależnymi
+      wywołaniami, nawet dla niemal identycznego tekstu (ten sam, głębszy
+      mechanizm co przy POPRAWCE (n)/(n2), tam dla nazwy modelu przy
+      remisie, tu dla samego faktu ponownego znalezienia wzorca).
+
+      **Naprawa (`analyze/index.ts`)**: nowa zmienna `refreshOldResult`
+      (hoisted na początku funkcji) zapamiętuje stary wynik WTEDY, gdy
+      przechodzimy dalej do prawdziwej, płatnej analizy (czyli poniżej
+      progu podobieństwa). Po policzeniu nowego wyniku — scalenie: każdy
+      STARY wzorzec, którego dosłowny `quote` nadal jest podciągiem
+      świeżo pobranej treści (i którego nowa analiza SAMA nie znalazła —
+      sprawdzane po treści cytatu, żeby nie zduplikować), zostaje
+      DOŁOŻONY do nowo znalezionych wzorców, nie zastąpiony. Wzorzec,
+      którego cytat faktycznie zniknął ze strony, słusznie znika też z
+      wyniku — to jedyny przypadek realnej utraty. Logika sprawdzona
+      dwoma syntetycznymi testami (Node) odzwierciedlającymi dokładnie
+      zgłoszony scenariusz — oba przeszły.
+
+      **Uczciwe zastrzeżenie (świadomie zaakceptowane, nie zablokowało
+      wdrożenia)**: `q_score` w scalonym wyniku to wciąż liczba z samego
+      NOWEGO przebiegu Gemini — jeśli dołożono stare wzorce, ocena może
+      nie w pełni odzwierciedlać finalną, scaloną listę wzorców. Mniejszy
+      problem niż to, co naprawia (całkowita utrata realnych, wciąż
+      obecnych wzorców) — do ewentualnej poprawki (np. osobne, tanie
+      przeliczenie oceny na podstawie finalnej listy), jeśli po
+      obserwacji na żywo okaże się to realnie mylące.
     - **POPRAWKA 2026-08-26(s) — nowa funkcja `weekly-model-report`, mail co
       piątek 11:00 z materiałem do wspólnego przeglądu modeli mentalnych.**
       Odpowiedź na pytanie właściciela o "automatykę" budującą bibliotekę

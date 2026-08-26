@@ -2076,6 +2076,11 @@ Deno.serve(async (req: Request) => {
     // `computeExpectedCost()` i reguła 4 audytu bezpieczeństwa niżej.
     let preFetchedText: string | null = null
     let urlFetchedCharCount: number | null = null
+    // POPRAWKA 2026-08-26(t) — patrz pełne uzasadnienie przy scaleniu
+    // wyników niżej (blisko zapisu do `scanRow`). Trzymane tu (nie lokalnie
+    // w bloku "Sprawdź, czy coś się zmieniło" niżej), żeby było dostępne
+    // dużo później, już po ewentualnej PŁATNEJ, świeżej analizie Gemini.
+    let refreshOldResult: { patterns?: Array<Record<string, unknown>> } | null = null
     // Wczytany dokument PDF (pdf-lib) — ustawiany niżej w gałęzi "pdf",
     // trzymany tu, żeby sekcja 5 (wywołanie Gemini, `analyzePdfChunk()`)
     // mogła z niego wycinać fragmenty bez ponownego parsowania tych samych
@@ -2305,6 +2310,14 @@ Deno.serve(async (req: Request) => {
               JSON.stringify({ cached: true, cost: 0, id: refreshScanId, result: existingForRefresh.result, source_url }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
+          }
+          // POPRAWKA 2026-08-26(t) — treść zmieniła się NA TYLE, że idziemy
+          // dalej do prawdziwej, płatnej analizy (poniżej progu podobieństwa
+          // wyżej) — zapamiętujemy STARY wynik do późniejszego scalenia
+          // (patrz `refreshOldResult` przy zapisie do `scanRow` niżej), zamiast
+          // bezwarunkowo go wyrzucać.
+          if (existingForRefresh) {
+            refreshOldResult = existingForRefresh.result as { patterns?: Array<Record<string, unknown>> }
           }
         }
       } else {
@@ -3035,6 +3048,60 @@ Deno.serve(async (req: Request) => {
           )
           result = { ...(result as Record<string, unknown>), patterns: finalPatterns }
         }
+      }
+    }
+
+    // POPRAWKA 2026-08-26(t) — SCALENIE wyniku przy "Sprawdź, czy coś się
+    // zmieniło", zamiast bezwarunkowego zastąpienia starego wyniku nowym.
+    // Żywy problem zgłoszony przez właściciela: dwa kolejne odświeżenia TEJ
+    // SAMEJ, w praktyce niewiele zmienionej strony dawały RÓŻNĄ liczbę
+    // wzorców (raz mniej, raz więcej) — bo samo rozumowanie Gemini nie jest
+    // w 100% deterministyczne między niezależnymi wywołaniami, nawet dla
+    // niemal identycznego tekstu (ten sam, głębszy problem co przy
+    // POPRAWCE (n)/(n2) — tam dotyczyło NAZWY modelu dla remisu, tu dotyczy
+    // samego faktu, czy wzorzec w ogóle zostanie ponownie znaleziony).
+    // Właściciel zaproponował wprost regułę: skoro cytat WCIĄŻ fizycznie
+    // istnieje w świeżo pobranej treści, nie wolno go po prostu "zgubić"
+    // tylko dlatego, że tym razem Gemini o nim nie wspomniało.
+    //
+    // Działanie: dla `forceRefresh` na znanym wierszu (`refreshScanId`),
+    // gdzie doszliśmy aż tutaj (czyli treść zmieniła się NA TYLE, że
+    // przeszliśmy próg podobieństwa i zapłaciliśmy za prawdziwą, nową
+    // analizę — patrz blok wyżej) — do NOWO znalezionych wzorców
+    // DOKŁADAMY (nie zastępujemy) każdy STARY wzorzec, którego dosłowny
+    // cytat nadal jest podciągiem świeżo pobranego tekstu, o ile nowa
+    // analiza nie znalazła go już sama (bez duplikatów). Wzorzec, którego
+    // cytat zniknął z treści, słusznie znika też z wyniku — to jedyny
+    // przypadek, w którym coś realnie ubywa.
+    //
+    // Uczciwe zastrzeżenie: `q_score` w wyniku to wciąż liczba z NOWEGO
+    // przebiegu Gemini, licząca tylko nowo znalezione wzorce — jeśli
+    // dołożyliśmy tu stare wzorce, ocena może nie w pełni odzwierciedlać
+    // finalną listę. Świadomie zaakceptowane jako mniejszy problem niż
+    // dotychczasowy (całkowita utrata realnych, wciąż obecnych wzorców) —
+    // do ewentualnej poprawki, jeśli po obserwacji na żywo okaże się to
+    // realnie mylące.
+    if (
+      forceRefresh &&
+      refreshScanId &&
+      refreshOldResult &&
+      Array.isArray(refreshOldResult.patterns) &&
+      result &&
+      Array.isArray((result as { patterns?: unknown }).patterns) &&
+      typeof preFetchedText === 'string'
+    ) {
+      const newPatterns = (result as { patterns: Array<Record<string, unknown>> }).patterns
+      const newQuotes = new Set(
+        newPatterns.map((p) => (typeof p.quote === 'string' ? p.quote : null)).filter((q): q is string => !!q)
+      )
+      const freshText = preFetchedText
+      const keptOldPatterns = refreshOldResult.patterns.filter((p) => {
+        const quote = typeof p.quote === 'string' ? p.quote : null
+        if (!quote || newQuotes.has(quote)) return false
+        return freshText.includes(quote)
+      })
+      if (keptOldPatterns.length > 0) {
+        result = { ...(result as Record<string, unknown>), patterns: [...keptOldPatterns, ...newPatterns] }
       }
     }
 
