@@ -496,9 +496,23 @@
 
                         // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,
                         // "Zaufanie do ręcznie wklejonych linków". Stała,
-                        // widoczna informacja, nigdy nie znika.
+                        // widoczna informacja, nigdy nie znika — TYLKO dla treści
+                        // faktycznie wklejonej ręcznie (byłoby mylące dla zwykłej,
+                        // automatycznej analizy linku).
                         if (data.is_manual_source) {
                             document.getElementById('scanManualSourceNotice').innerText = t('manual_source_notice');
+                        }
+                        // POPRAWKA 2026-08-26(k) — te trzy przyciski (zgłoś
+                        // niezgodność / sprawdź, czy coś się zmieniło / wklej
+                        // własną treść) dawniej pokazywały się WYŁĄCZNIE dla
+                        // treści wklejonej ręcznie — ale liczenie wyświetleń pod
+                        // automatyczne wycofanie już dziś liczy się jednakowo dla
+                        // wszystkich trybów, a "Sprawdź, czy coś się zmieniło"
+                        // jest teraz bezpieczne (porównanie podobieństwa treści,
+                        // darmowe gdy strona się nie zmieniła — patrz POPRAWKA
+                        // 2026-08-26(j)) — więc rozszerzamy widoczność na KAŻDĄ
+                        // analizę linku, nie tylko ręcznie wklejoną treść.
+                        if (data.is_manual_source || (data.input_type === 'url' && typeof data.source_url === 'string')) {
                             document.getElementById('scanManualSourceBox').style.display = 'block';
 
                             const manualStatusEl = document.getElementById('scanManualSourceStatus');

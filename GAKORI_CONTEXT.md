@@ -2464,6 +2464,22 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(k) — trzy przyciski ("Zgłoś niezgodność"/
+      "Sprawdź, czy coś się zmieniło"/"Wklej własną treść") rozszerzone
+      na KAŻDĄ analizę linku, nie tylko ręcznie wklejoną treść.**
+      Dotychczas widoczne WYŁĄCZNIE dla `is_manual_source` (żywy przykład
+      — właściciel zrobił zwykłą analizę linku i nie zobaczył żadnego z
+      tych przycisków). Sprawdzone: mechanizm liczenia wyświetleń pod
+      automatyczne wycofanie (`link_view_confirmations`) już wcześniej
+      liczył się jednakowo dla wszystkich trybów, a "Sprawdź, czy coś się
+      zmieniło" jest teraz bezpieczne dzięki POPRAWCE 2026-08-26(j)
+      (porównanie podobieństwa treści, darmowe gdy strona się nie
+      zmieniła) — więc nic architektonicznie nie stało na przeszkodzie,
+      żeby to rozszerzyć. Sam komunikat "Ta treść pochodzi z ręcznego
+      wklejenia..." (`manual_source_notice`) zostaje TYLKO dla prawdziwie
+      ręcznie wklejonej treści (byłby mylący dla zwykłej analizy linku) —
+      same przyciski są teraz widoczne dla każdego `input_type === 'url'`
+      z prawdziwym `source_url`.
     - **POPRAWKA 2026-08-26(j) — zamknięcie luki "przeklikiwania w nadziei
       na inny wynik" przy "Sprawdź, czy coś się zmieniło" (podobieństwo
       treści, nie dokładny odcisk palca).** Właściciel wprost postawił
