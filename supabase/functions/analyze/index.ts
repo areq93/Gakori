@@ -297,9 +297,9 @@ const MENTAL_MODELS_BY_CATEGORY: Record<string, string> = {
   FIZYKA: 'FIZYKA: Entropia (układy dążą do nieładu bez dopływu energii/pracy); Względność (ocena zależy od punktu widzenia obserwatora); Bezwładność (organizacje trwają w obecnym stanie, opór wobec zmiany); Masa Krytyczna (próg wielkości potrzebny, by coś się utrzymało); Prędkość vs Szybkość (tempo działania mylone z tempem w dobrym kierunku); Zasada Dźwigni (mała zmiana w kluczowym miejscu daje wielki efekt); Tarcie (celowe utrudnienia blokujące łatwe działanie, np. rezygnację).',
   CHEMIA: 'CHEMIA: Energia Aktywacji (próg wysiłku potrzebny, by zacząć działanie); Katalizator (coś przyspiesza proces, samo się nie zużywając); Półokres Rozpadu (wiedza/trend traci ważność z czasem); Entalpia/Hype (poziom sztucznie napompowanej ekscytacji bez fundamentów).',
   BIOLOGIA: 'BIOLOGIA: Dobór Naturalny (przetrwanie lepiej dopasowanego rozwiązania); Koewolucja (wyścig zbrojeń dwóch stron wzajemnie się napędzających); Homeostaza (nierealistyczna wiara w trwałą równowagę bez zaburzeń); Nisza Ekologiczna (wąska specjalizacja zamiast bycia dla wszystkich); Pasożytnictwo vs Symbioza (jedna strona korzysta kosztem drugiej); Regresja do Średniej (ekstremalny wynik mylony z nową normą); Sygnalizacja (kosztowny, pokazowy sygnał ma udowodnić cechę, niekoniecznie prawdziwą).',
-  'SYSTEMY I INŻYNIERIA': 'SYSTEMY I INŻYNIERIA: Pętle Sprzężenia (trend napędza sam siebie, dodatnio lub ujemnie); Redundancja (brak zapasu/planu B jako ukryte ryzyko); Wąskie Gardło (jeden słaby element ogranicza całość); Margines Bezpieczeństwa (brak zapasu na błąd lub niespodziankę); Antykruchość (system silniejszy dzięki wstrząsom, nie mimo nich); Modułowość (elementy da się wymieniać niezależnie); Prawo Moore\'a (mylne założenie o wiecznym, stałym tempie postępu).',
+  'SYSTEMY I INŻYNIERIA': 'SYSTEMY I INŻYNIERIA: Pętle Sprzężenia (trend napędza sam siebie, dodatnio lub ujemnie); Redundancja (brak zapasu/planu B jako ukryte ryzyko); Wąskie Gardło (jeden słaby, TECHNICZNY/STRUKTURALNY element ogranicza całość — np. szybki komputer, ale wolny internet; NIE chodzi o czyjś interes czy motywację, to bezosobowe ograniczenie zdolności/przepustowości systemu); Margines Bezpieczeństwa (brak zapasu na błąd lub niespodziankę); Antykruchość (system silniejszy dzięki wstrząsom, nie mimo nich); Modułowość (elementy da się wymieniać niezależnie); Prawo Moore\'a (mylne założenie o wiecznym, stałym tempie postępu).',
   'MATEMATYKA I STATYSTYKA': 'MATEMATYKA I STATYSTYKA: Rozkład Normalny (nierealistyczne "wszyscy osiągają wynik ekstremalny"); Zasada Pareta 80/20 (mała część przyczyn odpowiada za większość efektów); Procent Składany (efekt kuli śnieżnej, mylony z liniowym wzrostem); Błąd Przeżywalności (wnioskowanie tylko z tych, którzy "przetrwali", pomijając resztę); Istotność Statystyczna (wniosek z próby zbyt małej, by cokolwiek dowodzić); Czarny Łabędź (rzadkie zdarzenie o ogromnym wpływie, ignorowane w prognozach); Zasada Gołębnika (błąd w alokacji, gdy elementów jest więcej niż miejsc).',
-  EKONOMIA: 'EKONOMIA: Koszt Alternatywny (pomija się, co się traci, wybierając opcję); Bodźce (czyj interes naprawdę stoi za rekomendacją); Koszty Utopione (kontynuacja złej decyzji, bo już w nią zainwestowano); Podaż i Popyt (cena wynika z dostępności i chęci zakupu); Przewaga Komparatywna (opłacalność relatywna, nie bezwzględna); Tragedia Wspólnego Pastwiska (indywidualny interes niszczy wspólny zasób); Teoria Gier (wynik zależy od decyzji innych graczy, nie tylko naszej); Efekt Sieciowy (wartość usługi rośnie z liczbą użytkowników); Malejące Przychody (kolejna jednostka wysiłku daje coraz mniej); Asymetria Informacji (jedna strona transakcji wie wyraźnie więcej); Arbitraż (zysk z różnicy cen tego samego dobra na różnych rynkach).',
+  EKONOMIA: 'EKONOMIA: Koszt Alternatywny (pomija się, co się traci, wybierając opcję); Bodźce (czyj interes/MOTYWACJA naprawdę stoi za rekomendacją lub decyzją — np. doradca poleca akurat ten fundusz, bo dostaje z niego prowizję; chodzi o ludzki interes, nie o techniczne ograniczenie systemu); Koszty Utopione (kontynuacja złej decyzji, bo już w nią zainwestowano); Podaż i Popyt (cena wynika z dostępności i chęci zakupu); Przewaga Komparatywna (opłacalność relatywna, nie bezwzględna); Tragedia Wspólnego Pastwiska (indywidualny interes niszczy wspólny zasób); Teoria Gier (wynik zależy od decyzji innych graczy, nie tylko naszej); Efekt Sieciowy (wartość usługi rośnie z liczbą użytkowników); Malejące Przychody (kolejna jednostka wysiłku daje coraz mniej); Asymetria Informacji (jedna strona transakcji wie wyraźnie więcej); Arbitraż (zysk z różnicy cen tego samego dobra na różnych rynkach).',
   PSYCHOLOGIA: 'PSYCHOLOGIA (najczęstsze w manipulacji): Dowód Społeczny (rób jak inni, bo "wszyscy tak robią"); Efekt Potwierdzenia (dobór faktów pasujących do z góry przyjętej tezy); Dysonans Poznawczy (dyskomfort z dwóch sprzecznych przekonań wykorzystywany do nacisku); Efekt Halo (jedna dobra cecha przenoszona na całą ocenę); Heurystyka Dostępności (ocena ryzyka na podstawie tego, co łatwo przypomnieć); Warunkowanie (budowanie automatycznego skojarzenia bodziec-nagroda); Efekt Dunninga-Krugera (pewność siebie odwrotnie proporcjonalna do wiedzy); Awersja do Straty (strach przed stratą silniejszy niż chęć zysku, "nie przegap"); Framing (ta sama treść inaczej oceniana przez sposób podania); Zasada Wzajemności (drobny "prezent" ma wywołać poczucie długu); Fałszywa Pilność (sztuczna presja czasu wymuszająca szybką decyzję); Sztuczny Niedobór ("ostatnie sztuki" mające przyspieszyć zakup); Argument z Autorytetu (racja "bo tak powiedział ekspert/celebryta", bez dowodu); Strach przed Utratą, FOMO (lęk przed pominięciem okazji jako dźwignia nacisku).',
   SOCJOLOGIA: 'SOCJOLOGIA: Liczba Dunbara (granica liczby realnych relacji społecznych); Mądrość Tłumu (zbiorowa opinia bywa trafniejsza niż jeden ekspert — ale nie zawsze); Dyfuzja Odpowiedzialności (im więcej świadków, tym mniejsza szansa reakcji); Rdzeń-Peryferia (podział na uprzywilejowane centrum i zależne obrzeża); Kapitał Społeczny (wartość płynąca z sieci relacji i zaufania); Zasada Petera (awans aż do poziomu niekompetencji).',
   'FILOZOFIA I ETYKA': 'FILOZOFIA I ETYKA: Imperatyw Kategoryczny Kanta (czy zasada byłaby akceptowalna jako powszechne prawo); Utylitaryzm (ocena przez największe dobro dla największej liczby osób); Falsyfikowalność Poppera (teza, której nie da się obalić żadnym dowodem, nie jest naukowa); Relatywizm Kulturowy (norma etyczna zależna od kontekstu kulturowego); Epistemologia (skąd właściwie wiadomo, że to prawda); Stoicyzm (skupienie na tym, na co mamy wpływ); Eudajmonia (trwały sens mylony z chwilową przyjemnością); Primum Non Nocere (zasada "po pierwsze nie szkodzić").',
@@ -2318,12 +2318,26 @@ Deno.serve(async (req: Request) => {
       }
       // Dwuetapowa zgoda na koszt — dokładnie ten sam wzorzec co PDF niżej
       // (needs_confirmation/confirmed). Samo sprawdzenie ceny NIE kosztuje
-      // Gemini (fetchUrlAsText to zwykłe, darmowe pobranie strony), ale
-      // żeby ktoś nie mógł bez końca "sondować" cudzych linków za darmo
-      // jako anonimowy proxy, liczymy to tym samym licznikiem nadużyć co
-      // sondowanie dużych PDF-ów.
+      // Gemini (fetchUrlAsText to zwykłe, darmowe pobranie strony).
+      //
+      // POPRAWKA 2026-08-26(q) — USUNIĘTE: `logFailedAttempt()` wołane tutaj
+      // przy KAŻDYM sprawdzeniu ceny (czyli przy pierwszym, oczekiwanym kroku
+      // zwykłego, dwuetapowego przepływu — to NIE jest błąd ani nieudana
+      // próba, tylko normalne, udane zapytanie o cenę). Żywy błąd zgłoszony
+      // przez właściciela: po intensywnym testowaniu "Sprawdź, czy coś się
+      // zmieniło" na wielu linkach w krótkim czasie WSZYSTKIE kolejne analizy
+      // zaczęły od razu kończyć się błędem — to konto samo się zablokowało
+      // (próg 15 "nieudanych" prób w 10 minut, patrz RATE_LIMIT_* wyżej),
+      // mimo że w rzeczywistości nic się nie nie udało, po prostu sprawdzał
+      // cenę kilkanaście razy pod rząd, co jest normalnym użyciem funkcji.
+      // Pierwotny cel (żeby ktoś nie mógł bez końca "sondować" cudzych
+      // linków za darmo jako anonimowy proxy) i tak jest już zamknięty
+      // wyżej — ta gałąź wymaga zalogowanego konta (`!user_id` odrzuca
+      // anonimowych na samym początku), więc nie ma tu ryzyka anonimowego
+      // nadużycia, a karanie prawdziwego konta za samo sprawdzanie ceny
+      // było nieproporcjonalne i biło we właściciela/prawdziwych
+      // użytkowników, nie w nadużywających.
       if (confirmed !== true) {
-        await logFailedAttempt()
         return new Response(
           // `char_count` — POPRAWKA 2026-08-25 — właściciel chciał widzieć
           // na ekranie zgody, NA JAKIEJ PODSTAWIE (ile znaków) wyliczona
@@ -2401,17 +2415,17 @@ Deno.serve(async (req: Request) => {
       // page_count/estimated_cost i wysyła TO SAMO zapytanie ponownie z
       // confirmed:true, dopiero wtedy lecimy dalej do analizy.
       if (confirmed !== true) {
-        // POPRAWKA 2026-08-19 — "nieprzekraczalny mur" przeciw nadużyciu:
-        // samo sprawdzenie kosztu nie kosztuje nas pieniędzy (liczenie stron
-        // jest lokalne, za darmo), ALE zużywa realny czas procesora serwera
-        // (patrz komentarz przy PDF_HARD_MAX_PAGES wyżej) — bez tego wpisu
-        // ktoś mógłby bez końca "sondować" koszt dużych PDF-ów (nigdy nie
-        // potwierdzając analizy) zupełnie poza systemem blokad, bo żadna
-        // inna ścieżka PDF nie jest tu jeszcze liczona jako "nieudana
-        // próba". Liczymy to tym samym licznikiem co realne niepowodzenia —
-        // 15 takich "sondowań" w 10 minut i konto trafia w tę samą,
-        // rosnącą blokadę co przy nadużyciu innych trybów.
-        await logFailedAttempt()
+        // POPRAWKA 2026-08-19 — samo sprawdzenie kosztu nie kosztuje nas
+        // pieniędzy (liczenie stron jest lokalne, za darmo), tylko chwilę
+        // czasu procesora.
+        //
+        // POPRAWKA 2026-08-26(q) — USUNIĘTE: `logFailedAttempt()`, który tu
+        // wcześniej stał, liczył KAŻDE sprawdzenie ceny PDF-a jako "nieudaną
+        // próbę" — dokładnie ten sam błąd co w gałęzi "url" wyżej (patrz
+        // tamten komentarz po pełne uzasadnienie i żywy opis, jak to
+        // zablokowało konto właściciela po prostu za normalne korzystanie z
+        // funkcji). Ta gałąź też wymaga zalogowanego konta (`!user_id` na
+        // starcie), więc ryzyko anonimowego "sondowania" i tak nie istnieje.
         return new Response(
           JSON.stringify({ needs_confirmation: true, page_count: pageCount, estimated_cost: cost }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -2464,6 +2464,73 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(r) — celowane przykłady w bibliotece modeli
+      mentalnych, tylko dla PAR, które już się realnie pomyliły.**
+      Kontynuacja POPRAWKI (n)/(n2) — właściciel zapytał, czy uboga
+      biblioteka (nazwa + jedno zdanie, bez przykładów) utrudnia
+      modelowi rozróżnianie podobnych modeli, powołując się na żywy
+      przypadek "Bodziec" vs "Wąskie Gardło" dla tego samego cytatu.
+      Sprawdzone: osobny plik `MODELE_MENTALNE.md` ma już przykłady, ale
+      tylko dla 53 ze 100 modeli. Rekomendacja (zaakceptowana): NIE
+      dokładać przykładów do wszystkich 100 na raz (biblioteka i tak
+      leci w całości w każdym zapytaniu od POPRAWKI B1 — więcej
+      przykładów = wyższy koszt KAŻDEJ analizy), tylko do konkretnych,
+      już potwierdzonych na żywo mylących się par. Na razie jedna taka
+      para: dopisano krótkie rozróżnienie wprost w opisie obu modeli w
+      `MENTAL_MODELS_BY_CATEGORY` — "Wąskie Gardło" oznaczone jako
+      element TECHNICZNY/STRUKTURALNY (przykład: szybki komputer, ale
+      wolny internet), "Bodźce" jako czyjś interes/MOTYWACJA (przykład:
+      doradca poleca fundusz, bo ma z niego prowizję) — z wyraźnym "NIE
+      chodzi o..." w obu, żeby model miał jasny sygnał, kiedy wybrać
+      które. Kolejne pary dokładamy tylko wtedy, gdy realnie zobaczymy
+      kolejną pomyłkę na żywo — nie z góry, spekulacyjnie.
+    - **POPRAWKA 2026-08-26(q) — konto właściciela samo się zablokowało po
+      intensywnym testowaniu "Sprawdź, czy coś się zmieniło".** Żywe
+      zgłoszenie: po serii testów tej funkcji na wielu linkach WSZYSTKIE
+      kolejne analizy zaczęły od razu kończyć się błędem "Coś poszło nie
+      tak" — bez wyjątku, na wielu różnych linkach naraz.
+
+      **Przyczyna, znaleziona przez przegląd kodu (bez dostępu do logów
+      na żywo):** darmowy, pierwszy krok dwuetapowej zgody na koszt (samo
+      sprawdzenie ceny, ZANIM cokolwiek zostanie policzone/wysłane do
+      Gemini) był liczony przez `logFailedAttempt()` jako "nieudana
+      próba" — dokładnie ten sam licznik nadużyć co przy PRAWDZIWYCH
+      błędach (np. nieudane pobranie strony). Próg to 15 "nieudanych"
+      prób w ciągu 10 minut (`RATE_LIMIT_FAILURE_THRESHOLD`/
+      `RATE_LIMIT_WINDOW_MINUTES`) — przy intensywnym testowaniu (wiele
+      linków, wiele rund w tej sesji) to naturalnie się przekroczyło,
+      mimo że nic naprawdę się nie nie udało — to był tylko normalny,
+      pierwszy krok płatnego, dwuetapowego przepływu. Po przekroczeniu
+      progu konto dostaje blokadę (od 10 minut wzwyż, rosnącą 3× z każdą
+      kolejną w ciągu 30 dni) na WSZYSTKIE analizy, nie tylko na
+      "Sprawdź, czy coś się zmieniło" — stąd wrażenie, że "wysypało się"
+      wszystko naraz. Pogłębiał to fakt, że `scan.html` w ogóle nie znał
+      kodu błędu `too_many_failed_attempts` — pokazywał więc mylący,
+      uniwersalny komunikat zamiast uczciwej informacji "jesteś
+      zablokowany, spróbuj za X minut" (to drugie index.html już
+      pokazywało od dawna, z żywym licznikiem).
+
+      **Naprawa (`supabase/functions/analyze/index.ts`, wymaga ręcznego
+      wdrożenia w Supabase):** usunięto `logFailedAttempt()` z obu
+      miejsc, gdzie liczyło samo, udane sprawdzenie ceny — dla linku i
+      dla PDF-a. Uzasadnienie usunięcia (nie tylko podniesienia progu):
+      pierwotny cel tego wpisu ("żeby ktoś nie mógł bez końca sondować
+      cudzych linków/PDF-ów za darmo jako anonimowy proxy") jest już w
+      pełni zamknięty wymogiem zalogowanego konta na starcie obu tych
+      gałęzi (`!user_id` odrzuca anonimowych) — więc licznik nie chronił
+      przed niczym realnym, tylko karał prawdziwe konta za normalne
+      korzystanie z funkcji. (`scan.html`, frontend, auto-wdrożenie):
+      `showRefreshError()` rozpoznaje teraz `too_many_failed_attempts` i
+      pokazuje ten sam żywy, odliczający licznik co index.html, zamiast
+      uniwersalnego komunikatu — na wypadek, gdyby prawdziwa blokada
+      (z realnych błędów) kiedyś się zdarzyła.
+
+      **Co dalej dla właściciela**: naprawa w kodzie nie kasuje istniejącej
+      blokady w bazie (jeśli już powstała) — trzeba albo poczekać, aż
+      `blocked_until` minie (frontend po wdrożeniu poprawki pokaże
+      dokładnie ile zostało), albo ręcznie usunąć wiersz w tabeli
+      `rate_limit_blocks` (Supabase → Table Editor) dla swojego `user_id`,
+      jeśli zależy na natychmiastowym odblokowaniu.
     - **POPRAWKA 2026-08-26(p) — dwa żywe zgłoszenia właściciela: pozorne
       duplikaty w wyszukiwarce + "nic się nie wydarzyło" przy odświeżaniu.**
 

@@ -558,6 +558,21 @@
                                 }
                             });
 
+                            // Ten sam format co formatCountdown() w index.html — mm:ss
+                            // przy mniej niż godzinie, inaczej zaokrąglone godziny/dni.
+                            function formatCountdown(remainingMs) {
+                                const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+                                if (totalSeconds < 3600) {
+                                    const m = Math.floor(totalSeconds / 60);
+                                    const s = totalSeconds % 60;
+                                    return m + ':' + String(s).padStart(2, '0');
+                                }
+                                if (totalSeconds < 24 * 3600) {
+                                    return t('retry_hours', { hours: Math.ceil(totalSeconds / 3600) });
+                                }
+                                return t('retry_days', { days: Math.ceil(totalSeconds / (24 * 3600)) });
+                            }
+
                             // Punkt A4 audytu bezpieczeństwa — konkretne komunikaty
                             // błędów zamiast jednego uniwersalnego, ten sam wzorzec
                             // co errorMessageKeys w index.html (renderResult()).
@@ -568,7 +583,34 @@
                                 save_failed: 'err_save_failed',
                                 system_paused: 'err_system_paused',
                             };
-                            function showRefreshError(errorCode) {
+                            // POPRAWKA 2026-08-26(q) — dawniej `showRefreshError` dostawał
+                            // tylko sam kod błędu, więc "too_many_failed_attempts" (blokada
+                            // konta, patrz analyze/index.ts) zawsze lądowała jako mylący,
+                            // uniwersalny "Coś poszło nie tak" — ten sam żywy licznik co w
+                            // index.html (renderResult()), teraz też tutaj.
+                            let refreshRateLimitTimer = null;
+                            function showRefreshError(errorData) {
+                                if (refreshRateLimitTimer) {
+                                    clearInterval(refreshRateLimitTimer);
+                                    refreshRateLimitTimer = null;
+                                }
+                                const errorCode = errorData && errorData.error;
+                                if (errorCode === 'too_many_failed_attempts' && errorData.blocked_until) {
+                                    const targetTime = new Date(errorData.blocked_until).getTime();
+                                    const tick = () => {
+                                        const remainingMs = targetTime - Date.now();
+                                        if (remainingMs <= 0) {
+                                            clearInterval(refreshRateLimitTimer);
+                                            refreshRateLimitTimer = null;
+                                            manualStatusEl.innerText = t('rate_limit_expired');
+                                            return;
+                                        }
+                                        manualStatusEl.innerHTML = '<span class="status-err">' + t('err_too_many_failed_attempts', { time: formatCountdown(remainingMs) }) + '</span>';
+                                    };
+                                    tick();
+                                    refreshRateLimitTimer = setInterval(tick, 1000);
+                                    return;
+                                }
                                 const key = refreshErrorMessageKeys[errorCode];
                                 manualStatusEl.innerHTML = '<span class="status-err">' + (key ? t(key) : t('result_generic_error')) + '</span>';
                             }
@@ -628,7 +670,7 @@
                                             }
                                             window.location.href = 'scan.html?id=' + confirmedData.id;
                                         } else {
-                                            showRefreshError(confirmedData.error);
+                                            showRefreshError(confirmedData);
                                         }
                                     } catch {
                                         manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
@@ -674,7 +716,7 @@
                                         } else if (resData.id) {
                                             window.location.href = 'scan.html?id=' + resData.id;
                                         } else {
-                                            showRefreshError(resData.error);
+                                            showRefreshError(resData);
                                             btn.disabled = false;
                                         }
                                     } catch {
