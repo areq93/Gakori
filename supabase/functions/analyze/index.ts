@@ -1425,22 +1425,39 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // czymś zupełnie innym) i samotne "Czytaj więcej" (etykieta
     // przycisku, nie treść) — żaden z nich nie ma rozpoznawalnej klasy
     // HTML (to zwykły akapit tekstu w środku artykułu), więc filtrujemy
-    // je PO TREŚCI, całymi akapitami. Świadomie NIE ma tu "WIDEO:" — to
-    // też bywa zapowiedzią niepowiązanego materiału, ale w polskiej
-    // prasie bywa też prawdziwym, legalnym nagłówkiem artykułu O samym
-    // wideo — zbyt duże ryzyko przypadkowego usunięcia prawdziwego
-    // tytułu. Świadome ograniczenie: to lista specyficzna dla języka
-    // polskiego, nie pomoże na stronach w innych językach.
+    // je PO TREŚCI, całymi akapitami. Świadome ograniczenie: to lista
+    // specyficzna dla języka polskiego, nie pomoże na stronach w innych
+    // językach.
     const TEASER_LINE_PREFIXES = [
       'zobacz:', 'zobacz też:', 'czytaj także:', 'czytaj też:',
       'przeczytaj także:', 'przeczytaj też:', 'polecamy:',
     ]
+    // POPRAWKA 2026-08-26(i) — "WIDEO:" świadomie NIE było na liście wyżej
+    // (POPRAWKA 2026-08-25(g)) — obawa przed usunięciem prawdziwego,
+    // legalnego nagłówka artykułu O samym wideo. Ale mamy już DWA żywe
+    // przykłady (dwa różne artykuły, dwie różne strony), gdzie
+    // "WIDEO: ..." okazało się kompletnie NIEPOWIĄZANĄ zapowiedzią innego
+    // materiału, zawsze na SAMYM KOŃCU artykułu, tuż przed podpisem
+    // autora — nigdy prawdziwym tytułem. Konkretny dowód, że to naprawdę
+    // szkodzi: właściciel porównał ręczną kopię strony (bez tej linijki)
+    // z naszą analizą linku (z tą linijką) — ta sama treść dała RÓŻNE
+    // wyniki analizy, bo model potraktował niepowiązany "Ślub z
+    // krokodylem"/"Wpisał się w piątą kolumnę ukraińską" jako część
+    // ocenianego artykułu. Naprawa: filtrujemy "WIDEO:" tak jak resztę
+    // powyżej, ALE tylko gdy NIE jest pierwszym akapitem całego tekstu —
+    // zachowuje to ostrożność sprzed (g) na wypadek, gdyby to jednak był
+    // prawdziwy tytuł artykułu (ten zawsze ląduje na początku, nie na
+    // końcu tuż przed podpisem autora).
+    const TEASER_LINE_PREFIXES_UNLESS_FIRST_PARAGRAPH = ['wideo:']
     const EXACT_NOISE_LINES = new Set(['czytaj więcej', 'czytaj dalej', 'zobacz więcej'])
     const text = paragraphsWithNoise
       .split('\n\n')
-      .filter((para) => {
+      .filter((para, index) => {
         const lower = para.trim().toLowerCase()
-        return !EXACT_NOISE_LINES.has(lower) && !TEASER_LINE_PREFIXES.some((prefix) => lower.startsWith(prefix))
+        if (EXACT_NOISE_LINES.has(lower)) return false
+        if (TEASER_LINE_PREFIXES.some((prefix) => lower.startsWith(prefix))) return false
+        if (index !== 0 && TEASER_LINE_PREFIXES_UNLESS_FIRST_PARAGRAPH.some((prefix) => lower.startsWith(prefix))) return false
+        return true
       })
       .join('\n\n')
       .trim()

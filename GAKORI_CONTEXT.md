@@ -2464,6 +2464,39 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(i) — filtr "WIDEO:" (śródartykułowe zapowiedzi
+      niepowiązanego materiału wideo), z zabezpieczeniem dla pierwszego
+      akapitu.** Kontynuacja (g)/(f) — właściciel porównał ręczną kopię
+      strony (bez linijki "WIDEO: ...") z naszą analizą linku (Z tą
+      linijką) na dwóch RÓŻNYCH artykułach z dwóch różnych stron — za
+      każdym razem linijka "WIDEO: ..." okazała się kompletnie
+      niepowiązaną zapowiedzią innego materiału ("Ślub z krokodylem.
+      Marek Suski ostrzega", "Wpisał się w piątą kolumnę ukraińską"),
+      zawsze na SAMYM KOŃCU artykułu, tuż przed podpisem autora — nigdy
+      prawdziwym tytułem. To bezpośrednio psuło jakość: model oceniał
+      fragment tekstu, którego czytelnik kopiujący stronę ręcznie NIGDY
+      by nie zobaczył jako część artykułu. Naprawa: "wideo:" dołączone do
+      filtrowania akapitów-zapowiedzi (jak "zobacz:"/"czytaj też:"), ale
+      TYLKO gdy nie jest PIERWSZYM akapitem całego tekstu — zachowuje to
+      ostrożność z (g) (obawa przed usunięciem prawdziwego tytułu
+      artykułu O wideo, który zawsze ląduje na początku, nie na końcu).
+      Zweryfikowane syntetycznym testem: usuwa "WIDEO:" na końcu tekstu,
+      zostawia nietknięte, gdy jest pierwszym akapitem.
+
+      **Szerszy kontekst tej całej rundy poprawek (f)-(i), właściciel
+      wprost**: te niespójności bezpośrednio zagrażają planowanej w
+      przyszłości funkcji "Global Trust Index" — zbiorczej ocenie jakości
+      CAŁYCH domen internetowych, budowanej z wielu pojedynczych analiz
+      artykułów. Jeśli pojedyncze analizy tej samej treści potrafią dać
+      różne wyniki z powodu drobnego, niezwiązanego z treścią szumu —
+      każda zbiorcza metryka zbudowana na ich podstawie dziedziczy ten sam
+      brak wiarygodności, tylko w większej skali. Dlatego to dochodzenie
+      (server-side content_hash, usunięcie zawężania kategorii, checklist
+      kategorii, ujednolicenie CRLF/LF, ujednolicenie promptu link/tekst,
+      teraz filtr "WIDEO:") było warte pełnego, dokładnego przeprowadzenia
+      teraz, zanim jakakolwiek funkcja zbiorcza zacznie na tym polegać —
+      poprawianie fundamentu jest tanie teraz, drogie (i widoczne
+      publicznie) po zbudowaniu na nim czegoś większego.
     - **POPRAWKA 2026-08-26(f) — prawdziwa przyczyna niespójności link/tekst:
       różne znaki końca linii (CRLF vs LF).** Kontynuacja długiego śledztwa
       z (a)-(e): mimo naprawy odcisku palca po stronie serwera i usunięcia
