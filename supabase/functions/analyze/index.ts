@@ -1235,6 +1235,25 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     )
     if (!res.ok) return null
     let html = await res.text()
+    // POPRAWKA 2026-08-26(f) — żywy problem znaleziony po długim śledztwie
+    // niespójności link/tekst: strony czasem zapisują tekst ze znakami
+    // końca linii w stylu Windows (CRLF, "\r\n" — DWA znaki na jedno
+    // przejście do nowej linii), a my nigdy tego nie ujednolicaliśmy.
+    // Przeglądarka, gdy taki tekst trafia do zwykłego pola `<textarea>`
+    // (czy to przez wklejenie, czy przez jakikolwiek inny mechanizm), SAMA,
+    // zgodnie ze standardem HTML, zamienia "\r\n" na pojedyncze "\n" —
+    // czyli liczba znaków w polu tekstowym wychodzi MNIEJSZA niż to, co
+    // faktycznie zapisaliśmy i pokazaliśmy jako "liczbę znaków" gdzie
+    // indziej w aplikacji. To tłumaczyło żywy przypadek: właściciel
+    // porównywał tę samą treść (link vs wklejony tekst) i za każdym razem
+    // brakowało innej liczby znaków (42, 51, 61 — zależnie od artykułu),
+    // co wykluczało zarówno błąd kopiowania (już wykluczony wcześniej
+    // przyciskiem "Kopiuj"/mechanizmem bez schowka), jak i stały,
+    // przewidywalny błąd. Naprawa: ujednolicamy WSZYSTKIE znaki końca
+    // linii do pojedynczego "\n" od razu po pobraniu, ZANIM cokolwiek
+    // innego zacznie przetwarzać ten tekst — więc nie ma już czego
+    // "zgubić" po stronie przeglądarki.
+    html = html.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
     // POPRAWKA 2026-08-25 — ochrona limitu czasu procesora Supabase Edge
     // Function (patrz PDF_HARD_MAX_PAGES wyżej — to samo ograniczenie
     // platformy: tylko kilka sekund REALNEJ pracy procesora na całe
