@@ -2464,6 +2464,52 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(p) — dwa żywe zgłoszenia właściciela: pozorne
+      duplikaty w wyszukiwarce + "nic się nie wydarzyło" przy odświeżaniu.**
+
+      **1) Wyszukiwarka pokazywała tę samą treść po kilka razy.** Zrzut
+      ekranu właściciela: trzy pozycje na liście "Wyszukaj analizę" z
+      niemal identycznym początkiem tekstu ("To reakcja na obiektywne
+      trudności rynkowe...") — bo widoczny w wierszu "tytuł" to w
+      rzeczywistości pierwszy cytat/podsumowanie wyniku (`index.html` nie
+      ma osobnego pola tytułu dla skanów), więc kilka analiz TEJ SAMEJ
+      treści (raz z linku, raz z ręcznie wklejonego tekstu — dokładnie
+      historia testów z tej sesji) wyglądały jak zaśmiecający duplikat.
+      Właściciel wprost: "wystarczy że zmieni się tytuł w wyszukiwarce i
+      ta sama praktycznie analiza może być zdublowana w nieskończoność —
+      musimy jakoś opanować nazewnictwo i system wyszukiwania."
+
+      Naprawa (tylko `index.html`, `fetchAndRenderScans`): pobieramy teraz
+      60 najnowszych wierszy zamiast 20, po stronie przeglądarki
+      odsiewamy duplikaty po `content_hash` (ten sam serwerowo liczony
+      hash z POPRAWKI 2026-08-26, który zamyka "url≠tekst" niespójność —
+      patrz wyżej) — zostawiamy tylko NAJNOWSZY wiersz na unikalny hash, a
+      z tego przycinamy do 20 do wyświetlenia. Świadomie NIC nie kasujemy
+      w bazie — cała historia zostaje (ta sama zasada co przy "Zgłoś
+      niezgodność"), tylko lista widoczna na stronie głównej pokazuje
+      jedną pozycję na unikalną treść.
+
+      **Uczciwe zastrzeżenie**: to działa w pełni dopiero dla analiz
+      wykonanych PO dzisiejszej poprawce `effectiveContentHash` — starsze
+      wiersze w bazie (jak te trzy ze zrzutu ekranu) mogą mieć różne
+      hashe mimo tej samej treści (bo zostały zapisane, zanim hash liczył
+      się poprawnie po stronie serwera) i wciąż będą widoczne osobno,
+      dopóki nie zostaną odświeżone. Nowe duplikaty od teraz nie powinny
+      się już pojawiać.
+
+      **2) "Sprawdź, czy coś się zmieniło" — kliknięcie bez reakcji, potem
+      inny wynik po drugim kliknięciu.** Zapytanie do Gemini bywa wolne
+      (do 30s) — przycisk `scanForceRefreshBtn` nie był blokowany na czas
+      oczekiwania, więc drugie kliknięcie w trakcie ładowania odpalało
+      DRUGIE, równoległe zapytanie na ten sam wiersz (`refresh_scan_id`).
+      Backend nadpisuje ten sam wiersz (POPRAWKA A1, nie tworzy
+      duplikatu), ale przy dwóch równoległych zapytaniach to, co
+      faktycznie widać na końcu, zależy od tego, które z nich skończyło
+      się jako drugie — stąd wrażenie przypadkowości ("jakaś analiza w
+      cache się zaktualizowała"). Naprawa: przycisk (i "Tak, analizuj" na
+      ekranie zgody z POPRAWKI (o) wyżej) blokuje się na czas trwania
+      zapytania, więc drugie kliknięcie po prostu nic nie robi zamiast
+      wywoływać drugie, równoległe zapytanie.
     - **POPRAWKA 2026-08-26(o) — własny ekran zgody zamiast okienka
       przeglądarki dla "Sprawdź, czy coś się zmieniło".** Właściciel: okienko
       wyglądało "jakby z przeglądarki, a nie z naszego systemu aplikacji" —

@@ -402,7 +402,10 @@
                 request = request.or('result->>source_quote.ilike.%' + query + '%,result->>summary.ilike.%' + query + '%');
             }
 
-            const { data, error } = await request.order('created_at', { ascending: false }).limit(20);
+            // POPRAWKA 2026-08-26(p) — pobieramy więcej niż 20 wierszy (bo
+            // po odsianiu duplikatów niżej część zniknie), żeby lista wciąż
+            // realnie miała do 20 pozycji.
+            const { data, error } = await request.order('created_at', { ascending: false }).limit(60);
 
             listEl.innerHTML = '';
             if (error) {
@@ -414,7 +417,24 @@
                 return;
             }
 
-            let scans = data || [];
+            // POPRAWKA 2026-08-26(p) — kilka analiz tej samej treści (np. raz
+            // z linku, raz z ręcznie wklejonego tekstu) ma ten sam
+            // `content_hash` (patrz analyze/index.ts, `effectiveContentHash`)
+            // i zaśmiecało wyszukiwarkę pozornymi duplikatami — właściciel
+            // zgłosił to na żywo jako mylące i groźne dla jakości wyszukiwarki.
+            // Zostawiamy WSZYSTKIE wiersze w bazie (historia się nie zeruje —
+            // ta sama zasada co przy "Zgłoś niezgodność"), ale na liście
+            // pokazujemy tylko jeden, najnowszy wiersz na unikalny content_hash.
+            // Wiersze bez content_hash (starsze dane sprzed tej poprawki)
+            // traktujemy jako zawsze unikalne — nie ma jak ich bezpiecznie
+            // dopasować do siebie.
+            const seenHashes = new Set();
+            let scans = (data || []).filter(scan => {
+                if (!scan.content_hash) return true;
+                if (seenHashes.has(scan.content_hash)) return false;
+                seenHashes.add(scan.content_hash);
+                return true;
+            }).slice(0, 20);
 
             // Świadomie NIE dopełniamy listy tłumaczeniami z innych języków tu —
             // samo przeglądanie strony (nawet przez wielu różnych odwiedzających)

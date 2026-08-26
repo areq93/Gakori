@@ -614,6 +614,8 @@
                                 // ekranie zgody (#refreshConfirmOverlay), nie z domyślnego
                                 // confirm() przeglądarki.
                                 async function runConfirmedRefresh() {
+                                    const yesBtn = document.getElementById('refreshConfirmYes');
+                                    yesBtn.disabled = true;
                                     document.getElementById('refreshConfirmOverlay').style.display = 'none';
                                     manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
                                     try {
@@ -630,6 +632,8 @@
                                         }
                                     } catch {
                                         manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
+                                    } finally {
+                                        yesBtn.disabled = false;
                                     }
                                 }
                                 document.getElementById('refreshConfirmYes').addEventListener('click', runConfirmedRefresh);
@@ -637,7 +641,18 @@
                                     e.preventDefault();
                                     document.getElementById('refreshConfirmOverlay').style.display = 'none';
                                 });
+                                // POPRAWKA 2026-08-26(p) — właściciel zgłosił na żywo: kliknął,
+                                // czekał, "nic się nie wydarzyło", kliknął drugi raz i dostał
+                                // inny wynik ("jakaś analiza w cache się zaktualizowała"). Zapytanie
+                                // do Gemini bywa wolne (do 30s, patrz GEMINI_TIMEOUT_MS w
+                                // analyze/index.ts) — bez blokady przycisku drugie kliknięcie w
+                                // trakcie oczekiwania odpalało DRUGIE, równoległe zapytanie na ten
+                                // sam wiersz (refresh_scan_id), a widoczny efekt zależał od tego,
+                                // które z dwóch zapytań skończyło się jako drugie — stąd wrażenie
+                                // przypadkowości. Blokujemy przycisk na czas zapytania.
                                 document.getElementById('scanForceRefreshBtn').addEventListener('click', async () => {
+                                    const btn = document.getElementById('scanForceRefreshBtn');
+                                    btn.disabled = true;
                                     manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
                                     try {
                                         const resData = await requestRefresh(false);
@@ -655,13 +670,16 @@
                                             }
                                             document.getElementById('refreshConfirmCost').innerText = t('pdf_confirm_cost', { cost: resData.estimated_cost });
                                             document.getElementById('refreshConfirmOverlay').style.display = 'flex';
+                                            btn.disabled = false;
                                         } else if (resData.id) {
                                             window.location.href = 'scan.html?id=' + resData.id;
                                         } else {
                                             showRefreshError(resData.error);
+                                            btn.disabled = false;
                                         }
                                     } catch {
                                         manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
+                                        btn.disabled = false;
                                     }
                                 });
 
