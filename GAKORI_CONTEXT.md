@@ -2464,6 +2464,51 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(f) — prawdziwa przyczyna niespójności link/tekst:
+      różne znaki końca linii (CRLF vs LF).** Kontynuacja długiego śledztwa
+      z (a)-(e): mimo naprawy odcisku palca po stronie serwera i usunięcia
+      wstępnej kategoryzacji, testy na żywo (kilka różnych artykułów)
+      dalej pokazywały RÓŻNĄ liczbę znaków między treścią z linku a tą samą
+      treścią wklejoną w trybie "Tekst" — za każdym razem inną liczbę (42,
+      51, 61) — co wykluczało zarówno błąd ręcznego kopiowania (dodany i
+      później usunięty na żądanie właściciela przycisk "Kopiuj"
+      gwarantował dokładną kopię), jak i błąd stałej wielkości. Diagnoza:
+      niektóre strony zapisują tekst ze znakami końca linii w stylu
+      Windows (CRLF, "\r\n" — dwa znaki zamiast jednego), których nigdy
+      nie ujednolicaliśmy przy pobieraniu. Przeglądarka, zgodnie ze
+      standardem HTML, SAMA ujednolica "\r\n" do "\n" w polu `<textarea>`
+      — więc liczba znaków w trybie "Tekst" wychodziła mniejsza niż to, co
+      faktycznie zapisaliśmy dla linku, niezależnie od metody
+      przenoszenia tekstu. **Naprawa**: `fetchUrlAsText()` ujednolica
+      teraz WSZYSTKIE znaki końca linii do pojedynczego "\n" od razu po
+      pobraniu strony, zanim cokolwiek inne zacznie przetwarzać tekst.
+      **Potwierdzone na żywo przez właściciela DWUKROTNIE**, na różnych
+      artykułach — link → kopiowanie treści źródłowej → wklejenie w
+      trybie "Tekst" poprawnie trafia w cache za każdym razem.
+    - **POPRAWKA 2026-08-26(g) — link z dowolną wklejoną treścią (nie
+      linkiem) w polu adresu dawał "analizę".** Żywy przypadek: właściciel
+      przez pomyłkę wkleił zwykły tekst (nie link) w pole adresu w trybie
+      "Link" — pole sprawdzało tylko, czy nie jest puste, nigdy czy to
+      naprawdę wygląda na link. Po stronie serwera: własne pobranie strony
+      (`fetchUrlAsText`) poprawnie zawodzi dla nie-adresu, ale ścieżka
+      awaryjna (wbudowane narzędzie Gemini "URL context") dostawała
+      polecenie "przeanalizuj treść strony pod adresem: &lt;wklejony
+      tekst&gt;" — a Gemini, nie mogąc nic pobrać, czasem po prostu
+      analizowało SAM TEN TEKST jak treść strony. Nasze sprawdzenie
+      powodzenia pobrania (`retrievalStatus && retrievalStatus !==
+      'URL_RETRIEVAL_STATUS_SUCCESS'`) nigdy się nie uruchamiało, bo gdy
+      narzędzie w ogóle nie próbowało niczego pobrać, `retrievalStatus`
+      było `undefined` — fałszywe w JS, więc "brak informacji o pobraniu"
+      mylnie przechodziło jako "sukces". **Naprawa**: dodana walidacja
+      formatu linku (musi zaczynać się od `http://` albo `https://`) — i
+      w przeglądarce (natychmiastowy komunikat, zanim cokolwiek wyślemy),
+      i po stronie serwera (zero zaufania do klienta, ten sam wzorzec co
+      wszędzie indziej — odrzucamy PRZED jakąkolwiek próbą pobrania czy
+      wydaniem choćby grosza na Gemini). Świadomie NIE zmieniono samego
+      sprawdzenia `retrievalStatus` (mogło być celowo "wybaczające" dla
+      innych, prawdziwych przypadków brzegowych, bez żywego dowodu na
+      to nie ma pewności) — nowa walidacja formatu wystarcza, żeby
+      zablokować dokładnie ten zgłoszony scenariusz.
     - **POPRAWKA 2026-08-26(b) — przycisk "Kopiuj" przy pełnym tekście
       źródłowym (scan.html) + potwierdzenie na żywo naprawy A z (a).**
       Pierwszy test naprawy A (odcisk palca liczony przez serwer) na żywo

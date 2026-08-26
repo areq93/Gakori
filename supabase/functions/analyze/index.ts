@@ -1965,6 +1965,27 @@ Deno.serve(async (req: Request) => {
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+      // POPRAWKA 2026-08-26(g) — żywy przypadek: przez pomyłkę wklejono
+      // zwykłą treść (nie link) w pole linku — front-end zyskał tę samą
+      // walidację (patrz index.html), ale zero zaufania do klienta: bez
+      // tego sprawdzenia serwer próbowałby "pobrać stronę" spod adresu,
+      // który nie jest adresem, co samo się nie udaje (fetchUrlAsText
+      // zwraca null), ale potem ścieżka awaryjna (Gemini "URL context")
+      // dostawała ten sam nie-adres jako polecenie "przeanalizuj treść
+      // strony pod adresem: <wklejony tekst>" — a Gemini, nie mogąc nic
+      // pobrać, czasem po prostu analizowało SAM TEN TEKST jak treść
+      // strony (bo `urlContextMetadata` wtedy w ogóle nie istnieje w
+      // odpowiedzi, więc nasze sprawdzenie `retrievalStatus &&
+      // retrievalStatus !== 'URL_RETRIEVAL_STATUS_SUCCESS'` nigdy się nie
+      // uruchamiało — `undefined` jest fałszywe, więc "brak informacji o
+      // pobraniu" mylnie przechodziło jako "sukces"). Odrzucamy to od razu,
+      // zanim zapłacimy za cokolwiek.
+      if (!/^https?:\/\//i.test(source_url ?? '')) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_url', message: 'To nie jest prawidłowy link — musi zaczynać się od http:// albo https://' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
       // POPRAWKA 2026-08-25(d) — punkt spójności audytu bezpieczeństwa.
       // Żywy błąd, który to wymusił: użytkownik wkleił tekst+link w
       // trybie "Tekst" (dostał wynik A), potem wkleił TEN SAM link w

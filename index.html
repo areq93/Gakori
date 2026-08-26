@@ -1476,6 +1476,13 @@
             if (currentMode === 'url') {
                 const url = document.getElementById('urlInput').value.trim();
                 if (!url) return alert(t('alert_enter_link'));
+                // POPRAWKA 2026-08-26(g) — żywy przypadek: właściciel przez
+                // pomyłkę wkleił zwykłą treść (nie link) w to pole, a system
+                // mimo to próbował "przeanalizować" — pole sprawdzało tylko,
+                // czy nie jest puste, nigdy czy to naprawdę wygląda na link.
+                // Ten sam wzorzec walidacji co już mamy dla opcjonalnego
+                // pola źródła w trybie "Tekst" (textSourceUrlInput) niżej.
+                if (!/^https?:\/\//i.test(url)) return alert(t('alert_invalid_link'));
                 const hash = await sha256Hex(new TextEncoder().encode(url));
                 payload = { input_type: 'url', content_hash: hash, source_url: url, language: getCurrentLanguage() };
 
