@@ -2464,6 +2464,33 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(w) — dokończenie POPRAWKI (v) dla PDF/obrazu,
+      świadomy, jednorazowy koszt.** Właściciel potwierdził, że chce tej
+      samej weryfikacji nazw modeli także dla PDF-ów i zdjęć, mimo
+      dodatkowego kosztu — zapytał wprost, dlaczego dla tekstu/linku było
+      za darmo, a tu nie, i dlaczego "tylko raz" — wyjaśnienie: Etap 3
+      tekstu/linku i tak już wysyłał pełną bibliotekę drugi raz (recykling
+      istniejącego zapytania), a Etap 2 PDF-a/obrazu (czyszczenie
+      duplikatów, `verifyAndRefinePdfPatterns`/`verifyAndRefineImagePatterns`)
+      nigdy wcześniej biblioteki nie dostawał — to NOWA treść w prompcie,
+      stąd realny koszt. "Tylko raz" — bo ten krok uruchamia się RAZ na
+      całą analizę, po scaleniu wszystkich części z Etapu 1 (który już
+      wcześniej wysyłał bibliotekę per strona/zdjęcie — to ISTNIEJĄCY,
+      nie nowy koszt).
+
+      Zrobione: obie funkcje dostały nowy parametr `mentalModelsLibrary`
+      (przekazywany z `buildMentalModelsLibrary()` w obu miejscach
+      wywołania) i dopisane zadanie 4/5 w prompcie: sprawdź nazwę każdego
+      wzorca względem opisu/przykładu w bibliotece, popraw słabe
+      dopasowanie, ustaw nazwę dwumodelową przy prawdziwym remisie
+      (ta sama zasada "Model A / Model B" co w POPRAWKA (v), wyjaśniona tu
+      SAMODZIELNIE w prompcie — te dwie funkcje nie dostają całego
+      `buildSystemPrompt()`, więc nie mogły po prostu odwołać się do
+      sekcji "PRZYPADEK WIELOMODELOWY" z tamtego promptu, jak pierwotnie
+      napisano, i to poprawiono). Koszt (`costTracker`) automatycznie
+      podlega tym samym regułom 8/10 głównego wyłącznika co reszta
+      wywołań Gemini — bez dodatkowej pracy, zgodnie z zasadą "kill switch
+      przy każdej zmianie kosztowej".
     - **POPRAWKA 2026-08-26(v) — nazwa dwumodelowa przy prawdziwym remisie +
       weryfikacja już wybranych nazw, PRAWIE za darmo dla tekstu/linku.**
       Dwie połączone zmiany, obie w `buildSystemPrompt()`/

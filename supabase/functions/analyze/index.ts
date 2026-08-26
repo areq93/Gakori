@@ -1106,19 +1106,33 @@ ${originalContent}`
 // Fail-open: błąd/timeout zwraca ORYGINALNĄ, niezweryfikowaną listę zamiast
 // wywalać całą analizę — to wzbogacenie jakości, nie gwarancja pokrycia
 // (tę już zapewnia samo dzielenie na części w Etapie 1).
+// POPRAWKA 2026-08-26(w) — dopisany parametr `mentalModelsLibrary` +
+// zadanie 4 w prompcie niżej. Ten sam pomysł co POPRAWKA (v) dla
+// tekstu/linku (weryfikacja już wybranych nazw modeli względem biblioteki
+// z przykładami), ale TU jest to NOWY koszt, nie recykling istniejącego
+// zapytania — ta funkcja wcześniej w ogóle nie dostawała biblioteki (nie
+// była jej potrzebna do samego czyszczenia duplikatów). Świadomie
+// zaakceptowany, jednorazowy koszt (~$0,0006), bo funkcja uruchamia się
+// RAZ na całą analizę (po scaleniu wszystkich części z Etapu 1), nie
+// mnożony przez liczbę stron.
 async function verifyAndRefinePdfPatterns(
   patterns: Array<Record<string, unknown>>,
   langCode: string,
   geminiKey: string,
+  mentalModelsLibrary: string,
   costTracker?: CostTracker
 ): Promise<Array<Record<string, unknown>>> {
   if (patterns.length === 0) return patterns
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
-  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych OSOBNO w kolejnych, sąsiadujących fragmentach jednego dokumentu PDF (każdy fragment analizowany był bez wiedzy o pozostałych) — dlatego ta sama treść mogła zostać przypadkiem wykryta dwukrotnie, zwłaszcza gdy pochodzi z bliskich, sąsiadujących numerów stron. Twoje zadanie:
+  const prompt = `BIBLIOTEKA MODELI MENTALNYCH (do zadania 4 niżej):
+${mentalModelsLibrary}
+
+Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych OSOBNO w kolejnych, sąsiadujących fragmentach jednego dokumentu PDF (każdy fragment analizowany był bez wiedzy o pozostałych) — dlatego ta sama treść mogła zostać przypadkiem wykryta dwukrotnie, zwłaszcza gdy pochodzi z bliskich, sąsiadujących numerów stron. Twoje zadanie:
 1. Znajdź i usuń duplikaty/prawie-duplikaty (ten sam albo bardzo podobny cytat/mechanizm, zwłaszcza z bliskich stron) — zostaw tylko JEDEN egzemplarz każdego.
 2. Jeśli któreś "explanation" lub "tip" jest zbyt ogólnikowe/niejasne, popraw je (prosty język, zrozumiały dla 12-latka, bez żargonu, "tip" bez słów "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko konkretna czynność do wykonania).
 3. NIE DODAWAJ żadnych nowych wzorców, których nie ma na liście poniżej — to jest WYŁĄCZNIE czyszczenie i poprawianie istniejącej listy, nie nowa analiza. Pola "quote" i "page" zostają dokładnie takie same jak w oryginale (nie tłumacz/nie zmieniaj cytatów).
-4. Język pól "name"/"explanation"/"tip": ${langName}.
+4. Dla KAŻDEGO wzorca sprawdź, patrząc na opis i przykład w bibliotece wyżej, czy przypisana nazwa "name" naprawdę trafnie opisuje ten cytat — jeśli jest słabym dopasowaniem, popraw ją na lepszy model z biblioteki. Jeśli dwa modele pasują naprawdę tak samo dobrze (prawdziwy remis, nie zwykła niepewność) — nie wybieraj sztucznie jednego, tylko ustaw nazwę jako połączenie obu w formacie "Model A / Model B" (oba przetłumaczone na język ${langName}). Jeśli nazwa już dobrze pasuje, zostaw bez zmian.
+5. Język pól "name"/"explanation"/"tip": ${langName}.
 
 Zwróć WYŁĄCZNIE poprawioną listę w polu "patterns", zgodnie ze schematem.
 
@@ -1192,19 +1206,28 @@ ${compactList}`
 // "image_index" zostaje nietknięte. Fail-open: błąd/timeout zwraca
 // ORYGINALNĄ, niezweryfikowaną listę — to wzbogacenie jakości, nie gwarancja
 // pokrycia (tę już zapewnia samo osobne zapytanie na obraz w Etapie 1).
+// POPRAWKA 2026-08-26(w) — ten sam mechanizm i to samo uzasadnienie kosztu
+// co przy verifyAndRefinePdfPatterns() wyżej (nowy, jednorazowy koszt —
+// funkcja wcześniej nie miała biblioteki, uruchamia się raz na całą
+// analizę, nie mnożony przez liczbę zdjęć).
 async function verifyAndRefineImagePatterns(
   patterns: Array<Record<string, unknown>>,
   langCode: string,
   geminiKey: string,
+  mentalModelsLibrary: string,
   costTracker?: CostTracker
 ): Promise<Array<Record<string, unknown>>> {
   if (patterns.length === 0) return patterns
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
-  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych OSOBNO na kolejnych obrazach przesłanych w jednym zestawie (każdy obraz analizowany był bez wiedzy o pozostałych) — dlatego ta sama treść mogła zostać przypadkiem wykryta na więcej niż jednym obrazie (np. dwa zrzuty ekranu tej samej rozmowy). Twoje zadanie:
+  const prompt = `BIBLIOTEKA MODELI MENTALNYCH (do zadania 4 niżej):
+${mentalModelsLibrary}
+
+Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych OSOBNO na kolejnych obrazach przesłanych w jednym zestawie (każdy obraz analizowany był bez wiedzy o pozostałych) — dlatego ta sama treść mogła zostać przypadkiem wykryta na więcej niż jednym obrazie (np. dwa zrzuty ekranu tej samej rozmowy). Twoje zadanie:
 1. Znajdź i usuń duplikaty/prawie-duplikaty (ten sam albo bardzo podobny cytat/mechanizm) — zostaw tylko JEDEN egzemplarz każdego.
 2. Jeśli któreś "explanation" lub "tip" jest zbyt ogólnikowe/niejasne, popraw je (prosty język, zrozumiały dla 12-latka, bez żargonu, "tip" bez słów "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko konkretna czynność do wykonania).
 3. NIE DODAWAJ żadnych nowych wzorców, których nie ma na liście poniżej — to jest WYŁĄCZNIE czyszczenie i poprawianie istniejącej listy, nie nowa analiza. Pola "quote" i "image_index" zostają dokładnie takie same jak w oryginale (nie zmieniaj ich).
-4. Język pól "name"/"explanation"/"tip": ${langName}.
+4. Dla KAŻDEGO wzorca sprawdź, patrząc na opis i przykład w bibliotece wyżej, czy przypisana nazwa "name" naprawdę trafnie opisuje ten cytat — jeśli jest słabym dopasowaniem, popraw ją na lepszy model z biblioteki. Jeśli dwa modele pasują naprawdę tak samo dobrze (prawdziwy remis, nie zwykła niepewność) — nie wybieraj sztucznie jednego, tylko ustaw nazwę jako połączenie obu w formacie "Model A / Model B" (oba przetłumaczone na język ${langName}). Jeśli nazwa już dobrze pasuje, zostaw bez zmian.
+5. Język pól "name"/"explanation"/"tip": ${langName}.
 
 Zwróć WYŁĄCZNIE poprawioną listę w polu "patterns", zgodnie ze schematem.
 
@@ -2830,7 +2853,7 @@ Deno.serve(async (req: Request) => {
         const imageQScore = Math.round(
           imageResults.reduce((sum, r) => sum + r!.q_score, 0) / imageResults.length
         )
-        const verifiedImagePatterns = await verifyAndRefineImagePatterns(allImagePatterns, outputLanguage, geminiKey!, costTracker)
+        const verifiedImagePatterns = await verifyAndRefineImagePatterns(allImagePatterns, outputLanguage, geminiKey!, buildMentalModelsLibrary(), costTracker)
         const imageSummary = await composeImageSummary(
           verifiedImagePatterns as Array<{ pattern_type: string; name: string }>,
           imageQScore,
@@ -2990,7 +3013,7 @@ Deno.serve(async (req: Request) => {
         // pokazaniem jej użytkownikowi i PRZED napisaniem podsumowania
         // (Etap 3 niżej musi dostać już oczyszczoną listę, inaczej
         // podsumowanie mogłoby wspominać usunięte duplikaty).
-        const verifiedPatterns = await verifyAndRefinePdfPatterns(allPatterns, outputLanguage, geminiKey!, costTracker)
+        const verifiedPatterns = await verifyAndRefinePdfPatterns(allPatterns, outputLanguage, geminiKey!, buildMentalModelsLibrary(), costTracker)
         // Średnia ważona liczbą stron w każdej części — przybliża "jakość
         // całego tekstu", nie tylko średnią arytmetyczną z części o różnej
         // długości (ostatnia część bywa krótsza niż PDF_CHUNK_PAGES).
