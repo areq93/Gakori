@@ -413,6 +413,83 @@ async function sha256Hex(text: string): Promise<string> {
     .join('')
 }
 
+// POPRAWKA 2026-08-26(h) — ochrona przed SSRF ("server-side request
+// forgery"): zanim spróbujemy pobrać JAKIKOLWIEK adres podany przez
+// użytkownika (analiza linku), sprawdzamy, czy nie wskazuje on na adres
+// WEWNĘTRZNY naszej własnej infrastruktury (np. specjalny adres, którego
+// maszyny w chmurze używają do własnej konfiguracji, albo "localhost" —
+// czyli "sam do siebie"). Bez tego ktoś złośliwy mógłby użyć naszego
+// serwera jako pośrednika do odpytywania rzeczy, do których nie powinien
+// mieć dostępu — dokładnie ten sam duch co "zero zaufania do danych z
+// requestu" wszędzie indziej w tym pliku (patrz GAKORI_CONTEXT.md).
+// Sam wybór http/https nie ma tu znaczenia (nie wysyłamy tędy żadnych
+// sekretów, tylko czytamy publiczną treść) — prawdziwe zagrożenie to CEL,
+// nie szyfrowanie.
+function isPrivateOrReservedIp(ipRaw: string): boolean {
+  const ip = ipRaw.replace(/^\[|\]$/g, '')
+  // IPv4 — pełny zakres adresów prywatnych/zarezerwowanych (RFC 1918 i
+  // pokrewne), w tym 169.254.x.x (adres-łącze, m.in. metadata chmury —
+  // klasyczny cel SSRF).
+  if (/^127\./.test(ip)) return true
+  if (/^10\./.test(ip)) return true
+  if (/^192\.168\./.test(ip)) return true
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)) return true
+  if (/^169\.254\./.test(ip)) return true
+  if (/^0\./.test(ip)) return true
+  // IPv6
+  if (ip === '::1' || ip === '::') return true
+  if (/^fe80:/i.test(ip)) return true
+  if (/^f[cd][0-9a-f]{2}:/i.test(ip)) return true // fc00::/7, unique local
+  if (/^::ffff:/i.test(ip)) return isPrivateOrReservedIp(ip.slice(7))
+  return false
+}
+
+// Sprawdza, czy adres jest bezpieczny do pobrania — DWIE warstwy: (1)
+// sprawdzenie samego zapisu adresu (adres podany wprost jako liczby IP) —
+// zawsze działa, nic niepewnego; (2) rozpoznanie nazwy domeny na
+// prawdziwy adres IP (`Deno.resolveDns`) — głębsze, łapie też domenę,
+// która CELOWO wskazuje na wewnętrzny adres. Dostępność `Deno.resolveDns`
+// w środowisku Supabase Edge Functions nie jest przez nas zweryfikowana
+// na żywo (nie da się tego przetestować z tego środowiska) — dlatego
+// warstwa (2) fail-open (przepuszcza), gdyby funkcja była niedostępna,
+// zamiast zepsuć całą analizę linków dla WSZYSTKICH stron. Warstwa (1)
+// działa zawsze, niezależnie od (2).
+async function isUrlSafeToFetch(urlStr: string): Promise<boolean> {
+  let url: URL
+  try {
+    url = new URL(urlStr)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
+  const hostname = url.hostname.toLowerCase()
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return false
+  if (/^[\d.]+$/.test(hostname) || hostname.includes(':')) {
+    if (isPrivateOrReservedIp(hostname)) return false
+  }
+  try {
+    // deno-lint-ignore no-explicit-any
+    const resolveDns = (Deno as any).resolveDns
+    if (typeof resolveDns === 'function') {
+      const results = await Promise.allSettled([
+        resolveDns(hostname, 'A'),
+        resolveDns(hostname, 'AAAA'),
+      ])
+      for (const r of results) {
+        if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+          for (const ip of r.value) {
+            if (isPrivateOrReservedIp(String(ip))) return false
+          }
+        }
+      }
+    }
+  } catch {
+    // Brak uprawnień/nieznane środowisko — nie blokujemy na tej
+    // podstawie, warstwa (1) i tak już zadziałała.
+  }
+  return true
+}
+
 // Koduje bajty do base64 w kawałkach — bezpieczny sposób w Deno dla
 // większych plików. `String.fromCharCode(...bytes)` na dużej tablicy
 // (rozłożonej jako pojedyncze argumenty) potrafi przekroczyć limit
@@ -1983,6 +2060,17 @@ Deno.serve(async (req: Request) => {
       if (!/^https?:\/\//i.test(source_url ?? '')) {
         return new Response(
           JSON.stringify({ error: 'invalid_url', message: 'To nie jest prawidłowy link — musi zaczynać się od http:// albo https://' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      // POPRAWKA 2026-08-26(h) — ochrona SSRF, patrz isUrlSafeToFetch()
+      // wyżej po pełne uzasadnienie. Odrzucamy PRZED jakąkolwiek próbą
+      // pobrania (własnej ALBO przez narzędzie Gemini) i przed wyceną —
+      // adres wskazujący na naszą własną infrastrukturę nigdy nie powinien
+      // dotrzeć nawet do etapu "spróbujmy pobrać".
+      if (!(await isUrlSafeToFetch(source_url))) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_url', message: 'Ten adres nie może zostać przeanalizowany.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
