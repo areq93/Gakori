@@ -2464,6 +2464,39 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(n) — reguła pierwszeństwa przy remisie modeli
+      mentalnych ("SPÓJNOŚĆ WYBORU MODELU").** Żywy, konkretny dowód
+      głębszego problemu (poza wszystkim naprawionym wcześniej w tej
+      sesji): właściciel porównał trzy analizy tego samego zdania —
+      dokładnie ten sam cytat ("To reakcja na obiektywne trudności
+      rynkowe...") dostał RAZ nazwę "Bodziec", RAZ "Wąskie Gardło" — dwa
+      różne, ale podobnie trafne modele ekonomiczne dla tego samego
+      fragmentu. To dowodzi, że nawet po usunięciu wszystkich znalezionych
+      dotąd źródeł RÓŻNIC W TEKŚCIE (CRLF, WIDEO, lista popularnych
+      artykułów, zawężanie kategorii) — SAMO rozumowanie modelu AI wciąż
+      ma swobodę wyboru między kilkoma równie trafnymi etykietami, i ta
+      swoboda jest źródłem niespójności nawet dla IDENTYCZNEGO tekstu.
+      Właściciel wprost: skoro nie da się osiągnąc pełnej spójności samą
+      "prośbą", to "idźmy w stronę ograniczeń, żeby osiągnąć cel."
+
+      **Naprawa — REGUŁA PIERWSZEŃSTWA, nie kolejna prośba o dokładność**:
+      nowa sekcja promptu każe modelowi, przy PRAWDZIWYM remisie (kilka
+      modeli pasuje podobnie dobrze), zawsze wybrać ten wymieniony W
+      BIBLIOTECE JAKO PIERWSZY — stała, przewidywalna kolejność
+      (`MENTAL_MODELS_BY_CATEGORY`) zamiast dowolnego wyboru za każdym
+      razem. To mechaniczne ograniczenie pola decyzji modelu, nie kolejny
+      apel o "bycie dokładnym" — stąd "ograniczenie", o które prosił
+      właściciel. Przy okazji poprawiony też nieaktualny już fragment
+      komentarza w BIBLIOTECE MODELI MENTALNYCH (mówił o "wstępnym
+      zawężeniu do kategorii", którego już nie ma od POPRAWKI 2026-08-26).
+
+      **Uczciwe zastrzeżenie**: to nadal instrukcja tekstowa, nie twarda
+      gwarancja — model może jej nie zastosować idealnie za każdym razem,
+      zwłaszcza gdy "remis" jest subiektywną oceną samego modelu. To
+      pierwszy, tani krok (zero nowych zapytań do Gemini, zero kosztu) —
+      jeśli po obserwacji na żywo nadal będą się zdarzać podobne
+      przypadki, kolejnym, droższym krokiem pozostaje "15+1" (patrz wyżej,
+      zadania #64/#65), wymagające włączenia płatnego poziomu Google.
     - **POPRAWKA 2026-08-26(m) — naprawa: "Zgłoś niezgodność" dawało błąd
       dla zwykłej analizy linku.** Bezpośredni skutek uboczny POPRAWKI
       2026-08-26(k) (rozszerzenie widoczności przycisku na frontendzie) —
