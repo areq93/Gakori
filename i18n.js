@@ -51,7 +51,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "Nieprawidłowy format adresu e-mail.",
         err_captcha_generic: "Potwierdź, że nie jesteś robotem (zaznacz pole powyżej) i spróbuj ponownie.",
         account_aria_label: "Twoje konto", credit_balance_label: "Stan kredytów", account_back: "← Wróć do Gakori", account_title: "Twoje konto",
-        loading: "Ładowanie...", account_logged_in_as: "Zalogowano jako:",
+        loading: "Ładowanie...", account_logged_in_as: "Zalogowano jako:", account_block_status_title: "Aktywna blokada konta", account_block_status_text: "Poziom blokady: {tier}. Wraca za: {time}.",
         btn_logout: "Wyloguj", link_change_password: "Zmień hasło", btn_save_password: "Zapisz nowe hasło",
         password_changed: "Hasło zmienione.",
         account_load_error: "Nie udało się wczytać danych konta (sprawdź połączenie z internetem i odśwież stronę).",
@@ -140,7 +140,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "Invalid email format.",
         err_captcha_generic: "Confirm you're not a robot (check the box above) and try again.",
         account_aria_label: "Your account", credit_balance_label: "Credit balance", account_back: "← Back to Gakori", account_title: "Your account",
-        loading: "Loading...", account_logged_in_as: "Logged in as:",
+        loading: "Loading...", account_logged_in_as: "Logged in as:", account_block_status_title: "Active account block", account_block_status_text: "Block level: {tier}. Returns in: {time}.",
         btn_logout: "Log out", link_change_password: "Change password", btn_save_password: "Save new password",
         password_changed: "Password changed.",
         account_load_error: "Couldn't load your account (check your connection and reload the page).",
@@ -229,7 +229,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "Formato de correo electrónico no válido.",
         err_captcha_generic: "Confirma que no eres un robot (marca la casilla de arriba) e inténtalo de nuevo.",
         account_aria_label: "Tu cuenta", credit_balance_label: "Créditos disponibles", account_back: "← Volver a Gakori", account_title: "Tu cuenta",
-        loading: "Cargando...", account_logged_in_as: "Sesión iniciada como:",
+        loading: "Cargando...", account_logged_in_as: "Sesión iniciada como:", account_block_status_title: "Bloqueo de cuenta activo", account_block_status_text: "Nivel de bloqueo: {tier}. Vuelve en: {time}.",
         btn_logout: "Cerrar sesión", link_change_password: "Cambiar contraseña", btn_save_password: "Guardar nueva contraseña",
         password_changed: "Contraseña cambiada.",
         account_load_error: "No se pudieron cargar los datos de tu cuenta (revisa tu conexión y recarga la página).",
@@ -318,7 +318,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "Ungültiges E-Mail-Format.",
         err_captcha_generic: "Bitte bestätige, dass du kein Roboter bist (Kästchen oben anklicken) und versuche es erneut.",
         account_aria_label: "Dein Konto", credit_balance_label: "Guthaben", account_back: "← Zurück zu Gakori", account_title: "Dein Konto",
-        loading: "Wird geladen...", account_logged_in_as: "Angemeldet als:",
+        loading: "Wird geladen...", account_logged_in_as: "Angemeldet als:", account_block_status_title: "Aktive Kontosperre", account_block_status_text: "Sperrstufe: {tier}. Verfügbar in: {time}.",
         btn_logout: "Abmelden", link_change_password: "Passwort ändern", btn_save_password: "Neues Passwort speichern",
         password_changed: "Passwort geändert.",
         account_load_error: "Kontodaten konnten nicht geladen werden (Verbindung prüfen und Seite neu laden).",
@@ -407,7 +407,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "Format d'e-mail invalide.",
         err_captcha_generic: "Confirmez que vous n'êtes pas un robot (cochez la case ci-dessus) et réessayez.",
         account_aria_label: "Votre compte", credit_balance_label: "Solde de crédits", account_back: "← Retour à Gakori", account_title: "Votre compte",
-        loading: "Chargement...", account_logged_in_as: "Connecté en tant que :",
+        loading: "Chargement...", account_logged_in_as: "Connecté en tant que :", account_block_status_title: "Blocage de compte actif", account_block_status_text: "Niveau de blocage : {tier}. Retour dans : {time}.",
         btn_logout: "Se déconnecter", link_change_password: "Changer le mot de passe", btn_save_password: "Enregistrer le nouveau mot de passe",
         password_changed: "Mot de passe modifié.",
         account_load_error: "Impossible de charger les données du compte (vérifiez votre connexion et rechargez la page).",
@@ -496,7 +496,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "Неверный формат e-mail.",
         err_captcha_generic: "Подтвердите, что вы не робот (отметьте галочку выше), и попробуйте снова.",
         account_aria_label: "Ваш аккаунт", credit_balance_label: "Баланс кредитов", account_back: "← Назад в Gakori", account_title: "Ваш аккаунт",
-        loading: "Загрузка...", account_logged_in_as: "Вы вошли как:",
+        loading: "Загрузка...", account_logged_in_as: "Вы вошли как:", account_block_status_title: "Активная блокировка аккаунта", account_block_status_text: "Уровень блокировки: {tier}. Возврат через: {time}.",
         btn_logout: "Выйти", link_change_password: "Изменить пароль", btn_save_password: "Сохранить новый пароль",
         password_changed: "Пароль изменён.",
         account_load_error: "Не удалось загрузить данные аккаунта (проверьте подключение и обновите страницу).",
@@ -585,7 +585,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "邮箱格式无效。",
         err_captcha_generic: "请确认您不是机器人（勾选上方方框）并重试。",
         account_aria_label: "您的账户", credit_balance_label: "积分余额", account_back: "← 返回 Gakori", account_title: "您的账户",
-        loading: "加载中…", account_logged_in_as: "已登录为：",
+        loading: "加载中…", account_logged_in_as: "已登录为：", account_block_status_title: "账户已被限制", account_block_status_text: "限制等级：{tier}。恢复时间：{time}。",
         btn_logout: "退出登录", link_change_password: "修改密码", btn_save_password: "保存新密码",
         password_changed: "密码已修改。",
         account_load_error: "无法加载账户数据（请检查网络连接并刷新页面）。",
@@ -674,7 +674,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "メールアドレスの形式が正しくありません。",
         err_captcha_generic: "ロボットではないことを確認し（上のチェックボックスをクリック）、もう一度お試しください。",
         account_aria_label: "アカウント", credit_balance_label: "クレジット残高", account_back: "← Gakoriに戻る", account_title: "アカウント",
-        loading: "読み込み中…", account_logged_in_as: "ログイン中：",
+        loading: "読み込み中…", account_logged_in_as: "ログイン中：", account_block_status_title: "アカウントは現在ブロック中", account_block_status_text: "ブロックレベル: {tier}。解除まで: {time}。",
         btn_logout: "ログアウト", link_change_password: "パスワードを変更", btn_save_password: "新しいパスワードを保存",
         password_changed: "パスワードを変更しました。",
         account_load_error: "アカウント情報を読み込めませんでした（接続を確認してページを再読み込みしてください）。",
@@ -763,7 +763,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "अमान्य ईमेल फॉर्मेट।",
         err_captcha_generic: "पुष्टि करें कि आप रोबोट नहीं हैं (ऊपर चेकबॉक्स चुनें) और फिर से प्रयास करें।",
         account_aria_label: "आपका खाता", credit_balance_label: "क्रेडिट बैलेंस", account_back: "← Gakori पर वापस जाएं", account_title: "आपका खाता",
-        loading: "लोड हो रहा है...", account_logged_in_as: "इस रूप में लॉग इन:",
+        loading: "लोड हो रहा है...", account_logged_in_as: "इस रूप में लॉग इन:", account_block_status_title: "खाता सक्रिय रूप से ब्लॉक है", account_block_status_text: "ब्लॉक स्तर: {tier}। वापसी में: {time}।",
         btn_logout: "लॉग आउट करें", link_change_password: "पासवर्ड बदलें", btn_save_password: "नया पासवर्ड सहेजें",
         password_changed: "पासवर्ड बदल दिया गया।",
         account_load_error: "खाते का डेटा लोड नहीं हो सका (कनेक्शन जांचें और पेज रीलोड करें)।",
@@ -852,7 +852,7 @@ const TRANSLATIONS = {
         err_invalid_email_format: "صيغة بريد إلكتروني غير صالحة.",
         err_captcha_generic: "أكّد أنك لست روبوتًا (حدد المربع أعلاه) وحاول مرة أخرى.",
         account_aria_label: "حسابك", credit_balance_label: "رصيد الأرصدة", account_back: "← العودة إلى Gakori", account_title: "حسابك",
-        loading: "جارٍ التحميل...", account_logged_in_as: "تم تسجيل الدخول باسم:",
+        loading: "جارٍ التحميل...", account_logged_in_as: "تم تسجيل الدخول باسم:", account_block_status_title: "الحساب محظور حاليًا", account_block_status_text: "مستوى الحظر: {tier}. يعود بعد: {time}.",
         btn_logout: "تسجيل الخروج", link_change_password: "تغيير كلمة المرور", btn_save_password: "حفظ كلمة المرور الجديدة",
         password_changed: "تم تغيير كلمة المرور.",
         account_load_error: "تعذّر تحميل بيانات الحساب (تحقق من الاتصال وأعد تحميل الصفحة).",
@@ -1122,6 +1122,71 @@ function refreshCreditBalance(sb, userId) {
             el.textContent = data.wallet_balance;
         }
     });
+}
+
+// POPRAWKA 2026-08-26(af) — panel konta (account.html) ma teraz pokazywać
+// wprost, czy konto ma AKTYWNĄ blokadę (patrz "Ochrona cashflow" w
+// GAKORI_CONTEXT.md) — dotąd było to widoczne TYLKO w momencie próby
+// analizy. Czyta bezpośrednio z `rate_limit_blocks` przez RLS (własne
+// wiersze, patrz polityka SELECT w GAKORI_CONTEXT.md) — bez potrzeby
+// osobnej Edge Function. Chowa sekcję, jeśli nie ma aktywnej blokady albo
+// coś poszło nie tak przy odczycie (fail-open — brak tej informacji nie
+// może zablokować reszty strony).
+let blockStatusTimer = null;
+function renderBlockStatus(sb, userId) {
+    if (!sb || !userId) return Promise.resolve();
+    const box = document.getElementById('blockStatusBox');
+    const textEl = document.getElementById('blockStatusText');
+    if (!box || !textEl) return Promise.resolve();
+    return sb.from('rate_limit_blocks')
+        .select('blocked_until, strike_number')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data, error }) => {
+            if (blockStatusTimer) {
+                clearInterval(blockStatusTimer);
+                blockStatusTimer = null;
+            }
+            if (error || !data) {
+                box.style.display = 'none';
+                return;
+            }
+            const targetTime = new Date(data.blocked_until).getTime();
+            const tier = data.strike_number || 1;
+            const tick = () => {
+                const remainingMs = targetTime - Date.now();
+                if (remainingMs <= 0) {
+                    box.style.display = 'none';
+                    if (blockStatusTimer) {
+                        clearInterval(blockStatusTimer);
+                        blockStatusTimer = null;
+                    }
+                    return;
+                }
+                box.style.display = 'block';
+                textEl.innerText = t('account_block_status_text', { tier, time: formatCountdownShared(remainingMs) });
+            };
+            tick();
+            blockStatusTimer = setInterval(tick, 1000);
+        });
+}
+
+// Ta sama logika formatowania odliczania co w index.html/scan.html
+// (m:ss / godziny / dni), wydzielona tu, żeby account.html mogła z niej
+// skorzystać bez duplikowania kodu po raz trzeci.
+function formatCountdownShared(remainingMs) {
+    const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+    if (totalSeconds < 3600) {
+        const m = Math.floor(totalSeconds / 60);
+        const s = totalSeconds % 60;
+        return m + ':' + String(s).padStart(2, '0');
+    }
+    if (totalSeconds < 24 * 3600) {
+        return t('retry_hours', { hours: Math.ceil(totalSeconds / 3600) });
+    }
+    return t('retry_days', { days: Math.ceil(totalSeconds / (24 * 3600)) });
 }
 
 // Nazwa użytkownika: w przeciwieństwie do języka/motywu NIE ma domyślnej

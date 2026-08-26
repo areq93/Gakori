@@ -4056,6 +4056,51 @@ alter table rate_limit_blocks add column if not exists strike_number integer;
 Weryfikacja: `node --experimental-strip-types --check` oraz
 `tsc --noEmit --skipLibCheck` (bez nowych błędów typów).
 
+**POPRAWKA 2026-08-26(af) — trzy rzeczy naraz: próg ogólnych błędów
+podniesiony do 10 ("to przecież MVP"), zwolnienie konta właściciela z
+całej ochrony przed nadużyciem, i panel konta pokazujący status
+blokady.**
+
+1. `RATE_LIMIT_FAILURE_THRESHOLD`: 5 → 10 (okno 10 minut bez zmian).
+   `SAME_FILE_ATTEMPT_LIMIT` (5 prób/godzinę) — bez zmian, właściciel
+   wprost potwierdził zostawienie tej wartości.
+2. **Zwolnienie właściciela** (`profiles.is_admin`, nowa kolumna) — konto
+   z `is_admin = true` całkowicie pomija sprawdzenie aktywnej blokady (2b),
+   `logFailedAttempt()` i `logReanalysisAttempt()` (obie funkcje kończą się
+   natychmiast, `isExemptFromRateLimits`). Rozliczenie kredytów za UDANE
+   analizy działa bez zmian — zwolnienie dotyczy WYŁĄCZNIE mechanizmów
+   ochrony przed nadużyciem, bo te istnieją, żeby chronić budżet przed
+   OBCYMI kontami, nie żeby utrudniać właścicielowi testowanie własnego
+   systemu (bezpośredni powód: test 69-stronicowego PDF-a wpadał we
+   własne zabezpieczenia).
+3. **Panel konta** (`account.html`) — nowa sekcja `#blockStatusBox`,
+   widoczna WYŁĄCZNIE gdy konto ma aktywną blokadę: poziom (`strike_number`)
+   i żywo odliczający czas do końca (ta sama logika co komunikat błędu
+   przy próbie analizy). Czyta bezpośrednio z `rate_limit_blocks` przez
+   Supabase JS (RLS, nie przez Edge Function) — stąd nowa polityka RLS
+   niżej. Nowe funkcje `renderBlockStatus()`/`formatCountdownShared()` w
+   `i18n.js` (współdzielone, żeby nie duplikować trzeciej kopii tej samej
+   logiki odliczania po `index.html`/`scan.html`). Nowe klucze i18n
+   `account_block_status_title`/`account_block_status_text`, wszystkie 10
+   języków.
+
+   **Wymagana zmiana w bazie**:
+   ```sql
+   alter table profiles add column if not exists is_admin boolean not null default false;
+
+   create policy "users can view own rate limit blocks"
+     on rate_limit_blocks for select
+     using (auth.uid() = user_id);
+
+   update profiles set is_admin = true
+     where id = '427043e8-5f56-4bcf-ac97-863a13006abd';
+   ```
+   (ID konta właściciela podane wprost przez niego w rozmowie — konto z
+   1640 kredytami w zrzucie ekranu `profiles`, jedyne wyraźnie różniące
+   się od reszty kont testowych z 20 kredytami.) Jeśli polityka RLS już
+   istnieje z poprzedniego uruchomienia, drugie uruchomienie da błąd
+   "already exists" — to nieszkodliwe, oznacza że już działa.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

@@ -1782,9 +1782,10 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
 // zapytania do Gemini, ale nic nie zarabiamy — kredyty ściągamy dopiero po
 // sukcesie (sekcja 7 niżej). Bez ograniczenia ktoś mógłby (przez pomyłkę
 // albo celowo) zasypywać nas nieudanymi próbami bez końca. Próg wyzwalający
-// blokadę jest zawsze ten sam (5 nieudanych prób w 10 minut — POPRAWKA
-// 2026-08-26(ad), obniżone z 15 na wyraźną prośbę właściciela, żeby
-// reagować szybciej), ale CZAS TRWANIA blokady rośnie
+// blokadę jest zawsze ten sam (10 nieudanych prób w 10 minut — POPRAWKA
+// 2026-08-26(ad), obniżone z 15 do 5, potem POPRAWKA (af) podniesione do
+// 10 — "to przecież MVP", właściciel chciał trochę więcej luzu), ale
+// CZAS TRWANIA blokady rośnie
 // TRZYKROTNIE z każdą kolejną blokadą tego samego konta w ciągu ostatnich
 // RATE_LIMIT_STRIKE_RESET_DAYS dni (10 min → 30 min → 1,5h → 4,5h → ...,
 // z sufitem RATE_LIMIT_MAX_MINUTES) — jeśli konto przez ten czas nie
@@ -1794,7 +1795,7 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
 // wygasłaby, zanim najdłuższa możliwa blokada w ogóle się skończy, i ktoś
 // kto właśnie odsiedział maksymalną karę zaraz dostałby najniższą.
 const RATE_LIMIT_WINDOW_MINUTES = 10
-const RATE_LIMIT_FAILURE_THRESHOLD = 5
+const RATE_LIMIT_FAILURE_THRESHOLD = 10
 const RATE_LIMIT_STRIKE_RESET_DAYS = 30
 const RATE_LIMIT_BASE_MINUTES = 10
 const RATE_LIMIT_MULTIPLIER = 3
@@ -2059,11 +2060,19 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    let profile: { wallet_balance: number } | null = null
+    let profile: { wallet_balance: number; is_admin?: boolean } | null = null
     if (user_id) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user_id).single()
       profile = data
     }
+    // POPRAWKA 2026-08-26(af) — konto właściciela (`profiles.is_admin = true`,
+    // ustawiane ręcznie w Supabase Table Editor, patrz GAKORI_CONTEXT.md) jest
+    // ZWOLNIONE z blokad/kar za nadużycie niżej — one istnieją, żeby chronić
+    // budżet przed OBCYMI kontami, nie po to, żeby utrudniać właścicielowi
+    // testowanie własnego systemu. Rozliczenie kredytów (chargeCredits())
+    // dla udanych analiz działa dla admina bez zmian — zwolnienie dotyczy
+    // WYŁĄCZNIE mechanizmów rate-limitingu.
+    const isExemptFromRateLimits = !!profile?.is_admin
 
     // 2. CACHE: czy ta treść była już analizowana W TYM SAMYM JĘZYKU WYNIKU?
     // Cache jest wspólny dla wszystkich użytkowników, ale wynik AI jest teraz
@@ -2140,7 +2149,7 @@ Deno.serve(async (req: Request) => {
     // RATE_LIMIT_* i logFailedAttempt() niżej). Sprawdzane od razu, zanim
     // policzymy koszt czy wywołamy Gemini — nie ma sensu robić żadnej
     // dalszej pracy dla zablokowanego konta.
-    if (user_id) {
+    if (user_id && !isExemptFromRateLimits) {
       const { data: lastBlock } = await supabase
         .from('rate_limit_blocks')
         .select('blocked_until, strike_number')
@@ -2250,7 +2259,10 @@ Deno.serve(async (req: Request) => {
     // anonimowych analiza tekstu i tak jest darmowa niezależnie od wyniku,
     // więc nie ma tu dodatkowego ryzyka do ograniczenia.
     async function logFailedAttempt(): Promise<void> {
-      if (!user_id) return
+      // POPRAWKA 2026-08-26(af) — konto właściciela w ogóle nie zbiera tu
+      // żadnych śladów (ani bloków, ani kary finansowej) — patrz
+      // `isExemptFromRateLimits` wyżej.
+      if (!user_id || isExemptFromRateLimits) return
       await supabase.from('failed_scan_attempts').insert({ user_id })
 
       // POPRAWKA 2026-08-26(ae) — kara finansowa dla "powracających" kont,
@@ -2300,7 +2312,7 @@ Deno.serve(async (req: Request) => {
     // analizę TEGO SAMEGO pliku (tego samego `content_hash`), a nie przy
     // zwykłym, tanim odczycie z cache'u.
     async function logReanalysisAttempt(contentHash: string): Promise<void> {
-      if (!user_id) return
+      if (!user_id || isExemptFromRateLimits) return
       await supabase.from('content_reanalysis_attempts').insert({ user_id, content_hash: contentHash })
 
       const windowStart = new Date(Date.now() - SAME_FILE_ATTEMPT_WINDOW_MINUTES * 60 * 1000).toISOString()

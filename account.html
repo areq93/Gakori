@@ -46,6 +46,11 @@
             <p style="margin:0 0 10px 0;"><span data-i18n="account_logged_in_as">Zalogowano jako:</span><br><strong id="accountEmail"></strong></p>
             <button id="logoutBtn" type="button" data-i18n="btn_logout">Wyloguj</button>
 
+            <div id="blockStatusBox" style="display:none; margin-top:16px; padding:12px; border-radius:var(--radius-sm); background:#fff3cd; color:#664d03; font-size:13px;">
+                <strong data-i18n="account_block_status_title">Aktywna blokada konta</strong>
+                <p id="blockStatusText" style="margin:6px 0 0 0;"></p>
+            </div>
+
             <div style="margin-top:16px; text-align:center;">
                 <a href="historia.html" data-i18n="link_pdf_history">Twoje analizy PDF →</a>
             </div>
@@ -133,6 +138,7 @@
                     return;
                 }
                 refreshCreditBalance(sb, session.user.id);
+                renderBlockStatus(sb, session.user.id);
                 // Czekamy na zakończenie synchronizacji z profilem, zanim
                 // wypełnimy selektor — inaczej mógłby na chwilę (albo na
                 // stałe, jeśli coś przerwie stronę) pokazać nieaktualną
