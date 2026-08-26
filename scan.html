@@ -50,10 +50,6 @@
             <p id="scanSource" class="scan-source-box" style="display:none;"></p>
             <details id="scanTextSource" class="scan-text-source" style="display:none;">
                 <summary id="scanTextSourceSummary"></summary>
-                <div class="scan-text-source-actions">
-                    <button id="scanTextSourceCopyBtn" type="button" class="scan-text-source-copy-btn" data-i18n="btn_copy_source_text">Kopiuj</button>
-                    <button id="scanTextSourceDirectAnalyzeBtn" type="button" class="scan-text-source-copy-btn" data-i18n="btn_analyze_as_text">Analizuj jako tekst</button>
-                </div>
                 <div id="scanTextSourceContent" class="scan-text-source-content"></div>
             </details>
             <p id="scanRetractedNotice" style="display:none; color:var(--danger-text);"></p>
@@ -496,41 +492,6 @@
                                 buildHighlightedText(data.text_content, quoteEntries)
                             );
                             textSourceEl.style.display = 'block';
-
-                            // POPRAWKA 2026-08-26 — ręczne zaznaczanie tekstu myszką w tym
-                            // małym, przewijanym okienku łatwo (i niezauważalnie) pomija
-                            // fragment poza widocznym obszarem — żywy przykład: dwie
-                            // "niezależne" analizy tej samej treści (link + wklejony z
-                            // tego panelu tekst) dostały różny odcisk palca, bo wklejony
-                            // tekst NIE był dokładną kopią całości. Jeden przycisk kopiujący
-                            // CAŁY `data.text_content` programowo eliminuje to ryzyko.
-                            const copyBtn = document.getElementById('scanTextSourceCopyBtn');
-                            copyBtn.addEventListener('click', (e) => {
-                                e.preventDefault();
-                                navigator.clipboard.writeText(data.text_content).then(() => {
-                                    const original = copyBtn.innerText;
-                                    copyBtn.innerText = t('btn_copy_source_text_done');
-                                    setTimeout(() => { copyBtn.innerText = original; }, 2000);
-                                }).catch(() => {});
-                            });
-
-                            // POPRAWKA 2026-08-26(d) — nawet przycisk "Kopiuj" (schowek
-                            // systemowy) nie rozwiązał niespójności wyników — właściciel
-                            // słusznie zauważył, że schowek to kolejne, niepotrzebne ogniwo,
-                            // które MOŻE (z przyczyn systemowych/przeglądarki, poza naszą
-                            // kontrolą) zniekształcić tekst po drodze. Ten przycisk PRZENOSI
-                            // `data.text_content` do trybu "Tekst" WPROST w pamięci
-                            // przeglądarki (sessionStorage), bez dotykania schowka w ogóle —
-                            // ostateczny test, czy to naprawdę kwestia kopiowania, czy
-                            // czegoś głębszego po stronie serwera.
-                            document.getElementById('scanTextSourceDirectAnalyzeBtn').addEventListener('click', (e) => {
-                                e.preventDefault();
-                                sessionStorage.setItem('gakori_direct_text_transfer', data.text_content);
-                                const params = new URLSearchParams();
-                                params.set('prefill_full_text', '1');
-                                if (data.source_url) params.set('prefill_text_source_readonly', data.source_url);
-                                location.href = 'index.html?' + params.toString();
-                            });
                         }
 
                         // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,

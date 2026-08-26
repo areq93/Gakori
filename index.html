@@ -800,26 +800,6 @@
                 document.getElementById('textInput').focus();
             }
 
-            // POPRAWKA 2026-08-26(d) — przycisk "Analizuj jako tekst" na
-            // scan.html przenosi tu treść WPROST przez sessionStorage, bez
-            // dotykania schowka systemowego (patrz tamtejszy komentarz) —
-            // ostateczny test spójności wyników link/tekst, bez ryzyka, że
-            // coś zniekształci się po drodze przy ręcznym kopiowaniu.
-            // Jednorazowe użycie: klucz usuwany od razu po odczytaniu.
-            if (params.get('prefill_full_text') === '1') {
-                const transferred = sessionStorage.getItem('gakori_direct_text_transfer');
-                sessionStorage.removeItem('gakori_direct_text_transfer');
-                if (transferred) {
-                    setMode('text');
-                    document.getElementById('textInput').value = transferred;
-                    const readonlySource = params.get('prefill_text_source_readonly');
-                    if (readonlySource && /^https?:\/\//i.test(readonlySource)) {
-                        document.getElementById('textSourceUrlInput').value = readonlySource;
-                    }
-                    updateTextCostEstimate();
-                }
-            }
-
             receiveSharedImage(params);
         });
 
@@ -878,7 +858,13 @@
         function updateTextCostEstimate() {
             const len = textInputEl.value.length;
             const estEl = document.getElementById('textCostEstimate');
-            estEl.innerText = len > 0 ? t('live_cost_estimate', { cost: estimateTextCost(len) }) : '';
+            // POPRAWKA 2026-08-26(e) — liczba znaków WPROST, tuż pod polem, tym
+            // samym kluczem co na scan.html (scan_text_source_char_count) —
+            // pozwala od razu, PRZED wysłaniem, porównać z liczbą znaków
+            // pokazaną przy analizie linku, bez czekania na wynik.
+            estEl.innerText = len > 0
+                ? t('scan_text_source_char_count', { count: len }) + ' — ' + t('live_cost_estimate', { cost: estimateTextCost(len) })
+                : '';
         }
         textInputEl.addEventListener('input', updateTextCostEstimate);
 
