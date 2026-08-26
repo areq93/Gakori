@@ -67,6 +67,7 @@
                 <p id="scanSummary" class="result-summary"></p>
             </div>
             <p id="scanCostNotice" style="margin-top:10px; font-size:12px; color:var(--ink-soft);"></p>
+            <p id="scanViewCount" style="margin-top:4px; font-size:12px; color:var(--ink-soft);"></p>
         </div>
     </div>
 
@@ -323,7 +324,7 @@
                 showNotFound();
             } else {
                 sessionReady.then(() => sb.from('scans')
-                    .select('input_type, source_url, text_content, result, is_manual_source, retracted')
+                    .select('input_type, source_url, text_content, result, is_manual_source, retracted, view_count')
                     .eq('id', scanId)
                     .maybeSingle())
                     .then(({ data, error }) => {
@@ -372,23 +373,34 @@
                         // kod) — WYŁĄCZNIE dla osoby, która przed chwilą sama
                         // uruchomiła TĘ analizę, jednorazowy odczyt (tak jak
                         // miniatury obrazów wyżej). Ktoś inny otwierający ten sam
-                        // link później nic tu nie zobaczy — to nie jest stały,
-                        // publiczny fakt o wyniku, tylko osobisty "paragon".
+                        // link później nic tu nie zobaczy.
+                        // POPRAWKA 2026-08-25(e) — na wyraźną prośbę właściciela
+                        // pokazujemy TERAZ już WYŁĄCZNIE informację "za darmo — z
+                        // pamięci" (trafienie w cache); ile kredytów kosztowała
+                        // płatna analiza — świadomie NIE pokazujemy już wcale
+                        // (zamiast tego stały licznik wyświetleń niżej).
                         const costKey = 'gakori_scan_cost_' + scanId;
                         const costRaw = sessionStorage.getItem(costKey);
                         if (costRaw) {
                             sessionStorage.removeItem(costKey);
                             try {
                                 const costInfo = JSON.parse(costRaw);
-                                const costEl = document.getElementById('scanCostNotice');
-                                costEl.innerText = costInfo.cached
-                                    ? t('cost_free_cache_notice')
-                                    : t('cost_paid_notice', { cost: costInfo.cost });
-                                costEl.style.display = 'block';
+                                if (costInfo.cached) {
+                                    const costEl = document.getElementById('scanCostNotice');
+                                    costEl.innerText = t('cost_free_cache_notice');
+                                    costEl.style.display = 'block';
+                                }
                             } catch {
                                 // uszkodzony zapis — po prostu nie pokazujemy paragonu
                             }
                         }
+
+                        // POPRAWKA 2026-08-25(e) — stały, zawsze widoczny licznik
+                        // wyświetleń (nie jednorazowy "paragon" jak wyżej — to
+                        // prawdziwa, publiczna liczba z bazy, ta sama dla każdego,
+                        // kto otworzy ten link). Na wyraźną prośbę właściciela.
+                        document.getElementById('scanViewCount').innerText =
+                            t('scan_view_count', { count: data.view_count ?? 0 });
 
                         // Punkt B audytu bezpieczeństwa — treść automatycznie
                         // wycofana (patrz report-link-mismatch, GAKORI_CONTEXT.md).
