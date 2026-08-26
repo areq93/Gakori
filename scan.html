@@ -50,6 +50,7 @@
             <p id="scanSource" class="scan-source-box" style="display:none;"></p>
             <details id="scanTextSource" class="scan-text-source" style="display:none;">
                 <summary id="scanTextSourceSummary"></summary>
+                <button id="scanTextSourceCopyBtn" type="button" class="scan-text-source-copy-btn" data-i18n="btn_copy_source_text">Kopiuj</button>
                 <div id="scanTextSourceContent" class="scan-text-source-content"></div>
             </details>
             <p id="scanRetractedNotice" style="display:none; color:var(--danger-text);"></p>
@@ -483,6 +484,23 @@
                                 buildHighlightedText(data.text_content, quoteEntries)
                             );
                             textSourceEl.style.display = 'block';
+
+                            // POPRAWKA 2026-08-26 — ręczne zaznaczanie tekstu myszką w tym
+                            // małym, przewijanym okienku łatwo (i niezauważalnie) pomija
+                            // fragment poza widocznym obszarem — żywy przykład: dwie
+                            // "niezależne" analizy tej samej treści (link + wklejony z
+                            // tego panelu tekst) dostały różny odcisk palca, bo wklejony
+                            // tekst NIE był dokładną kopią całości. Jeden przycisk kopiujący
+                            // CAŁY `data.text_content` programowo eliminuje to ryzyko.
+                            const copyBtn = document.getElementById('scanTextSourceCopyBtn');
+                            copyBtn.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                navigator.clipboard.writeText(data.text_content).then(() => {
+                                    const original = copyBtn.innerText;
+                                    copyBtn.innerText = t('btn_copy_source_text_done');
+                                    setTimeout(() => { copyBtn.innerText = original; }, 2000);
+                                }).catch(() => {});
+                            });
                         }
 
                         // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,
