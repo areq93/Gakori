@@ -2265,18 +2265,35 @@ Deno.serve(async (req: Request) => {
         // przypadek to 1 zapytanie do Gemini (ścieżka główna) albo 1
         // zapytanie (ścieżka awaryjna) — plus wspólna "druga runda
         // szukania" (Etap 3) na ścieżce głównej.
-        const rawTextNotice = `\n\nUWAGA: poniższy tekst pochodzi z surowego, automatycznego pobrania strony internetowej — może mieszać właściwą treść artykułu z menu nawigacyjnym, stopką, reklamami, linkami "czytaj też", banerem cookie itp. Skup się WYŁĄCZNIE na rzeczywistej treści artykułu/strony, ten szum wokół niej całkowicie zignoruj.`
         // POPRAWKA 2026-08-23(a) — `preFetchedText` pobrane jest już WYŻEJ,
         // w gałęzi wyceny kosztu (ten sam request, po stronie "2. WYCENA"),
         // bo cena linku wymaga teraz znajomości liczby znaków. Nie pobieramy
         // strony drugi raz — używamy hoisted zmiennej wprost.
-
+        //
+        // POPRAWKA 2026-08-26(d) — właściciel zwrócił uwagę na coś
+        // fundamentalnego: skoro link i tak sprowadza się do "pobierz tekst,
+        // potem przeanalizuj go", to PO CO mieć dla tego OSOBNY kod
+        // analizy, różny od zwykłego trybu "Tekst"? Sprawdziłem — mieliśmy:
+        // ta gałąź dokładała do promptu dodatkowy akapit `rawTextNotice`
+        // ("UWAGA: poniższy tekst pochodzi z surowego, automatycznego
+        // pobrania strony..."), którego tryb "Tekst" NIGDY nie dostawał.
+        // Czyli nawet dla BAJT W BAJT identycznej treści artykułu, prompt
+        // wysyłany do Gemini był RÓŻNY między trybami — osobne źródło
+        // niespójności, niezależne od odcisku palca/cache'u (POPRAWKA
+        // 2026-08-26/(b)). Naprawa: link, gdy ma już własny pobrany tekst,
+        // NIE dostaje już żadnego specjalnego dopisku — leci DOKŁADNIE tą
+        // samą ścieżką promptu co tryb "Tekst" niżej (ten sam `systemPrompt`,
+        // ta sama etykieta "TEKST DO ANALIZY:"). Uzasadnienie usunięcia
+        // dopisku: `fetchUrlAsText()` i tak już oczyszcza stronę z szumu
+        // (nawigacja, reklamy, zapowiedzi — patrz POPRAWKA 2026-08-25/(f)/
+        // (g)) na tyle dobrze, że osobne ostrzeżenie "to surowe dane,
+        // zignoruj szum" nie jest już potrzebne — a jego brak w trybie
+        // "Tekst" i tak nigdy nie był problemem.
         if (preFetchedText) {
           // Ścieżka główna (zdecydowana większość stron): mamy już tekst,
-          // więc dokładnie ten sam wzorzec co przy zwykłym tekście — patrz
-          // gałąź "text" niżej (POPRAWKA 2026-08-26: bez etapu
-          // kategoryzacji, zawsze cała biblioteka — patrz
-          // buildMentalModelsLibrary()).
+          // więc DOKŁADNIE ten sam kod co przy zwykłym tekście — patrz
+          // gałąź "text" niżej (ten sam `systemPrompt`, ta sama etykieta,
+          // ten sam brak zawężania kategorii — POPRAWKA 2026-08-26).
           const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary())
           geminiData = await callGemini(
             {
@@ -2284,7 +2301,7 @@ Deno.serve(async (req: Request) => {
                 {
                   parts: [
                     {
-                      text: `${systemPrompt}${rawTextNotice}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nTEKST DO ANALIZY (pobrany bezpośrednio ze strony):\n${preFetchedText}`,
+                      text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nTEKST DO ANALIZY:\n${preFetchedText}`,
                     },
                   ],
                 },
@@ -2300,10 +2317,10 @@ Deno.serve(async (req: Request) => {
             costTracker
           )
           // Etap 3 (findAdditionalPatterns) dostanie dokładnie ten sam
-          // tekst i instrukcje co Etap 2 wyżej (systemPrompt + dopisek o
-          // szumie) — patrz obsługa niżej, po sparsowaniu geminiData.
+          // tekst i instrukcje co Etap 2 wyżej — patrz obsługa niżej, po
+          // sparsowaniu geminiData.
           secondPassText = preFetchedText
-          secondPassSystemPrompt = `${systemPrompt}${rawTextNotice}`
+          secondPassSystemPrompt = systemPrompt
         } else {
           // POPRAWKA 2026-08-25(d) — sprawdzenie ratunku po `source_url`
           // (rescueExact/rescueOriginal) przeniesione WYŻEJ, do gałęzi
