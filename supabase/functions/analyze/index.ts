@@ -2143,7 +2143,7 @@ Deno.serve(async (req: Request) => {
     if (user_id) {
       const { data: lastBlock } = await supabase
         .from('rate_limit_blocks')
-        .select('blocked_until')
+        .select('blocked_until, strike_number')
         .eq('user_id', user_id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -2153,12 +2153,16 @@ Deno.serve(async (req: Request) => {
         if (remainingMs > 0) {
           // "blocked_until" (dokładny znacznik czasu) pozwala frontendowi
           // pokazać żywo odliczający licznik do końca blokady, zamiast
-          // statycznego, zaokrąglonego komunikatu.
+          // statycznego, zaokrąglonego komunikatu. POPRAWKA 2026-08-26(ae)
+          // — `strike_number` dopisane, żeby użytkownik ZAWSZE widział, na
+          // którym jest poziomie eskalacji (fallback `1`, gdyby ktoś miał
+          // stary wiersz sprzed dodania tej kolumny).
           return new Response(
             JSON.stringify({
               error: 'too_many_failed_attempts',
               blocked_until: lastBlock.blocked_until,
               retry_after_minutes: Math.ceil(remainingMs / 60000),
+              strike_number: lastBlock.strike_number ?? 1,
             }),
             { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
@@ -2199,8 +2203,12 @@ Deno.serve(async (req: Request) => {
         RATE_LIMIT_MAX_MINUTES
       )
       const blockedUntil = new Date(Date.now() + blockMinutes * 60 * 1000).toISOString()
+      // POPRAWKA 2026-08-26(ae) — zapisany wprost w wierszu (nie liczony na
+      // nowo przy sprawdzaniu blokady niżej), żeby użytkownik ZAWSZE widział,
+      // na którym jest poziomie, przy każdym komunikacie o blokadzie.
+      const strikeNumber = (recentStrikes ?? 0) + 1
 
-      await supabase.from('rate_limit_blocks').insert({ user_id, blocked_until: blockedUntil, reason })
+      await supabase.from('rate_limit_blocks').insert({ user_id, blocked_until: blockedUntil, reason, strike_number: strikeNumber })
 
       // Powiadomienie mailowe — POPRAWKA 2026-08-26(ad), właściciel wprost
       // poprosił: dotąd te blokady działy się po cichu, widoczne tylko
@@ -2228,7 +2236,7 @@ Deno.serve(async (req: Request) => {
             sender: { email: senderEmail, name: senderName },
             to: [{ email: recipient }],
             subject: '🟠 Gakori: konto użytkownika zablokowane automatycznie',
-            htmlContent: `<p>Automatyczna ochrona przed nadużyciem zablokowała właśnie jedno konto.</p><p><strong>Powód:</strong> ${reason}</p><p><strong>Konto (e-mail):</strong> ${userEmail}</p><p><strong>ID konta:</strong> ${user_id}</p><p><strong>Blokada do:</strong> ${blockedUntilPl} (czasu polskiego)</p><p><strong>To która blokada w ostatnich ${RATE_LIMIT_STRIKE_RESET_DAYS} dniach:</strong> ${(recentStrikes ?? 0) + 1}</p><p>Szczegółowy rejestr prób znajdziesz w Supabase Dashboard → Table Editor → <code>failed_scan_attempts</code> / <code>content_reanalysis_attempts</code>, filtrując po ID konta wyżej.</p>`,
+            htmlContent: `<p>Automatyczna ochrona przed nadużyciem zablokowała właśnie jedno konto.</p><p><strong>Powód:</strong> ${reason}</p><p><strong>Konto (e-mail):</strong> ${userEmail}</p><p><strong>ID konta:</strong> ${user_id}</p><p><strong>Blokada do:</strong> ${blockedUntilPl} (czasu polskiego)</p><p><strong>To która blokada w ostatnich ${RATE_LIMIT_STRIKE_RESET_DAYS} dniach:</strong> ${strikeNumber}${strikeNumber > 1 ? ' (od tej pory każda kolejna nieudana próba tego konta kosztuje połowę stawki, patrz POPRAWKA 2026-08-26(ae))' : ''}</p><p>Szczegółowy rejestr prób znajdziesz w Supabase Dashboard → Table Editor → <code>failed_scan_attempts</code> / <code>content_reanalysis_attempts</code>, filtrując po ID konta wyżej.</p>`,
           }),
         })
       } catch {
@@ -2244,6 +2252,36 @@ Deno.serve(async (req: Request) => {
     async function logFailedAttempt(): Promise<void> {
       if (!user_id) return
       await supabase.from('failed_scan_attempts').insert({ user_id })
+
+      // POPRAWKA 2026-08-26(ae) — kara finansowa dla "powracających" kont,
+      // wyraźnie potwierdzona przez właściciela. PIERWSZA blokada konta
+      // pozostaje całkowicie darmowa (tylko czasowa) — dopiero jeśli konto
+      // JUŻ MA za sobą co najmniej jedną blokadę w ostatnich
+      // RATE_LIMIT_STRIKE_RESET_DAYS dniach, KAŻDA kolejna nieudana próba
+      // (nie tylko ta, która akurat wywoła nową blokadę) kosztuje połowę
+      // stawki, jaką ta próba by kosztowała, gdyby się udała. Zaokrąglone
+      // w górę (jak cała reszta cennika PDF-a) i ZAWSZE obcięte do
+      // faktycznego salda konta — NIGDY nie robimy salda ujemnego (to by
+      // niesłusznie uruchomiło główny wyłącznik awaryjny dla WSZYSTKICH
+      // użytkowników, Reguła 3, za problem jednego konta). Korzysta z
+      // ISTNIEJĄCEJ, już zweryfikowanej funkcji `chargeCredits()` (te same
+      // reguły A2/A3/A5 audytu bezpieczeństwa), zamiast pisać nową,
+      // niezależną ścieżkę zmiany salda.
+      if (profile && profile.wallet_balance > 0) {
+        const resetStartForPenalty = new Date(Date.now() - RATE_LIMIT_STRIKE_RESET_DAYS * 24 * 60 * 60 * 1000).toISOString()
+        const { count: priorBlocks } = await supabase
+          .from('rate_limit_blocks')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user_id)
+          .gte('created_at', resetStartForPenalty)
+        if ((priorBlocks ?? 0) > 0) {
+          const halfCost = Math.ceil(cost / 2)
+          const chargeAmount = Math.min(halfCost, profile.wallet_balance)
+          if (chargeAmount > 0) {
+            await chargeCredits(chargeAmount, 'failed_attempt_penalty', null)
+          }
+        }
+      }
 
       const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000).toISOString()
       const { count: recentFailures } = await supabase

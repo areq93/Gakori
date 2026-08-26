@@ -1203,6 +1203,7 @@
 
                 if (data.error === 'too_many_failed_attempts' && data.blocked_until) {
                     const targetTime = new Date(data.blocked_until).getTime();
+                    const tier = data.strike_number || 1;
                     const tick = () => {
                         const remainingMs = targetTime - Date.now();
                         if (remainingMs <= 0) {
@@ -1211,7 +1212,7 @@
                             summary.innerText = t('rate_limit_expired');
                             return;
                         }
-                        summary.innerText = t('err_too_many_failed_attempts', { time: formatCountdown(remainingMs) });
+                        summary.innerText = t('err_too_many_failed_attempts', { time: formatCountdown(remainingMs), tier });
                     };
                     tick();
                     rateLimitCountdownTimer = setInterval(tick, 1000);

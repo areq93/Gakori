@@ -3824,7 +3824,9 @@ cashflow" niżej):
 niżej):
 - `id`, `user_id`, `blocked_until`, `created_at`, `reason` (text, nullable —
   dodane POPRAWKA 2026-08-26(ad), żeby mail alarmowy i historia w tabeli
-  pokazywały PRZYCZYNĘ blokady, nie tylko fakt jej nałożenia)
+  pokazywały PRZYCZYNĘ blokady, nie tylko fakt jej nałożenia), `strike_number`
+  (integer, nullable — dodane POPRAWKA 2026-08-26(ae), żeby użytkownik ZAWSZE
+  widział, na którym jest poziomie eskalacji, w komunikacie o blokadzie)
 
 **`content_reanalysis_attempts`** (dodane POPRAWKA 2026-08-26(ad) — log
 "wymuszonych" ponownych analiz TEGO SAMEGO pliku, patrz "Ochrona cashflow"
@@ -4008,6 +4010,51 @@ to robił całą noc?".** Trzy zmiany naraz, na wyraźne potwierdzenie:
    Weryfikacja: `node --experimental-strip-types --check` (poprawna
    składnia) oraz `tsc --noEmit --skipLibCheck` (brak nowych błędów typów —
    te same dwa przedawnione, niezwiązane z tą zmianą, co wcześniej).
+
+**POPRAWKA 2026-08-26(ae) — kara finansowa dla "powracających" kont +
+widoczność poziomu blokady dla użytkownika.** Rozmowa zaczęła się od
+pomysłu właściciela: naliczać koszt za same nieudane próby (nawet od 3.
+z rzędu). Zwróciłem uwagę na realne ryzyko: NIE potrafimy dziś odróżnić
+"celowego nadużycia" od "trafił na nasz błąd" (żywy przykład z tego
+samego dnia: 69-stronicowy PDF zawodzi 3 razy z rzędu z NASZEJ winy —
+limit procesora, nie zachowanie użytkownika). Uzgodniony kompromis:
+**pierwsza blokada konta zawsze zostaje CAŁKOWICIE darmowa** (tylko
+czasowa, jak w POPRAWKA (ad)) — dopiero jeśli konto JUŻ MA za sobą
+choć jedną blokadę w ostatnich `RATE_LIMIT_STRIKE_RESET_DAYS` (30) dniach,
+KAŻDA kolejna nieudana próba (nie tylko ta, która wywoła następną
+blokadę) kosztuje **połowę stawki**, jaką ta próba by kosztowała, gdyby
+się udała (ta sama funkcja wyceny co reszta systemu, zaokrąglone w górę).
+Świadomie zaakceptowane ryzyko szczątkowe: dopóki błąd 69-stronicowego
+PDF-a nie zostanie naprawiony, ktoś kto wróci i trafi na TEN SAM błąd
+systemu drugi raz, wejdzie już w płatny poziom mimo braku winy — dlatego
+naprawa tego błędu (patrz "Do zrobienia") jest tym pilniejsza.
+
+Implementacja (`analyze/index.ts`, funkcja `logFailedAttempt()`): przed
+sprawdzeniem progu nowej blokady, sprawdzamy czy konto ma jakąkolwiek
+wcześniejszą blokadę w oknie resetu — jeśli tak, liczymy
+`Math.ceil(cost / 2)` i **obcinamy do faktycznego salda konta**
+(`Math.min(halfCost, profile.wallet_balance)`) — NIGDY nie tworzymy
+salda ujemnego, bo to niesłusznie uruchomiłoby główny wyłącznik awaryjny
+(Reguła 3) dla WSZYSTKICH użytkowników z powodu jednego konta. Naliczenie
+idzie przez ISTNIEJĄCĄ, już zweryfikowaną `chargeCredits()` (typ
+transakcji `failed_attempt_penalty`) — żadnej nowej, niezależnej ścieżki
+zmiany salda, żeby nie tworzyć nowej klasy błędu księgowego.
+
+**Widoczność poziomu blokady**: `rate_limit_blocks` ma teraz kolumnę
+`strike_number`, zapisywaną wprost przy tworzeniu blokady (w
+`applyEscalatingBlock()`) — komunikat `too_many_failed_attempts` (i mail
+do właściciela) zawsze pokazuje, którym to jest poziomem z rzędu.
+Frontend (`index.html`, `scan.html`) i wszystkie 10 języków w `i18n.js`
+(`err_too_many_failed_attempts`) zaktualizowane o `{tier}`.
+
+**Wymagana zmiana w bazie** (dodatkowa do tej z POPRAWKI (ad) — jeśli
+jeszcze nie uruchomiona, wykonaj obie naraz, SQL PRZED wklejeniem kodu):
+```sql
+alter table rate_limit_blocks add column if not exists strike_number integer;
+```
+
+Weryfikacja: `node --experimental-strip-types --check` oraz
+`tsc --noEmit --skipLibCheck` (bez nowych błędów typów).
 
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 

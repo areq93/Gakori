@@ -597,6 +597,7 @@
                                 const errorCode = errorData && errorData.error;
                                 if (errorCode === 'too_many_failed_attempts' && errorData.blocked_until) {
                                     const targetTime = new Date(errorData.blocked_until).getTime();
+                                    const tier = errorData.strike_number || 1;
                                     const tick = () => {
                                         const remainingMs = targetTime - Date.now();
                                         if (remainingMs <= 0) {
@@ -605,7 +606,7 @@
                                             manualStatusEl.innerText = t('rate_limit_expired');
                                             return;
                                         }
-                                        manualStatusEl.innerHTML = '<span class="status-err">' + t('err_too_many_failed_attempts', { time: formatCountdown(remainingMs) }) + '</span>';
+                                        manualStatusEl.innerHTML = '<span class="status-err">' + t('err_too_many_failed_attempts', { time: formatCountdown(remainingMs), tier }) + '</span>';
                                     };
                                     tick();
                                     refreshRateLimitTimer = setInterval(tick, 1000);
