@@ -2464,6 +2464,33 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(o) — własny ekran zgody zamiast okienka
+      przeglądarki dla "Sprawdź, czy coś się zmieniło".** Właściciel: okienko
+      wyglądało "jakby z przeglądarki, a nie z naszego systemu aplikacji" —
+      słuszna uwaga prestiżowa, bo `confirm()` to gołe okno systemu
+      operacyjnego, bez naszych kolorów/logo, tej samej jakości co reszta
+      aplikacji. Naprawa (tylko `scan.html`, frontend): nowy
+      `#refreshConfirmOverlay` — dokładnie ten sam wzorzec wizualny co
+      istniejący `#pdfConfirmOverlay` w `index.html` (`.modal-overlay` +
+      `.card`, wspólne z `style.css`), tylko osobna instancja (scan.html nie
+      ładuje tamtego div-a z index.html). Pokazuje liczbę znaków do analizy
+      i uwagę o oczyszczeniu strony (te same klucze i18n co przy PDF/linku:
+      `url_confirm_char_count`, `url_confirm_clean_notice`), koszt
+      (`pdf_confirm_cost` — celowo reużyty, treść ogólna: "Koszt: {cost}
+      kredytów") i dwa przyciski (`btn_pdf_confirm_yes`/`btn_pdf_confirm_no`
+      — też reużyte). Klucz `force_refresh_confirm_cost` stał się przez to
+      martwy (nieużywany nigdzie) — usunięty z `i18n.js` (wszystkie 10
+      języków), liczba kluczy na język: 164 (sprawdzone skryptem).
+
+      Przy okazji wyjaśnienie właścicielowi (bez żargonu) faktu, który
+      zaobserwował tego samego dnia: "Sprawdź, czy coś się zmieniło" na
+      analizie linku sprzed dzisiejszych poprawek filtra "Najpopularniejsze"
+      poprawnie pokazało pytanie o dopłatę — bo świeże pobranie strony (już
+      z NOWYM, lepszym czyszczeniem) dało znacznie mniej znaków niż stary,
+      zaszumiony zapis sprzed poprawki. To NIE błąd, tylko jednorazowy
+      efekt przejścia na lepsze czyszczenie — dotyczy wyłącznie starych,
+      jeszcze nieodświeżonych wyników; nowe analizy linków od razu dostają
+      czysty tekst i nie będą tak "skakać" przy weryfikacji.
     - **POPRAWKA 2026-08-26(n) — reguła pierwszeństwa przy remisie modeli
       mentalnych ("SPÓJNOŚĆ WYBORU MODELU").** Żywy, konkretny dowód
       głębszego problemu (poza wszystkim naprawionym wcześniej w tej

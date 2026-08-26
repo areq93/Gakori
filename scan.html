@@ -60,6 +60,24 @@
                 <button id="scanPasteOwnContentBtn" type="button" data-i18n="btn_paste_own_content">Nie zgadzasz się? Wklej własną treść</button>
                 <p id="scanManualSourceStatus" style="margin-top:6px;"></p>
             </div>
+            <!-- Ekran zgody na koszt "Sprawdź, czy coś się zmieniło" — POPRAWKA
+                 2026-08-26(o): dawniej zwykłe okienko przeglądarki confirm(),
+                 mylące (wyglądało jak komunikat systemu operacyjnego, nie
+                 aplikacji) — teraz ten sam, spójny wzorzec co ekran zgody dla
+                 PDF/linku w index.html (patrz #pdfConfirmOverlay tam), tylko
+                 osobna instancja tutaj (scan.html nie ładuje tamtego div-a). -->
+            <div id="refreshConfirmOverlay" class="modal-overlay" style="display:none;">
+                <div class="card">
+                    <h2 data-i18n="pdf_confirm_title">Potwierdź analizę</h2>
+                    <p id="refreshConfirmCharCount" style="color:var(--ink-soft); font-size:13px;"></p>
+                    <p id="refreshConfirmCleanNotice" style="color:var(--ink-soft); font-size:12.5px;"></p>
+                    <p id="refreshConfirmCost"></p>
+                    <button type="button" id="refreshConfirmYes" data-i18n="btn_pdf_confirm_yes">Tak, analizuj</button>
+                    <div style="text-align:center; margin-top:10px;">
+                        <a href="#" id="refreshConfirmNo" style="font-size:13px;" data-i18n="btn_pdf_confirm_no">Anuluj</a>
+                    </div>
+                </div>
+            </div>
             <div id="scanBadge" class="result-badge"></div>
             <div id="scanPatterns"></div>
             <div class="summary-block">
@@ -591,6 +609,34 @@
                                     }, 'url');
                                     return res.json();
                                 }
+                                // POPRAWKA 2026-08-26(o) — druga, płatna prośba (confirmed:true)
+                                // wysyłana teraz z kliknięcia "Tak, analizuj" na własnym
+                                // ekranie zgody (#refreshConfirmOverlay), nie z domyślnego
+                                // confirm() przeglądarki.
+                                async function runConfirmedRefresh() {
+                                    document.getElementById('refreshConfirmOverlay').style.display = 'none';
+                                    manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
+                                    try {
+                                        const confirmedData = await requestRefresh(true);
+                                        if (confirmedData.id) {
+                                            try {
+                                                sessionStorage.setItem('gakori_scan_cost_' + confirmedData.id, JSON.stringify({ cost: confirmedData.cost, cached: !!confirmedData.cached }));
+                                            } catch {
+                                                // limit sessionStorage — pomijamy "paragon"
+                                            }
+                                            window.location.href = 'scan.html?id=' + confirmedData.id;
+                                        } else {
+                                            showRefreshError(confirmedData.error);
+                                        }
+                                    } catch {
+                                        manualStatusEl.innerHTML = '<span class="status-err">' + t('result_generic_error') + '</span>';
+                                    }
+                                }
+                                document.getElementById('refreshConfirmYes').addEventListener('click', runConfirmedRefresh);
+                                document.getElementById('refreshConfirmNo').addEventListener('click', (e) => {
+                                    e.preventDefault();
+                                    document.getElementById('refreshConfirmOverlay').style.display = 'none';
+                                });
                                 document.getElementById('scanForceRefreshBtn').addEventListener('click', async () => {
                                     manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
                                     try {
@@ -600,24 +646,15 @@
                                             // Punkt C audytu bezpieczeństwa — pokazujemy też, na jakiej
                                             // podstawie (ile znaków) wyliczona jest cena, ten sam wzorzec
                                             // co w index.html (showPdfConfirm).
-                                            let confirmMsg = t('force_refresh_confirm_cost', { cost: resData.estimated_cost });
                                             if (typeof resData.char_count === 'number') {
-                                                confirmMsg = t('url_confirm_char_count', { count: resData.char_count }) + '\n' + confirmMsg;
-                                            }
-                                            const proceed = confirm(confirmMsg);
-                                            if (!proceed) return;
-                                            manualStatusEl.innerHTML = '<span class="status-ok">' + t('status_please_wait') + '</span>';
-                                            const confirmedData = await requestRefresh(true);
-                                            if (confirmedData.id) {
-                                                try {
-                                                    sessionStorage.setItem('gakori_scan_cost_' + confirmedData.id, JSON.stringify({ cost: confirmedData.cost, cached: !!confirmedData.cached }));
-                                                } catch {
-                                                    // limit sessionStorage — pomijamy "paragon"
-                                                }
-                                                window.location.href = 'scan.html?id=' + confirmedData.id;
+                                                document.getElementById('refreshConfirmCharCount').innerText = t('url_confirm_char_count', { count: resData.char_count });
+                                                document.getElementById('refreshConfirmCleanNotice').innerText = t('url_confirm_clean_notice');
                                             } else {
-                                                showRefreshError(confirmedData.error);
+                                                document.getElementById('refreshConfirmCharCount').innerText = '';
+                                                document.getElementById('refreshConfirmCleanNotice').innerText = '';
                                             }
+                                            document.getElementById('refreshConfirmCost').innerText = t('pdf_confirm_cost', { cost: resData.estimated_cost });
+                                            document.getElementById('refreshConfirmOverlay').style.display = 'flex';
                                         } else if (resData.id) {
                                             window.location.href = 'scan.html?id=' + resData.id;
                                         } else {
