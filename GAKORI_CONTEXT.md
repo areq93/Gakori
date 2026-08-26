@@ -4263,6 +4263,21 @@ zupełnie inna liczba, i to ta druga jest poprawna.
 
 ## Zasady współpracy w tym projekcie
 
+- **PODEJŚCIE ETAPOWE/HIERARCHICZNE JAKO STANDARD JAKOŚCI (ustalone wprost
+  2026-08-26), dopóki nie znajdziemy lepszego.** Właściciel, po rozmowie o
+  różnicach między architekturą tekstu/linku a PDF/obrazu, ustalił wprost:
+  bez etapów i podejścia hierarchicznego nie dostaniemy analiz wysokiej
+  jakości, a jakość jest naszym absolutnym priorytetem wobec odbiorców.
+  Mniej więcej taki, orientacyjny zamysł kolejnych faz (NIE sztywny,
+  obowiązkowy szablon do każdej zmiany — chodzi o KIERUNEK myślenia, nie
+  o dosłowne 6 kroków za każdym razem): zbieranie → przesiewanie →
+  sprawdzanie → konsolidacja → analizowanie → tworzenie raportu. W
+  praktyce: przy projektowaniu/rozbudowie silnika analizy domyślnie
+  rozważać rozbicie na etapy zamiast jednego, dużego zapytania robiącego
+  wszystko naraz — to już sprawdzony wzorzec w tym kodzie (kaskada
+  tekstu/linku, wieloetapowa architektura PDF-a/obrazu, patrz "Kaskada
+  dwuetapowa" niżej) i ma pozostać domyślnym sposobem myślenia o
+  jakości, nie wyjątkiem.
 - **GAKORI TO PRESTIŻOWA MARKA (ustalone wprost 2026-08-20): aplikacja ma
   oferować jakość WIELOKROTNIE większą niż to, czego odbiorca się
   spodziewa i ile płaci za analizę.** To nie jest tanie, masowe narzędzie
