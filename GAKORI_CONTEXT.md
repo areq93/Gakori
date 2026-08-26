@@ -2464,6 +2464,43 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(aa) — limit stron PDF podniesiony z 80 do 160,
+      na wyraźną prośbę właściciela, PO wspólnym sprawdzeniu wpływu na
+      cashflow.** Właściciel chciał przetestować hierarchię PDF (POPRAWKA
+      (z) niżej) na dłuższym pliku i zauważył, że limit w kodzie (80) nie
+      zgadza się z liczbą 160, którą wcześniej używaliśmy w rozmowie —
+      słusznie, bo 160 było wtedy TYLKO przykładem do liczenia
+      kosztów/marży, nigdy nie było potwierdzone jako zmiana realnego
+      limitu (patrz POPRAWKA (y) niżej — tam świadomie zostawione bez
+      zmian). Zgodnie z zasadą "sprawdzaj lub pytaj przy cashflow"
+      sprawdziłem PRZED wdrożeniem: cena rośnie liniowo
+      (`PDF_PAGE_COST_PER_PAGE=2.5`), więc 160 stron = dokładnie 400
+      kredytów — to DOKŁADNIE ten wariant, który wcześniej mieścił się w
+      ustalonym paśmie marży 88-95%; próg awaryjny "Reguła 8" ($6,25 na
+      jedno zapytanie) jest daleko od realnego kosztu nawet przy 160
+      stronach (koszt to grosze) — istniejące reguły głównego wyłącznika
+      już to pokrywają, więc NIE dodano żadnego nowego progu.
+      `PDF_HARD_MAX_PAGES = 80` → `160` (jedna stała w `analyze/index.ts`).
+
+      **Jedyne ryzyko, jawnie zakomunikowane właścicielowi, to NIE
+      cashflow, tylko niezawodność**: oryginalny limit 80 miał zostać
+      podniesiony dopiero PO zebraniu realnych danych produkcyjnych
+      (komentarz w kodzie sprzed tej poprawki) — czego jeszcze nie
+      zrobiliśmy. Właściciel świadomie wybrał podniesienie od razu do 160,
+      rozumiejąc że w najgorszym razie bardzo długi/złożony PDF może
+      zakończyć się błędem (przekroczenie limitu czasu procesora Supabase)
+      zamiast wynikiem — a NIE stratą pieniędzy, bo `chargeCredits()`
+      obciąża konto DOPIERO po pełnym sukcesie całej analizy (sprawdzone w
+      kodzie przed odpowiedzią właścicielowi). Test na żywym, długim PDF-ie
+      (blisko 160 stron) pozostaje zalecanym pierwszym krokiem po wdrożeniu.
+
+      **Frontend**: nowy komunikat w panelu wgrywania PDF-a (`index.html`,
+      tuż pod "Wybierz plik PDF do analizy:") — nowy klucz i18n
+      `label_pdf_page_limit` ("(maksymalnie 160 stron)"), dodany do
+      WSZYSTKICH 10 języków w `i18n.js`. Istniejący komunikat błędu
+      `err_pdf_too_long` już wcześniej pobierał liczbę `{max}` dynamicznie
+      z odpowiedzi backendu, więc automatycznie pokazuje teraz 160 bez
+      żadnej zmiany w tym miejscu.
     - **POPRAWKA 2026-08-26(x)/(y)/(z) — duży pakiet: protokół 15 kategorii
       (schemat), niższa cena PDF-a, i nowy POZIOM 1 hierarchii PDF-a z
       wykrywaniem rozdziałów.** Wdrożone razem, na wyraźną prośbę

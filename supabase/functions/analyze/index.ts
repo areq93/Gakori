@@ -235,11 +235,16 @@ const PDF_PAGE_COST_PER_PAGE = 2.5
 // (`countPdfPages()`, biblioteka pdf-lib) to prawdziwa, synchroniczna praca
 // procesora, i to na SŁABSZYM/współdzielonym sprzęcie serwera, nie na
 // komputerze deweloperskim — dla dużego, złożonego pliku mogłoby to realnie
-// zbliżyć się do tego limitu. Zaczynamy więc od bezpieczniejszego pułapu i
-// PODNOSIMY go dopiero po zebraniu realnych danych z produkcji (patrz
-// GAKORI_CONTEXT.md) — łatwiej podnieść limit później niż odkryć na żywo,
-// że coś się wywala.
-const PDF_HARD_MAX_PAGES = 80
+// zbliżyć się do tego limitu.
+// POPRAWKA 2026-08-26(aa) — podniesione z 80 do 160 na wyraźną prośbę
+// właściciela, PO wspólnym sprawdzeniu, że nie psuje to marży (cena rośnie
+// liniowo, 160 stron = dokładnie 400 kredytów, już wcześniej policzone w
+// paśmie 88-95%). Ryzyko przekroczenia limitu procesora dla bardzo długich
+// PDF-ów pozostaje NIEZWERYFIKOWANE na żywej infrastrukturze — świadomie
+// zaakceptowane: w najgorszym razie pojedyncza analiza kończy się błędem
+// (i NIE jest obciążana kredytami, patrz `chargeCredits()` niżej — płatność
+// następuje dopiero po pełnym sukcesie), nie stratą pieniędzy.
+const PDF_HARD_MAX_PAGES = 160
 const MAX_PDF_BYTES = 10 * 1024 * 1024 // 10 MB (świadomie mniej niż 20 MB limit obrazów — patrz wyżej)
 // PDF-y (zwłaszcza bliżej PDF_HARD_MAX_PAGES) bywają zauważalnie dłuższe do
 // przetworzenia dla Gemini niż zwykły tekst/obraz — osobny, dłuższy limit
