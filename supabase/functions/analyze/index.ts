@@ -1806,7 +1806,22 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // POPRAWKA 2026-08-26(ac) — patrz GAKORI_CONTEXT.md: zabezpieczenie przed
+  // sytuacją, w której analiza PRZERYWA SIĘ błędem w trakcie, a koszt
+  // zapytań do Gemini, które już zdążyły się wykonać, nigdy nie trafia do
+  // dziennego licznika `system_daily_spend` (Reguły 8/10 były dotąd
+  // sprawdzane TYLKO po pełnym sukcesie). Te cztery zmienne trzymają
+  // referencje ustawione WEWNĄTRZ funkcji, żeby blok `finally` niżej mógł
+  // wywołać DOKŁADNIE TĘ SAMĄ logikę liczenia kosztu i sprawdzania progów,
+  // niezależnie od tego, czy zapytanie zakończyło się sukcesem, znanym
+  // błędem, czy nieoczekiwanym wyjątkiem.
+  let costTrackerRef: CostTracker | null = null
+  let spendRecorded = false
+  let recordSpendRef: (() => Promise<string | null>) | null = null
+  let outageResponseRef: ((reason?: string) => Response) | null = null
+
   try {
+    try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -1863,6 +1878,7 @@ Deno.serve(async (req: Request) => {
     // TEGO JEDNEGO zapytania (patrz CostTracker/callGemini wyżej). Musi być
     // zadeklarowany PRZED jakimkolwiek wywołaniem Gemini niżej.
     const costTracker: CostTracker = { totalUsd: 0 }
+    costTrackerRef = costTracker
 
     // Zatrzymuje system (patrz reguła, która to wywołała, w treści `reason`)
     // i wysyła Tobie (REPORT_RECIPIENT_EMAIL, ten sam adres co raport
@@ -1914,6 +1930,48 @@ Deno.serve(async (req: Request) => {
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    outageResponseRef = outageResponse
+
+    // Reguły A8/A10 audytu bezpieczeństwa — POPRAWKA 2026-08-26(ac):
+    // wydzielone do jednej funkcji, żeby DOKŁADNIE TA SAMA logika liczenia
+    // kosztu i sprawdzania progów uruchamiała się w dwóch miejscach: (1)
+    // niżej, na końcu ścieżki sukcesu (tak jak dotychczas), i (2) w bloku
+    // `finally` na samym końcu pliku — dla przypadków, gdy analiza kończy
+    // się błędem/wyjątkiem zamiast sukcesem, żeby te realnie wydane
+    // dolary NIE znikały bez śladu z dziennego budżetu.
+    async function recordSpendAndCheckThresholds(): Promise<string | null> {
+      // Reguła A8 — koszt WSZYSTKICH wywołań Gemini w obrębie TEGO JEDNEGO
+      // zapytania (patrz CostTracker/callGemini wyżej) nie powinien
+      // przekroczyć ustalonej z właścicielem części dziennego budżetu.
+      if (costTracker.totalUsd > thresholds.single_request_cost_limit_usd) {
+        const reason = `Reguła 8: pojedyncze zapytanie kosztowało $${costTracker.totalUsd.toFixed(4)} — powyżej progu $${thresholds.single_request_cost_limit_usd}.`
+        await tripKillSwitch(reason)
+        return reason
+      }
+
+      // Reguła A10 — dzienny budżet w USD (wszyscy użytkownicy razem).
+      // `system_daily_spend` ma jeden wiersz na dzień — data jest samym
+      // kluczem, więc licznik "resetuje się" sam każdego nowego dnia, bez
+      // żadnej ręcznej interwencji ani zadania cyklicznego. Dzień liczony
+      // wg czasu POLSKIEGO (Europe/Warsaw), nie UTC.
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(new Date())
+      const { data: existingSpend } = await supabase
+        .from('system_daily_spend')
+        .select('total_usd')
+        .eq('spend_date', today)
+        .maybeSingle()
+      const newDailyTotal = (existingSpend?.total_usd ?? 0) + costTracker.totalUsd
+      await supabase
+        .from('system_daily_spend')
+        .upsert({ spend_date: today, total_usd: newDailyTotal }, { onConflict: 'spend_date' })
+      if (newDailyTotal > thresholds.daily_budget_usd) {
+        const reason = `Reguła 10: dzienny koszt Gemini osiągnął $${newDailyTotal.toFixed(2)} — powyżej progu $${thresholds.daily_budget_usd}.`
+        await tripKillSwitch(reason)
+        return reason
+      }
+      return null
+    }
+    recordSpendRef = recordSpendAndCheckThresholds
 
     const body = await req.json()
     const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, confirmed, force_refresh, refresh_scan_id } = body
@@ -3478,36 +3536,14 @@ ${compactExisting}`
       }
     }
 
-    // Reguła A8 — koszt WSZYSTKICH wywołań Gemini w obrębie TEGO JEDNEGO
-    // zapytania (patrz costTracker/callGemini wyżej) nie powinien przekroczyć
-    // ustalonej z właścicielem części dziennego budżetu.
-    if (costTracker.totalUsd > thresholds.single_request_cost_limit_usd) {
-      const reason = `Reguła 8: pojedyncze zapytanie kosztowało $${costTracker.totalUsd.toFixed(4)} — powyżej progu $${thresholds.single_request_cost_limit_usd}.`
-      await tripKillSwitch(reason)
-      return outageResponse(reason)
-    }
-
-    // Reguła A10 — dzienny budżet w USD (wszyscy użytkownicy razem).
-    // `system_daily_spend` ma jeden wiersz na dzień — data jest samym
-    // kluczem, więc licznik "resetuje się" sam każdego nowego dnia, bez
-    // żadnej ręcznej interwencji ani zadania cyklicznego. POPRAWKA
-    // 2026-08-21(t) — dzień liczony wg czasu POLSKIEGO (Europe/Warsaw), nie
-    // UTC — inaczej "nowy dzień" zaczynałby się o 1:00/2:00 w nocy czasu
-    // polskiego (zależnie od pory roku), zamiast o północy.
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(new Date())
-    const { data: existingSpend } = await supabase
-      .from('system_daily_spend')
-      .select('total_usd')
-      .eq('spend_date', today)
-      .maybeSingle()
-    const newDailyTotal = (existingSpend?.total_usd ?? 0) + costTracker.totalUsd
-    await supabase
-      .from('system_daily_spend')
-      .upsert({ spend_date: today, total_usd: newDailyTotal }, { onConflict: 'spend_date' })
-    if (newDailyTotal > thresholds.daily_budget_usd) {
-      const reason = `Reguła 10: dzienny koszt Gemini osiągnął $${newDailyTotal.toFixed(2)} — powyżej progu $${thresholds.daily_budget_usd}.`
-      await tripKillSwitch(reason)
-      return outageResponse(reason)
+    // Reguły A8/A10 — patrz recordSpendAndCheckThresholds() wyżej (POPRAWKA
+    // 2026-08-26(ac)). `spendRecorded = true` mówi blokowi `finally` na
+    // końcu pliku, że koszt TEGO zapytania został już policzony tutaj —
+    // żeby nie doliczyć go do dziennego budżetu drugi raz.
+    {
+      const tripReason = await recordSpendAndCheckThresholds()
+      spendRecorded = true
+      if (tripReason) return outageResponse(tripReason)
     }
 
     // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników).
@@ -3613,10 +3649,24 @@ ${compactExisting}`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    } catch (err) {
+      return new Response(
+        JSON.stringify({ error: String(err) }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+  } finally {
+    // POPRAWKA 2026-08-26(ac) — patrz komentarz na górze funkcji. Jeśli
+    // ścieżka sukcesu wyżej NIE zdążyła policzyć kosztu tego zapytania
+    // (`spendRecorded` wciąż `false` — bo analiza skończyła się błędem
+    // albo nieoczekiwanym wyjątkiem, ZANIM doszła do tego kroku), a mimo
+    // to jakiś realny koszt Gemini już powstał (`costTracker.totalUsd > 0`
+    // — czyli chociaż jedno zapytanie zdążyło się wykonać, zanim coś
+    // poszło nie tak) — liczymy go i sprawdzamy progi TERAZ, żeby żaden
+    // wydany dolar nigdy nie zniknął z dziennego budżetu bez śladu.
+    if (!spendRecorded && costTrackerRef && costTrackerRef.totalUsd > 0 && recordSpendRef && outageResponseRef) {
+      const tripReason = await recordSpendRef()
+      if (tripReason) return outageResponseRef(tripReason)
+    }
   }
 })

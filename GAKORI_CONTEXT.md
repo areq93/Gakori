@@ -2464,6 +2464,60 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(ac) — zamknięcie realnej luki: koszt Gemini z
+      NIEUDANYCH analiz teraz też liczy się do dziennego budżetu.**
+      Bezpośrednia reakcja na (ab) niżej — właściciel trafnie zauważył:
+      "jakby ktoś to robił całą noc, to byśmy poczuli" — i miał rację.
+      Reguły 8 (limit $6,25/zapytanie) i 10 (limit $125/dzień, cała firma)
+      były dotąd sprawdzane i zapisywane do `system_daily_spend` TYLKO na
+      samym końcu, PO w pełni udanej analizie. Jeśli analiza przerywała się
+      błędem w trakcie — koszt zapytań do Gemini, które już zdążyły się
+      wykonać, znikał bez śladu: nie trafiał do licznika, nie mógł zatrzymać
+      systemu. Jedyna dotychczasowa ochrona (`logFailedAttempt`/
+      `rate_limit_blocks`) blokuje tylko POJEDYNCZE, zalogowane konto po
+      kilku nieudanych próbach — nie chroni budżetu całej firmy przed wieloma
+      kontami albo wolniejszym tempem.
+
+      **Naprawa**: logika liczenia kosztu i sprawdzania obu progów (dawniej
+      wbudowana tylko w ścieżkę sukcesu) wydzielona do jednej funkcji
+      `recordSpendAndCheckThresholds()`, wywoływanej teraz z DWÓCH miejsc:
+      (1) tak jak dotychczas, na końcu udanej analizy, (2) NOWO — w bloku
+      `finally` obejmującym całą resztę funkcji `Deno.serve`, który
+      wykonuje się ZAWSZE, niezależnie od tego, czy analiza zakończyła się
+      sukcesem, znanym błędem (`return` w środku), czy nieoczekiwanym
+      wyjątkiem (`catch`). Blok `finally` uruchamia tę funkcję TYLKO jeśli
+      koszt nie został już policzony na ścieżce sukcesu (`spendRecorded`)
+      ORAZ faktycznie powstał jakiś koszt (`costTracker.totalUsd > 0` —
+      czyli chociaż jedno zapytanie do Gemini zdążyło się wykonać) — dzięki
+      temu zwykłe, "tanie" wczesne wyjścia (np. `system_paused`, sam
+      ekran potwierdzenia ceny bez wywołania Gemini) nie robią zbędnego
+      zapytania do bazy. Jeśli po doliczeniu tego kosztu okaże się, że
+      przekroczono próg — `finally` NADPISUJE odpowiedź komunikatem
+      "system wstrzymany" (`outageResponse`), tak samo jak już działo się to
+      na ścieżce sukcesu.
+
+      **Efekt**: KAŻDY realnie wydany dolar na Gemini — udany czy nie —
+      trafia teraz do dziennego licznika i jest sprawdzany względem obu
+      progów. Ktoś odpalający w kółko nieudane, kosztowne analizy (np.
+      duże PDF-y kończące się błędem procesora) zostanie zatrzymany przez
+      Regułę 10, tak jak każdy inny sposób przekroczenia dziennego budżetu.
+
+      **Świadome ograniczenie**: jeśli platforma (Supabase/Deno) przerwie
+      działanie funkcji na tyle brutalnie (twardy limit procesora — patrz
+      POPRAWKA (ab)), że nasz własny kod JS w ogóle nie zdąży się wykonać —
+      ani `catch`, ani `finally` nie uruchomią się, i tego pojedynczego
+      kosztu nadal nie zobaczymy. To fundamentalna granica tego, co kod
+      może kontrolować, nie da się jej zamknąć od środka funkcji.
+
+      Weryfikacja: `node --experimental-strip-types --check` (poprawna
+      składnia) oraz `tsc --noEmit --skipLibCheck` (brak nowych błędów
+      typów — te same dwa przedawnione, niezwiązane z tą zmianą, co
+      wcześniej).
+
+      **Do zrobienia (na osobne potwierdzenie właściciela)**: rozważyć
+      dodatkowe zabezpieczenie na dokładnie tę sytuację — np. niższy,
+      dodatkowy próg specyficzny dla "spadku sukcesu" (wysoki odsetek
+      nieudanych analiz w krótkim czasie), niezależny od progu $/dzień.
     - **POPRAWKA 2026-08-26(ab) — WYCOFANIE (aa): limit stron PDF wrócił z
       160 na 80, po realnym teście na żywo.** Właściciel przetestował
       90-stronicowy PDF (już w granicach nowego limitu 160) i analiza
