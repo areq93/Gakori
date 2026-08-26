@@ -1782,10 +1782,9 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
 // zapytania do Gemini, ale nic nie zarabiamy — kredyty ściągamy dopiero po
 // sukcesie (sekcja 7 niżej). Bez ograniczenia ktoś mógłby (przez pomyłkę
 // albo celowo) zasypywać nas nieudanymi próbami bez końca. Próg wyzwalający
-// blokadę jest zawsze ten sam (15 nieudanych prób w 10 minut — przy tak
-// tanim modelu jak Flash-Lite realny koszt finansowy nawet tej liczby prób
-// jest znikomy, więc próg może być wysoki, żeby nie łapać prawdziwych
-// użytkowników przez przypadek), ale CZAS TRWANIA blokady rośnie
+// blokadę jest zawsze ten sam (5 nieudanych prób w 10 minut — POPRAWKA
+// 2026-08-26(ad), obniżone z 15 na wyraźną prośbę właściciela, żeby
+// reagować szybciej), ale CZAS TRWANIA blokady rośnie
 // TRZYKROTNIE z każdą kolejną blokadą tego samego konta w ciągu ostatnich
 // RATE_LIMIT_STRIKE_RESET_DAYS dni (10 min → 30 min → 1,5h → 4,5h → ...,
 // z sufitem RATE_LIMIT_MAX_MINUTES) — jeśli konto przez ten czas nie
@@ -1795,11 +1794,25 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
 // wygasłaby, zanim najdłuższa możliwa blokada w ogóle się skończy, i ktoś
 // kto właśnie odsiedział maksymalną karę zaraz dostałby najniższą.
 const RATE_LIMIT_WINDOW_MINUTES = 10
-const RATE_LIMIT_FAILURE_THRESHOLD = 15
+const RATE_LIMIT_FAILURE_THRESHOLD = 5
 const RATE_LIMIT_STRIKE_RESET_DAYS = 30
 const RATE_LIMIT_BASE_MINUTES = 10
 const RATE_LIMIT_MULTIPLIER = 3
 const RATE_LIMIT_MAX_MINUTES = 30 * 24 * 60 // sufit: 30 dni, żeby kara nie rosła bez końca
+
+// POPRAWKA 2026-08-26(ad) — drugi, NIEZALEŻNY powód tej samej blokady konta:
+// ten sam plik (content_hash) "wymuszony" (forceRefresh) do ponownej,
+// płatnej analizy zbyt wiele razy w krótkim czasie. W przeciwieństwie do
+// linków (patrz POPRAWKA 2026-08-26(j) — tam powtórka na niezmienionej
+// treści jest DARMOWA i nie woła Gemini drugi raz), dla PDF-a "wymuszona
+// ponowna analiza" z definicji zawsze dotyczy tego samego, niezmiennego
+// pliku — więc nie da się tu zastosować tej samej sztuczki. Każda taka
+// próba i tak kosztuje użytkownika normalnie (to nie jest "darmowe
+// oszustwo"), ale właściciel słusznie chciał mieć o tym WIDOCZNOŚĆ i
+// granicę — stąd osobny licznik, ale WSPÓLNA z powyższym "drabinka"
+// eskalacji czasu blokady (patrz `applyEscalatingBlock()` niżej).
+const SAME_FILE_ATTEMPT_WINDOW_MINUTES = 60
+const SAME_FILE_ATTEMPT_LIMIT = 5
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -2153,6 +2166,76 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // POPRAWKA 2026-08-26(ad) — jeśli warunek wyżej (sekcja 2, CACHE) nie
+    // zwrócił z cache'u WYŁĄCZNIE dlatego, że to `forceRefresh` na znanym,
+    // "ręcznym" pliku (patrz `!(forceRefresh && existing.is_manual_source)`
+    // w tamtym warunku) — to znaczy, że za chwilę ruszy PRAWDZIWA, płatna
+    // ponowna analiza TEGO SAMEGO pliku. Liczymy to jako osobny sygnał
+    // nadużycia (patrz stałe SAME_FILE_ATTEMPT_* i logReanalysisAttempt()
+    // wyżej), niezależnie od tego, czy ta konkretna analiza się uda, czy
+    // nie. Sprawdzane PO kontroli aktywnej blokady wyżej — nie ma sensu
+    // liczyć kolejnej próby dla konta, które i tak już jest zablokowane.
+    if (existing && !existing.retracted && forceRefresh && existing.is_manual_source && user_id) {
+      await logReanalysisAttempt(effectiveContentHash)
+    }
+
+    // POPRAWKA 2026-08-26(ad) — jedna, wspólna "drabinka" eskalacji czasu
+    // blokady konta, niezależnie OD POWODU (zbyt wiele nieudanych prób,
+    // ALBO zbyt wiele wymuszonych ponownych analiz tego samego pliku —
+    // patrz logReanalysisAttempt() niżej). Wcześniej ta logika była
+    // wpisana tylko w logFailedAttempt() — wydzielona tutaj, żeby oba
+    // powody dzieliły DOKŁADNIE TĘ SAMĄ matematykę czasu trwania kary
+    // (10 min → 30 min → 1,5h → ...) i to samo powiadomienie mailowe do
+    // właściciela, zamiast dwóch osobnych kopii tej samej logiki.
+    async function applyEscalatingBlock(reason: string): Promise<void> {
+      const resetStart = new Date(Date.now() - RATE_LIMIT_STRIKE_RESET_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      const { count: recentStrikes } = await supabase
+        .from('rate_limit_blocks')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user_id)
+        .gte('created_at', resetStart)
+      const blockMinutes = Math.min(
+        RATE_LIMIT_BASE_MINUTES * Math.pow(RATE_LIMIT_MULTIPLIER, recentStrikes ?? 0),
+        RATE_LIMIT_MAX_MINUTES
+      )
+      const blockedUntil = new Date(Date.now() + blockMinutes * 60 * 1000).toISOString()
+
+      await supabase.from('rate_limit_blocks').insert({ user_id, blocked_until: blockedUntil, reason })
+
+      // Powiadomienie mailowe — POPRAWKA 2026-08-26(ad), właściciel wprost
+      // poprosił: dotąd te blokady działy się po cichu, widoczne tylko
+      // ręcznie w Supabase. Świadomie fail-open TYLKO na samym wysłaniu
+      // maila (jak w tripKillSwitch() wyżej) — brak alertu nie może cofnąć
+      // już nałożonej blokady.
+      try {
+        const brevoKey = Deno.env.get('BREVO_API_KEY')
+        const senderEmail = Deno.env.get('BREVO_SENDER_EMAIL')
+        const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Gakori — alarm systemowy'
+        const recipient = Deno.env.get('REPORT_RECIPIENT_EMAIL')
+        if (!brevoKey || !senderEmail || !recipient) return
+        let userEmail = '(nieznany)'
+        try {
+          const { data: userData } = await supabase.auth.admin.getUserById(user_id!)
+          if (userData?.user?.email) userEmail = userData.user.email
+        } catch {
+          // fail-open — brak adresu e-mail w treści alertu nie jest powodem, żeby go nie wysłać
+        }
+        const blockedUntilPl = new Date(blockedUntil).toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw' })
+        await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+          body: JSON.stringify({
+            sender: { email: senderEmail, name: senderName },
+            to: [{ email: recipient }],
+            subject: '🟠 Gakori: konto użytkownika zablokowane automatycznie',
+            htmlContent: `<p>Automatyczna ochrona przed nadużyciem zablokowała właśnie jedno konto.</p><p><strong>Powód:</strong> ${reason}</p><p><strong>Konto (e-mail):</strong> ${userEmail}</p><p><strong>ID konta:</strong> ${user_id}</p><p><strong>Blokada do:</strong> ${blockedUntilPl} (czasu polskiego)</p><p><strong>To która blokada w ostatnich ${RATE_LIMIT_STRIKE_RESET_DAYS} dniach:</strong> ${(recentStrikes ?? 0) + 1}</p><p>Szczegółowy rejestr prób znajdziesz w Supabase Dashboard → Table Editor → <code>failed_scan_attempts</code> / <code>content_reanalysis_attempts</code>, filtrując po ID konta wyżej.</p>`,
+          }),
+        })
+      } catch {
+        // fail-open — jak wyżej
+      }
+    }
+
     // Loguje nieudaną próbę (patrz stałe RATE_LIMIT_* wyżej) i, jeśli w ciągu
     // ostatnich RATE_LIMIT_WINDOW_MINUTES uzbierało się ich za dużo, nakłada
     // nową, coraz dłuższą blokadę. Wywoływana tylko dla zalogowanych — dla
@@ -2170,19 +2253,28 @@ Deno.serve(async (req: Request) => {
         .gte('created_at', windowStart)
       if ((recentFailures ?? 0) < RATE_LIMIT_FAILURE_THRESHOLD) return
 
-      const resetStart = new Date(Date.now() - RATE_LIMIT_STRIKE_RESET_DAYS * 24 * 60 * 60 * 1000).toISOString()
-      const { count: recentStrikes } = await supabase
-        .from('rate_limit_blocks')
+      await applyEscalatingBlock('Zbyt wiele nieudanych prób analizy w krótkim czasie.')
+    }
+
+    // POPRAWKA 2026-08-26(ad) — patrz stałe SAME_FILE_ATTEMPT_* wyżej.
+    // Wywoływana WYŁĄCZNIE w momencie, gdy użytkownik wymusza ("Sprawdź,
+    // czy coś się zmieniło"/ponowna analiza) płatną, prawdziwą ponowną
+    // analizę TEGO SAMEGO pliku (tego samego `content_hash`), a nie przy
+    // zwykłym, tanim odczycie z cache'u.
+    async function logReanalysisAttempt(contentHash: string): Promise<void> {
+      if (!user_id) return
+      await supabase.from('content_reanalysis_attempts').insert({ user_id, content_hash: contentHash })
+
+      const windowStart = new Date(Date.now() - SAME_FILE_ATTEMPT_WINDOW_MINUTES * 60 * 1000).toISOString()
+      const { count: recentAttempts } = await supabase
+        .from('content_reanalysis_attempts')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user_id)
-        .gte('created_at', resetStart)
-      const blockMinutes = Math.min(
-        RATE_LIMIT_BASE_MINUTES * Math.pow(RATE_LIMIT_MULTIPLIER, recentStrikes ?? 0),
-        RATE_LIMIT_MAX_MINUTES
-      )
-      const blockedUntil = new Date(Date.now() + blockMinutes * 60 * 1000).toISOString()
+        .eq('content_hash', contentHash)
+        .gte('created_at', windowStart)
+      if ((recentAttempts ?? 0) < SAME_FILE_ATTEMPT_LIMIT) return
 
-      await supabase.from('rate_limit_blocks').insert({ user_id, blocked_until: blockedUntil })
+      await applyEscalatingBlock('Ten sam plik analizowany zbyt wiele razy w krótkim czasie.')
     }
 
     // Reguły C6/C7/C9 audytu bezpieczeństwa — "coś nawala w skali", w
