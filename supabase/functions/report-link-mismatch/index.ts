@@ -75,14 +75,20 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Zgłoszenie ma sens WYŁĄCZNIE dla treści oznaczonej jako pochodząca z
-    // ręcznego wklejenia — patrz `scans.is_manual_source`.
+    // POPRAWKA 2026-08-26(k) — dawniej zgłoszenie miało sens WYŁĄCZNIE dla
+    // treści oznaczonej jako pochodząca z ręcznego wklejenia
+    // (`is_manual_source`) — ale przycisk "Zgłoś niezgodność" na scan.html
+    // jest teraz widoczny dla KAŻDEJ analizy linku (patrz tamtejsza
+    // POPRAWKA), więc backend musi akceptować to samo, szersze grono —
+    // inaczej przycisk widoczny, ale nieużywalny (żywy błąd zgłoszony przez
+    // właściciela: kliknięcie dawało błąd dla zwykłej analizy linku, bo ta
+    // funkcja wciąż odrzucała wszystko poza `is_manual_source`).
     const { data: scan, error: scanError } = await supabase
       .from('scans')
-      .select('id, is_manual_source, retracted')
+      .select('id, is_manual_source, input_type, retracted')
       .eq('id', scanId)
       .maybeSingle()
-    if (scanError || !scan || !scan.is_manual_source) {
+    if (scanError || !scan || !(scan.is_manual_source || scan.input_type === 'url')) {
       return new Response(JSON.stringify({ error: 'not_reportable' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

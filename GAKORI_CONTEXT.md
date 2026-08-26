@@ -2464,6 +2464,15 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(m) — naprawa: "Zgłoś niezgodność" dawało błąd
+      dla zwykłej analizy linku.** Bezpośredni skutek uboczny POPRAWKI
+      2026-08-26(k) (rozszerzenie widoczności przycisku na frontendzie) —
+      backend (`report-link-mismatch`) NIE został wtedy zaktualizowany i
+      wciąż odrzucał każde zgłoszenie dla wiersza, który nie był
+      `is_manual_source`, zwracając `not_reportable` (wyświetlane jako
+      ogólny błąd). Naprawa: warunek rozszerzony do `is_manual_source OR
+      input_type === 'url'`, dokładnie tak samo jak widoczność przycisku
+      na scan.html — backend i frontend znów się zgadzają.
     - **POPRAWKA 2026-08-26(l) — filtr "Najpopularniejsze [portal]" (lista
       niepowiązanych artykułów na końcu strony), rozpoznawany po wzorcu
       dat, nie po klasie HTML.** Największe dotąd znalezione źródło szumu
