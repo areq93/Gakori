@@ -2464,6 +2464,41 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(ab) — WYCOFANIE (aa): limit stron PDF wrócił z
+      160 na 80, po realnym teście na żywo.** Właściciel przetestował
+      90-stronicowy PDF (już w granicach nowego limitu 160) i analiza
+      zakończyła się błędem — pierwsze REALNE potwierdzenie ryzyka, o
+      którym ostrzegałem przy POPRAWCE (aa) (limit czasu procesora Supabase,
+      sztywne 2 sekundy, identyczne na każdym planie — sprawdzone w
+      dokumentacji Supabase). Właściciel słusznie zażądał powrotu do 80 —
+      jedynej wartości faktycznie sprawdzonej w produkcji.
+      `PDF_HARD_MAX_PAGES` → z powrotem 160 → 80, oraz cofnięty napis w
+      panelu PDF (`index.html` + wszystkie 10 języków w `i18n.js`) —
+      "(maksymalnie 80 stron)". `PDF_LEVEL1_MAX_GROUP_PAGES` i cała
+      architektura hierarchii (POPRAWKA (z)) — BEZ ZMIAN, nadal wdrożona i
+      aktywna, tylko górny sufit stron wrócił do poprzedniej wartości.
+
+      **Ważniejsze odkrycie przy tej samej okazji — realna luka w głównym
+      wyłączniku bezpieczeństwa, potwierdzona w kodzie, NIE hipoteza:**
+      Reguła 8 (limit $6,25/zapytanie) i Reguła 10 (limit $125/dzień,
+      `system_daily_spend`) liczą i zapisują koszt TYLKO na samym końcu
+      funkcji, PO udanym zakończeniu całej analizy (`costTracker.totalUsd`
+      sprawdzane i dopisywane do `system_daily_spend` dopiero tuż przed
+      `chargeCredits()`). Jeśli analiza przerywa się błędem w trakcie (np.
+      przez limit procesora, awarię Gemini, cokolwiek) — te już naprawdę
+      wydane dolary (za zapytania do Gemini, które zdążyły się wykonać
+      przed przerwaniem) **nigdy nie trafiają do `system_daily_spend` i
+      nigdy nie są konfrontowane z żadnym progiem**. Jedyna dziś istniejąca
+      ochrona przed powtarzającymi się nieudanymi próbami to
+      `logFailedAttempt()`/`rate_limit_blocks` — ale to blokuje TYLKO
+      pojedyncze, zalogowane konto po kilku nieudanych próbach, nie chroni
+      globalnego budżetu firmy przed wieloma kontami/wolniejszym tempem.
+      Właściciel trafnie zauważył: "jakby ktoś to robił całą noc, to
+      byśmy poczuli" — DZIŚ jest to prawdą, bo nic globalnego by tego nie
+      zatrzymało. **Zidentyfikowane, jeszcze NIE naprawione** — czeka na
+      osobną decyzję/potwierdzenie właściciela co do sposobu naprawy
+      (patrz "Do zrobienia" niżej), zgodnie z zasadą "nic nie wdrażam bez
+      wyraźnego tak".
     - **POPRAWKA 2026-08-26(aa) — limit stron PDF podniesiony z 80 do 160,
       na wyraźną prośbę właściciela, PO wspólnym sprawdzeniu wpływu na
       cashflow.** Właściciel chciał przetestować hierarchię PDF (POPRAWKA
