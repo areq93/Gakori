@@ -69,7 +69,7 @@ function computeExpectedCost(
     if (urlFetchedCharCount === null) return URL_SCAN_COST
     return FIXED_FEE + Math.ceil(urlFetchedCharCount / 1000) * MULTIPLIER_PER_1000_CHARS
   }
-  if (inputType === 'pdf') return PDF_PAGE_COST * pageCount
+  if (inputType === 'pdf') return Math.ceil(PDF_PAGE_COST_PER_PAGE * pageCount)
   return FIXED_FEE + Math.ceil(charCount / 1000) * MULTIPLIER_PER_1000_CHARS
 }
 
@@ -203,9 +203,21 @@ async function maybeRecheckLinkFreshness(
 }
 
 // --- PDF (FAZA 2) ---
-// Strona PDF-a liczona identycznie jak obraz kosztowo — ustalone wcześniej
-// w GAKORI_CONTEXT.md ("jedna strona PDF-a ≈ jeden obraz kosztowo").
-const PDF_PAGE_COST = IMAGE_SCAN_COST
+// POPRAWKA 2026-08-26(y) — dawniej `PDF_PAGE_COST = IMAGE_SCAN_COST` (8
+// kredytów/stronę), "pożyczone" od ceny zdjęcia bez realnego związku z
+// kosztem PDF-a jako TEKSTU (obrazy w PDF-ie i tak ignorujemy, patrz
+// pdfInstruction niżej). Właściciel ocenił 1280 kredytów za 160-stronicowy
+// PDF jako zbyt dużo względem realnego kosztu AI (~$0,25 nawet z nową
+// hierarchią niżej) i ustalił docelową marżę 88-95% (patrz GAKORI_CONTEXT.md,
+// sekcja "Cennik") — nowa stawka to w przybliżeniu to, co dałby wzór
+// tekstowy przy typowej gęstości ~2500 znaków/stronę, zaokrąglone w górę do
+// pełnych kredytów za cały dokument (nigdy w dół — nie zaniżamy ceny). Od
+// teraz ŚWIADOMIE ODDZIELONE od `IMAGE_SCAN_COST` (już nie ta sama stała) —
+// zdjęcia nie dostają nowej, wieloetapowej hierarchii niżej, więc ich koszt
+// wewnętrzny się nie zmienił; cena zdjęć NIE była osobno przeanalizowana z
+// tą samą dokładnością, więc świadomie zostaje bez zmian, żeby nie zgadywać
+// (patrz "DOKŁADNOŚĆ PRZY CASHFLOW" w "Zasady współpracy").
+const PDF_PAGE_COST_PER_PAGE = 2.5
 // POPRAWKA 2026-08-23(a), punkt C10 — dawniej analiza PDF-a ruszała od razu
 // bez pytania o zgodę do pewnej liczby stron (PDF_AUTO_ANALYZE_MAX_PAGES,
 // usunięte) i dopiero powyżej trzeba było WPROST potwierdzić koszt. Teraz,
@@ -310,6 +322,29 @@ const MENTAL_MODELS_BY_CATEGORY: Record<string, string> = {
   INTERDYSCYPLINARNE: 'INTERDYSCYPLINARNE: Efekt Lindy\'ego (im dłużej coś istnieje, tym dłużej prawdopodobnie przetrwa — np. książka wydana 50 lat temu, wciąż czytana, prawdopodobnie przetrwa kolejne 50); Brzytwa Adlera (twierdzenie nie do zweryfikowania eksperymentem nie jest warte sporu — np. kłótnia o coś, czego nie da się w żaden sposób sprawdzić ani zmierzyć); Prawo Parkinsona (praca/koszty rozrastają się, by wypełnić dostępny czas/budżet — np. projekt z terminem za miesiąc, który i tak zajmie dokładnie cały ten miesiąc); Hanlon dla Systemów (błąd systemowy/biurokratyczny mylony ze złą wolą — np. opóźniona dostawa nazwana "spiskiem firmy", choć to zwykły błąd logistyczny); Heurystyka Uznania (rozpoznawalna marka/nazwisko uznawana za lepszą bez dowodu — np. wybór droższego produktu tylko dlatego, że nazwa marki brzmi znajomo).',
 }
 const MENTAL_MODEL_CATEGORIES = Object.keys(MENTAL_MODELS_BY_CATEGORY)
+
+// POPRAWKA 2026-08-26(x) — prawdziwa, techniczna gwarancja przeglądu
+// WSZYSTKICH 15 kategorii, nie tylko prośba tekstowa. Do tej pory
+// "PRZEGLĄD KATEGORII" (patrz CHAIN_OF_THOUGHT_INSTRUCTION niżej) był
+// jednym wolnym polem tekstowym ("reasoning_steps") — nasz kod sprawdzał
+// tylko, że to pole NIE JEST PUSTE, nigdy że model faktycznie ocenił
+// każdą z 15 kategorii. To była prośba, nie protokół — żywe pytanie
+// właściciela wprost o pewność tego mechanizmu ujawniło tę słabość.
+// Naprawa: zamiast jednego wolnego pola, osobny, WYMAGANY klucz dla
+// KAŻDEJ z 15 kategorii (wygenerowany programowo z `MENTAL_MODEL_CATEGORIES`,
+// żeby nigdy nie rozjechał się z prawdziwą listą kategorii) — Gemini w
+// trybie ustrukturyzowanej odpowiedzi (`responseSchema`) fizycznie NIE
+// MOŻE zwrócić poprawnego JSON-a, w którym brakuje któregokolwiek z tych
+// 15 wymaganych pól. Uczciwe zastrzeżenie: to gwarantuje, że KAŻDA
+// kategoria zostanie jawnie oceniona (pasuje/nie pasuje) — nie
+// gwarantuje, że sama OCENA jest trafna (to wciąż osąd modelu).
+const CATEGORY_CHECKLIST_SCHEMA = {
+  type: 'object',
+  properties: Object.fromEntries(
+    MENTAL_MODEL_CATEGORIES.map((c) => [c, { type: 'string', enum: ['pasuje', 'nie pasuje'] }])
+  ),
+  required: MENTAL_MODEL_CATEGORIES,
+}
 
 // POPRAWKA 2026-08-26 — pełna biblioteka WSZYSTKICH 15 kategorii, zawsze.
 // Dawniej (ETAP 1, "tani, sitowy" — pickRelevantCategories(), usunięte)
@@ -678,12 +713,13 @@ const RESPONSE_SCHEMA = {
 const DETECTION_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
+    category_checklist: CATEGORY_CHECKLIST_SCHEMA,
     reasoning_steps: { type: 'string' },
     q_score: { type: 'integer' },
     patterns: RESPONSE_SCHEMA.properties.patterns,
     summary: { type: 'string' },
   },
-  required: ['reasoning_steps', 'q_score', 'patterns', 'summary'],
+  required: ['category_checklist', 'reasoning_steps', 'q_score', 'patterns', 'summary'],
 }
 
 // POPRAWKA 2026-08-26 — sekcja "PRZEGLĄD KATEGORII" dopisana PRZED
@@ -692,18 +728,19 @@ const DETECTION_RESPONSE_SCHEMA = {
 // KAŻDA analiza dostaje od razu całą, 15-kategoriową bibliotekę w jednym
 // zapytaniu, co zwiększa (niewielkie, ale realne) ryzyko, że model "zjedzie"
 // po kilku najbardziej oczywistych kategoriach i przez nieuwagę pominie
-// resztę. To nie jest matematyczna gwarancja (żadna instrukcja tekstowa nią
-// nie jest) — prawdziwą gwarancję dałoby tylko osobne zapytanie na każdą
-// kategorię (świadomie odłożone, patrz GAKORI_CONTEXT.md, "15+1"), ale to
-// tania, prawie darmowa poprawka w TYM SAMYM zapytaniu, więc wymuszamy ją
-// zawsze: model musi jawnie, jedną linijką na kategorię, zaznaczyć
-// pasuje/nie pasuje dla WSZYSTKICH 15, zanim w ogóle zacznie iść akapit po
-// akapicie — nie ma jak "przeoczyć" kategorii, której nawet nie ocenił.
-const CHAIN_OF_THOUGHT_INSTRUCTION = `\n\nPRZEGLĄD KATEGORII (KRYTYCZNIE WAŻNE, RÓB TO ZAWSZE JAKO PIERWSZY KROK): Zanim zaczniesz analizować tekst akapit po akapicie, na samym początku pola "reasoning_steps" przejdź PO KOLEI przez WSZYSTKIE 15 kategorii biblioteki (dokładnie w tej kolejności, jedna krótka linijka na każdą — "KATEGORIA: pasuje" albo "KATEGORIA: nie pasuje"):
-${MENTAL_MODEL_CATEGORIES.join(', ')}
-Rób to nawet wtedy, gdy odpowiedź wydaje się oczywista — to wymusza świadome sprawdzenie każdej kategorii, zamiast pominięcia którejś przez przeoczenie. Dopiero PO tej liście przejdź do szczegółowego przeglądu tekstu.
+// resztę.
+//
+// POPRAWKA 2026-08-26(x) — dawniej ta instrukcja kazała wpisać przegląd
+// kategorii jako WOLNY TEKST na początku pola "reasoning_steps", a nasz kod
+// nigdy nie sprawdzał, czy model naprawdę ocenił wszystkie 15 — tylko że
+// pole nie jest puste. To była prośba, nie protokół. Teraz przegląd
+// kategorii idzie do OSOBNEGO, ustrukturyzowanego pola `category_checklist`
+// (patrz definicja wyżej) z 15 WYMAGANYMI kluczami — Gemini fizycznie nie
+// zwróci poprawnej odpowiedzi z pominiętą choćby jedną kategorią. Cały czas
+// bez dodatkowego zapytania/kosztu — to wciąż JEDNO, to samo zapytanie.
+const CHAIN_OF_THOUGHT_INSTRUCTION = `\n\nPRZEGLĄD KATEGORII (KRYTYCZNIE WAŻNE, RÓB TO ZAWSZE JAKO PIERWSZY KROK): Zanim zaczniesz analizować tekst akapit po akapicie, wypełnij pole "category_checklist" — dla KAŻDEJ z 15 kategorii biblioteki ustaw wartość "pasuje" albo "nie pasuje", w zależności od tego, czy cokolwiek w analizowanej treści pasuje do JAKIEGOKOLWIEK modelu z tej kategorii. Rób to nawet wtedy, gdy odpowiedź wydaje się oczywista — to wymusza świadome sprawdzenie każdej kategorii, zamiast pominięcia którejś przez przeoczenie. Dopiero PO wypełnieniu tego pola przejdź do szczegółowego przeglądu tekstu.
 
-MYŚLENIE KROK PO KROKU (CHAIN OF THOUGHT, KRYTYCZNIE WAŻNE): Po przeglądzie kategorii wyżej, w DALSZEJ części pola "reasoning_steps" rozpisz krótkimi notatkami, akapit po akapicie / twierdzenie po twierdzeniu, swój tok myślenia: co zauważasz w tym fragmencie, czy pasuje do jakiegoś modelu z biblioteki (do którego dokładnie), i czy to dopasowanie jest pewne czy wątpliwe (jakie jest ryzyko pomyłki/naciągania). Dopiero NA PODSTAWIE całego pola "reasoning_steps" (przeglądu kategorii i przeglądu akapitów) wypełnij ostateczne pole "patterns" — tylko tymi wzorcami, które po tym namyśle uznajesz za trafne. Pole "reasoning_steps" to Twój wewnętrzny brudnopis, nikt go nie zobaczy — pisz w nim swobodnie, nie musi być "ładne", ma być systematyczne.`
+MYŚLENIE KROK PO KROKU (CHAIN OF THOUGHT, KRYTYCZNIE WAŻNE): Po przeglądzie kategorii wyżej, w polu "reasoning_steps" rozpisz krótkimi notatkami, akapit po akapicie / twierdzenie po twierdzeniu, swój tok myślenia: co zauważasz w tym fragmencie, czy pasuje do jakiegoś modelu z biblioteki (do którego dokładnie), i czy to dopasowanie jest pewne czy wątpliwe (jakie jest ryzyko pomyłki/naciągania). Dopiero NA PODSTAWIE "category_checklist" i "reasoning_steps" wypełnij ostateczne pole "patterns" — tylko tymi wzorcami, które po tym namyśle uznajesz za trafne. Pole "reasoning_steps" to Twój wewnętrzny brudnopis, nikt go nie zobaczy — pisz w nim swobodnie, nie musi być "ładne", ma być systematyczne.`
 
 // Kategorie niedozwolonej treści na obrazie — patrz moderacja niżej
 // (Deno.serve, gałąź "image"). Trzymane jako lista stałych wartości (nie
@@ -769,11 +806,12 @@ const IMAGE_CHUNK_SCHEMA = {
   properties: {
     unsafe_content: { type: 'boolean' },
     unsafe_content_category: { type: 'string' },
+    category_checklist: CATEGORY_CHECKLIST_SCHEMA,
     reasoning_steps: { type: 'string' },
     q_score: { type: 'integer' },
     patterns: RESPONSE_SCHEMA.properties.patterns,
   },
-  required: ['unsafe_content', 'unsafe_content_category', 'reasoning_steps', 'q_score', 'patterns'],
+  required: ['unsafe_content', 'unsafe_content_category', 'category_checklist', 'reasoning_steps', 'q_score', 'patterns'],
 }
 
 // Schemat dla ETAPU 2 obrazu (weryfikacja/scalanie, patrz
@@ -826,15 +864,37 @@ const PDF_RESPONSE_SCHEMA = {
 // DETECTION_RESPONSE_SCHEMA dla tekstu/linku: PDF_RESPONSE_SCHEMA jest
 // współdzielony z translateResult() (tłumaczenie gotowego wyniku PDF-a),
 // gdzie dodatkowe wymagane pole tylko by przeszkadzało.
+// POPRAWKA 2026-08-26(z) — pole "chapter_starts" dopisane do TEGO SAMEGO
+// zapytania Etapu 1 (analyzePdfChunk), bez żadnego nowego wywołania Gemini.
+// Cel: wykryć naturalne granice rozdziałów/sekcji dokumentu "przy okazji"
+// (model i tak już czyta te strony), żeby nowy Poziom 1 (grupowanie kilku
+// kawałków razem, patrz buildLevel1Groups()/GAKORI_CONTEXT.md) mógł stawiać
+// granice grup NA granicach rozdziałów zamiast w losowym miejscu co 16
+// stron — mniejsze ryzyko przecięcia spójnego fragmentu na pół. Fail-open:
+// pusta lista jest w pełni poprawną odpowiedzią (po prostu brak wyraźnych
+// rozdziałów w tym kawałku) — nie ma tu nic "wymaganego do znalezienia".
+const CHAPTER_STARTS_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      page: { type: 'integer' },
+      title: { type: 'string' },
+    },
+    required: ['page', 'title'],
+  },
+}
 const PDF_DETECTION_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
+    category_checklist: CATEGORY_CHECKLIST_SCHEMA,
     reasoning_steps: { type: 'string' },
+    chapter_starts: CHAPTER_STARTS_SCHEMA,
     q_score: { type: 'integer' },
     patterns: PDF_RESPONSE_SCHEMA.properties.patterns,
     summary: { type: 'string' },
   },
-  required: ['reasoning_steps', 'q_score', 'patterns', 'summary'],
+  required: ['category_checklist', 'reasoning_steps', 'chapter_starts', 'q_score', 'patterns', 'summary'],
 }
 
 // Schemat dla ETAPU 2 (weryfikacja/scalanie, patrz verifyAndRefinePdfPatterns()
@@ -847,6 +907,87 @@ const PDF_VERIFICATION_SCHEMA = {
     patterns: PDF_RESPONSE_SCHEMA.properties.patterns,
   },
   required: ['patterns'],
+}
+
+// POPRAWKA 2026-08-26(z) — nowy POZIOM 1 hierarchii PDF-a (patrz
+// buildLevel1Groups() i uzasadnienie architektury w GAKORI_CONTEXT.md,
+// sekcja "PODEJŚCIE ETAPOWE/HIERARCHICZNE"). Etap 1 (analyzePdfChunk,
+// kawałki po PDF_CHUNK_PAGES=4 strony) czyta KAŻDĄ stronę, ale każdy
+// kawałek osobno, bez wiedzy o pozostałych — nie może złapać powiązania
+// rozciągniętego na więcej niż 4 strony (np. sprzeczność między
+// wcześniejszym a późniejszym fragmentem dokumentu). Ten schemat jest dla
+// zapytań Poziomu 1: WIĘKSZa grupa stron (do PDF_LEVEL1_MAX_GROUP_PAGES,
+// wyrównana do granic rozdziałów, gdy wykryte — patrz `chapter_starts`)
+// dostaje NOWE zapytanie, widzące treść RAZ JESZCZE (RAZEM, nie osobnymi
+// kawałkami) plus już znalezione przez Etap 1 wzorce z tego zakresu stron —
+// ma za zadanie (1) znaleźć DODATKOWE wzorce widoczne tylko w szerszym
+// kontekście, (2) poprawić nazwę już znalezionego wzorca, jeśli źle
+// dopasowana (ten sam mechanizm "corrections" co w findAdditionalPatterns()
+// dla tekstu/linku). "patterns" tu = TYLKO nowo znalezione (z polem "page",
+// przeliczanym tak samo jak w analyzePdfChunk).
+const PDF_LEVEL1_SCHEMA = {
+  type: 'object',
+  properties: {
+    patterns: PDF_RESPONSE_SCHEMA.properties.patterns,
+    corrections: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          quote: { type: 'string' },
+          name: { type: 'string' },
+        },
+        required: ['quote', 'name'],
+      },
+    },
+  },
+  required: ['patterns', 'corrections'],
+}
+
+// Maksymalna liczba stron w jednej grupie Poziomu 1 — świadomie ograniczona
+// (nie "cały rozdział na raz", niezależnie jak długi), żeby koszt jednego
+// zapytania Poziomu 1 zostawał przewidywalny nawet dla bardzo długich
+// rozdziałów. Właściciel: "jeżeli są [rozdziały], uznajemy rozdziały jako
+// grupy, dzielimy je na części po 4 strony, [kolejny poziom] itd" — dłuższy
+// rozdział po prostu dostaje KILKA grup Poziomu 1 zamiast jednej.
+const PDF_LEVEL1_MAX_GROUP_PAGES = 16
+
+// Buduje grupy Poziomu 1 (numeracja stron 1-indeksowana, WŁĄCZNIE z końcem
+// przedziału — czyli ta sama konwencja co pole "page" w wzorcach). Gdy
+// wykryto realny podział na rozdziały (`chapterStarts.length >= 2` PO
+// odjęciu domyślnego, niejawnego startu na stronie 1 — czyli faktycznie
+// >=3 unikalnych granic łącznie z tą niejawną "1") — granice grup NIGDY nie
+// przecinają rozdziału w środku (dłuższy rozdział dostaje kilka grup, ale
+// żadna grupa nie łączy końcówki jednego rozdziału z początkiem drugiego).
+// W przeciwnym razie (brak wyraźnych rozdziałów — typowe dla surowych
+// raportów bez podziału) — zwykły, sztywny podział co PDF_LEVEL1_MAX_GROUP_PAGES
+// stron. Czysta funkcja, przetestowana osobno (Node) przed wpisaniem tutaj —
+// patrz GAKORI_CONTEXT.md po opis testów.
+function buildLevel1Groups(
+  totalPages: number,
+  chapterStartsRaw: number[]
+): Array<{ start: number; end: number; chapter: number | null }> {
+  const boundaries = [...new Set(chapterStartsRaw)].sort((a, b) => a - b)
+  if (boundaries.length === 0 || boundaries[0] !== 1) boundaries.unshift(1)
+
+  const useChapters = boundaries.length >= 3
+  const groups: Array<{ start: number; end: number; chapter: number | null }> = []
+
+  if (!useChapters) {
+    for (let start = 1; start <= totalPages; start += PDF_LEVEL1_MAX_GROUP_PAGES) {
+      groups.push({ start, end: Math.min(start + PDF_LEVEL1_MAX_GROUP_PAGES - 1, totalPages), chapter: null })
+    }
+    return groups
+  }
+
+  for (let i = 0; i < boundaries.length; i++) {
+    const chapterStart = boundaries[i]
+    const chapterEnd = i + 1 < boundaries.length ? boundaries[i + 1] - 1 : totalPages
+    for (let start = chapterStart; start <= chapterEnd; start += PDF_LEVEL1_MAX_GROUP_PAGES) {
+      groups.push({ start, end: Math.min(start + PDF_LEVEL1_MAX_GROUP_PAGES - 1, chapterEnd), chapter: i + 1 })
+    }
+  }
+  return groups
 }
 
 // POPRAWKA 2026-08-25(c) — podniesione z 20s na 30s po żywym zgłoszeniu
@@ -2492,7 +2633,7 @@ Deno.serve(async (req: Request) => {
         )
       }
       pdfPageCount = pageCount
-      cost = PDF_PAGE_COST * pageCount
+      cost = Math.ceil(PDF_PAGE_COST_PER_PAGE * pageCount)
       // POPRAWKA 2026-08-23(a), punkt C10 — ZAWSZE trzeba WPROST potwierdzić
       // koszt (dawniej tylko powyżej PDF_AUTO_ANALYZE_MAX_PAGES, usunięte) —
       // zwracamy BEZ wywoływania Gemini i BEZ obciążania konta (żadnych
@@ -2769,7 +2910,7 @@ Deno.serve(async (req: Request) => {
           mimeType: string,
           base64Data: string
         ): Promise<{ unsafe: boolean; unsafeCategory: string; q_score: number; patterns: Array<Record<string, unknown>> } | null> {
-          const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy przesłany obraz przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "reasoning_steps", "q_score" i "patterns" zostaw odpowiednio: pusty tekst, 0, pusta lista. NIE opisuj ani nie analizuj dalej obrazu. Jeśli obraz NIE przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.${CHAIN_OF_THOUGHT_INSTRUCTION}`
+          const moderationInstruction = `ZANIM COKOLWIEK PRZEANALIZUJESZ: sprawdź, czy przesłany obraz przedstawia którąkolwiek z następujących treści: nagość lub treści jednoznacznie seksualne; drastyczna przemoc, krew, wnętrzności, poważne obrażenia ciała lub zwłoki; znęcanie się nad ludźmi lub zwierzętami; drastyczne, szokujące skutki katastrof. Jeśli TAK — ustaw pole "unsafe_content" na true, "unsafe_content_category" na jedną z wartości (dokładnie w tym brzmieniu): ${UNSAFE_CONTENT_CATEGORIES.join(', ')} — a pola "category_checklist" (każda kategoria: "nie pasuje"), "reasoning_steps", "q_score" i "patterns" zostaw odpowiednio: wszystkie "nie pasuje", pusty tekst, 0, pusta lista. NIE opisuj ani nie analizuj dalej obrazu. Jeśli obraz NIE przedstawia niczego z powyższej listy — ustaw "unsafe_content" na false, "unsafe_content_category" na pusty tekst, i przeprowadź normalną analizę jak zwykle.${CHAIN_OF_THOUGHT_INSTRUCTION}`
           const geminiData = await callGemini(
             {
               contents: [
@@ -2917,7 +3058,11 @@ Deno.serve(async (req: Request) => {
         async function analyzePdfChunk(
           start: number,
           end: number
-        ): Promise<{ q_score: number; patterns: Array<Record<string, unknown>> } | null> {
+        ): Promise<{
+          q_score: number
+          patterns: Array<Record<string, unknown>>
+          chapterStarts: Array<{ page: number; title: string }>
+        } | null> {
           const chunkBase64 = await buildChunkBase64(start, end)
           const chunkPageCount = end - start
           const isOnlyChunk = chunkRanges.length === 1
@@ -2932,7 +3077,11 @@ Deno.serve(async (req: Request) => {
           // fizycznie tylko 13 stron. "page" MUSI zawsze być POZYCJĄ STRONY
           // W PLIKU (licząc od 1), NIGDY numerem wydrukowanym w treści.
           const pageFieldNote = ` W polu "page" podawaj WYŁĄCZNIE fizyczną pozycję strony W PRZESŁANYM PLIKU, licząc od 1 (pierwsza strona pliku = 1, druga = 2, itd.) — NIGDY numeru strony wydrukowanego/widocznego w treści dokumentu, nawet jeśli dokument ma własną numerację (np. fragment książki, gdzie strony pliku są ponumerowane np. 43, 44, 45...) — taki wydrukowany numer CAŁKOWICIE ZIGNORUJ, liczy się tylko fizyczna kolejność strony w tym konkretnym pliku.`
-          const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF — potraktuj go dokładnie tak samo jak tekst do analizy. Przeczytaj GO CAŁEGO, stronę po stronie, każdą stronę sprawdź tak samo uważnie jak pierwszą — nie ograniczaj się do najbardziej rzucających się w oczy fragmentów.${rangeNote} Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie szukać danego miejsca, sam cytat nie wystarczy.${pageFieldNote}${CHAIN_OF_THOUGHT_INSTRUCTION}`
+          // POPRAWKA 2026-08-26(z) — pytanie o "chapter_starts" dopisane do
+          // TEGO SAMEGO zapytania (zero nowego kosztu) — patrz uzasadnienie
+          // przy CHAPTER_STARTS_SCHEMA/buildLevel1Groups() wyżej.
+          const chapterInstruction = ` Dodatkowo: jeśli na którejś stronie TEGO fragmentu zaczyna się wyraźny, nowy rozdział/sekcja dokumentu (prawdziwy nagłówek, np. "Rozdział 2", "Podsumowanie zarządu", NIE zwykły akapit czy śródtytuł) — zgłoś to w polu "chapter_starts" (numer strony w TEJ SAMEJ konwencji co pole "page" — pozycja w tym fragmencie, licząc od 1 — i krótki tytuł). Jeśli w tym fragmencie nie ma takich podziałów, zostaw pustą listę — to częsty, poprawny wynik.`
+          const pdfInstruction = `Przeanalizuj WYŁĄCZNIE tekst zawarty w przesłanym pliku PDF — potraktuj go dokładnie tak samo jak tekst do analizy. Przeczytaj GO CAŁEGO, stronę po stronie, każdą stronę sprawdź tak samo uważnie jak pierwszą — nie ograniczaj się do najbardziej rzucających się w oczy fragmentów.${rangeNote} Jeśli PDF zawiera obrazy, wykresy, zdjęcia lub inne elementy wizualne — CAŁKOWICIE JE POMIŃ, nie opisuj ich ani nie wyciągaj z nich żadnych wniosków, analizuj TYLKO sam tekst. Dla KAŻDEGO wykrytego wzorca podaj w polu "page" numer strony — to jest OBOWIĄZKOWE, czytelnik musi wiedzieć, gdzie szukać danego miejsca, sam cytat nie wystarczy.${pageFieldNote}${chapterInstruction}${CHAIN_OF_THOUGHT_INSTRUCTION}`
           const geminiData = await callGemini(
             {
               contents: [
@@ -2963,7 +3112,18 @@ Deno.serve(async (req: Request) => {
                   page: (typeof p.page === 'number' ? p.page : 1) + start,
                 }))
               : []
-            return { q_score: typeof parsed.q_score === 'number' ? parsed.q_score : 50, patterns }
+            // Ta sama konwencja przesunięcia co "page" wyżej — kawałek liczy
+            // strony od 1 W SWOIM OBRĘBIE, dodajemy `start` (offset 0-indeksowany
+            // tego kawałka), żeby dostać pozycję w CAŁYM dokumencie.
+            const chapterStarts = Array.isArray(parsed.chapter_starts)
+              ? parsed.chapter_starts
+                  .filter((c: Record<string, unknown>) => typeof c?.page === 'number')
+                  .map((c: Record<string, unknown>) => ({
+                    page: (c.page as number) + start,
+                    title: typeof c.title === 'string' ? c.title : '',
+                  }))
+              : []
+            return { q_score: typeof parsed.q_score === 'number' ? parsed.q_score : 50, patterns, chapterStarts }
           } catch {
             return null
           }
@@ -3008,12 +3168,129 @@ Deno.serve(async (req: Request) => {
           await tripKillSwitch(reason)
           return outageResponse(reason)
         }
-        // ETAP 2 — czyści listę zebraną z WSZYSTKICH części (duplikaty na
-        // granicach sąsiednich fragmentów, słabe uzasadnienia) PRZED
-        // pokazaniem jej użytkownikowi i PRZED napisaniem podsumowania
-        // (Etap 3 niżej musi dostać już oczyszczoną listę, inaczej
-        // podsumowanie mogłoby wspominać usunięte duplikaty).
-        const verifiedPatterns = await verifyAndRefinePdfPatterns(allPatterns, outputLanguage, geminiKey!, buildMentalModelsLibrary(), costTracker)
+
+        // POZIOM 1 (POPRAWKA 2026-08-26(z)) — patrz pełne uzasadnienie przy
+        // PDF_LEVEL1_SCHEMA/buildLevel1Groups() wyżej. Grupuje kawałki Etapu
+        // 1 w większe zakresy stron (wyrównane do granic rozdziałów, gdy
+        // wykryte — patrz `chapterStarts` zebrane z KAŻDEGO kawałka) i daje
+        // AI szansę zobaczyć je RAZEM, nie osobno — (1) szuka dodatkowych
+        // wzorców widocznych tylko w szerszym kontekście, (2) poprawia
+        // nazwy już znalezionych, jeśli źle dopasowane.
+        const aggregatedChapterStarts = chunkResults.flatMap((r) => r!.chapterStarts.map((c) => c.page))
+        const level1Groups = buildLevel1Groups(pdfPageCount, aggregatedChapterStarts)
+
+        async function analyzePdfLevel1Group(
+          group: { start: number; end: number; chapter: number | null }
+        ): Promise<{ newPatterns: Array<Record<string, unknown>>; corrections: Array<{ quote: string; name: string }> }> {
+          // `group.start`/`group.end` są 1-indeksowane, włącznie z końcem —
+          // `buildChunkBase64` oczekuje 0-indeksowanego, wyłącznego końca
+          // (ta sama konwencja co `chunkRanges` wyżej).
+          const groupBase64 = await buildChunkBase64(group.start - 1, group.end)
+          const groupPageCount = group.end - group.start + 1
+          const existingInGroup = allPatterns.filter(
+            (p) => typeof p.page === 'number' && (p.page as number) >= group.start && (p.page as number) <= group.end
+          )
+          const compactExisting =
+            existingInGroup.length > 0
+              ? existingInGroup
+                  .map((p) => `- [${p.pattern_type}] ${p.name}: "${p.quote}"`)
+                  .join('\n')
+              : '(na razie nic nie znaleziono w tym zakresie stron)'
+          const prompt = `${systemPrompt}
+
+DRUGI PRZEGLĄD WIĘKSZEGO FRAGMENTU (KRYTYCZNIE WAŻNE): Ten fragment to strony ${group.start}-${group.end} z ${pdfPageCount}-stronicowego dokumentu (w polu "page" licz strony OD 1 W OBRĘBIE TEGO FRAGMENTU, czyli od 1 do ${groupPageCount}). Ten sam zakres stron był już czytany osobno, po kawałku po kilka stron — teraz widzisz go w CAŁOŚCI naraz. Masz dwa zadania:
+1. Poszukaj DODATKOWYCH wzorców widocznych DOPIERO gdy widzi się ten szerszy fragment razem (np. sprzeczność między wcześniejszą a późniejszą częścią tego zakresu) — NIE powtarzaj już znalezionych (lista niżej, porównaj cytaty).
+2. Dla KAŻDEGO już znalezionego wzorca z listy niżej sprawdź, patrząc na opis/przykład w bibliotece wyżej, czy przypisana nazwa naprawdę trafnie opisuje ten cytat — jeśli jest słabym dopasowaniem, dodaj wpis do "corrections" z dosłownym cytatem i lepszą nazwą. Jeśli dwa modele pasują naprawdę tak samo dobrze, ustaw nazwę w formacie "Model A / Model B". Jeśli nazwa już dobrze pasuje, nie dodawaj jej do "corrections" (pusta lista w "corrections" jest częstym, poprawnym wynikiem).
+
+JUŻ ZNALEZIONE W TYM ZAKRESIE (nie powtarzaj w "patterns", ale sprawdź nazwy dla "corrections"):
+${compactExisting}`
+          const geminiData = await callGemini(
+            {
+              contents: [
+                {
+                  parts: [
+                    { text: prompt },
+                    { inlineData: { mimeType: 'application/pdf', data: groupBase64 } },
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
+                responseMimeType: 'application/json',
+                responseSchema: PDF_LEVEL1_SCHEMA,
+              },
+            },
+            geminiKey!,
+            PDF_GEMINI_TIMEOUT_MS,
+            costTracker
+          )
+          const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
+          // Fail-open — patrz uzasadnienie przy PDF_LEVEL1_SCHEMA wyżej:
+          // Poziom 1 to wzbogacenie jakości NA BAZIE JUŻ KOMPLETNEGO wyniku
+          // Etapu 1 (ten już gwarantuje pełne pokrycie stron), nie kolejna
+          // gwarancja pokrycia — błąd/timeout TEJ JEDNEJ grupy nie może
+          // przerwać całej analizy, tracimy po prostu bonus dla tego
+          // zakresu stron, w przeciwieństwie do Etapu 1, gdzie błąd
+          // JEDNEGO kawałka wciąż wywala całą analizę (patrz wyżej).
+          if (!text) return { newPatterns: [], corrections: [] }
+          try {
+            const parsed = JSON.parse(text)
+            const newPatterns = Array.isArray(parsed.patterns)
+              ? parsed.patterns.map((p: Record<string, unknown>) => ({
+                  ...p,
+                  page: (typeof p.page === 'number' ? p.page : 1) + (group.start - 1),
+                }))
+              : []
+            const corrections = Array.isArray(parsed.corrections)
+              ? parsed.corrections.filter(
+                  (c: Record<string, unknown>) => typeof c?.quote === 'string' && typeof c?.name === 'string'
+                )
+              : []
+            return { newPatterns, corrections }
+          } catch {
+            return { newPatterns: [], corrections: [] }
+          }
+        }
+
+        const level1Results = await Promise.all(level1Groups.map((g) => analyzePdfLevel1Group(g)))
+
+        // Scalenie — ten sam wzorzec "corrections po dosłownym cytacie" co
+        // POPRAWKA 2026-08-26(v) dla tekstu/linku: fail-open, cytat którego
+        // nie ma na oryginalnej liście po prostu nic nie zmienia.
+        const level1CorrectionByQuote = new Map<string, string>()
+        for (const r of level1Results) {
+          for (const c of r.corrections) {
+            level1CorrectionByQuote.set(c.quote, c.name)
+          }
+        }
+        const patternsAfterCorrections =
+          level1CorrectionByQuote.size === 0
+            ? allPatterns
+            : allPatterns.map((p) => {
+                const quote = typeof p.quote === 'string' ? p.quote : null
+                const correctedName = quote ? level1CorrectionByQuote.get(quote) : undefined
+                return correctedName ? { ...p, name: correctedName } : p
+              })
+        const level1NewPatterns = level1Results.flatMap((r) => r.newPatterns)
+        const patternsAfterLevel1 = [...patternsAfterCorrections, ...level1NewPatterns]
+
+        // Ta sama reguła integralności D13 co dla Etapu 1 wyżej — nowe
+        // wzorce z Poziomu 1 też muszą mieć poprawny numer strony.
+        const badLevel1Page = level1NewPatterns.find(
+          (p) => typeof p.page === 'number' && (p.page as number) > pdfPageCount
+        )
+        if (badLevel1Page) {
+          const reason = `Reguła D13 (Poziom 1): wzorzec wskazuje stronę ${badLevel1Page.page} w ${pdfPageCount}-stronicowym pliku PDF — naruszenie integralności numeracji stron.`
+          await tripKillSwitch(reason)
+          return outageResponse(reason)
+        }
+
+        // ETAP KOŃCOWY (dawny "Etap 2") — czyści listę zebraną z WSZYSTKICH
+        // części I Poziomu 1 (duplikaty na granicach sąsiednich fragmentów,
+        // słabe uzasadnienia) PRZED pokazaniem jej użytkownikowi i PRZED
+        // napisaniem podsumowania (Etap 3 niżej musi dostać już oczyszczoną
+        // listę, inaczej podsumowanie mogłoby wspominać usunięte duplikaty).
+        const verifiedPatterns = await verifyAndRefinePdfPatterns(patternsAfterLevel1, outputLanguage, geminiKey!, buildMentalModelsLibrary(), costTracker)
         // Średnia ważona liczbą stron w każdej części — przybliża "jakość
         // całego tekstu", nie tylko średnią arytmetyczną z części o różnej
         // długości (ostatnia część bywa krótsza niż PDF_CHUNK_PAGES).
@@ -3099,10 +3376,12 @@ Deno.serve(async (req: Request) => {
           )
         }
         // "reasoning_steps" (patrz DETECTION_RESPONSE_SCHEMA/POPRAWKA
-        // 2026-08-20(c)) to wyłącznie wewnętrzny brudnopis modelu, wymuszony
-        // przez schemat, żeby poprawić jakość WYPEŁNIANIA "patterns" —
-        // nigdy nie ma trafić do zapisanego wyniku ani do użytkownika.
+        // 2026-08-20(c)) i "category_checklist" (POPRAWKA 2026-08-26(x)) to
+        // wyłącznie wewnętrzny brudnopis/checklist modelu, wymuszone przez
+        // schemat, żeby poprawić jakość WYPEŁNIANIA "patterns" — nigdy nie
+        // mają trafić do zapisanego wyniku ani do użytkownika.
         delete (result as Record<string, unknown>).reasoning_steps
+        delete (result as Record<string, unknown>).category_checklist
 
         // ETAP 3 (POPRAWKA 2026-08-20(b)) — "druga runda szukania", tylko
         // gdy gałąź wyżej ustawiła secondPassText (tekst i link ze ścieżki

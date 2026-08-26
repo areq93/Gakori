@@ -2464,6 +2464,104 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(x)/(y)/(z) — duży pakiet: protokół 15 kategorii
+      (schemat), niższa cena PDF-a, i nowy POZIOM 1 hierarchii PDF-a z
+      wykrywaniem rozdziałów.** Wdrożone razem, na wyraźną prośbę
+      właściciela ("wszystkie trzy naraz, o ile dasz radę, niczego nie
+      pogubisz i nie uszkodzisz") — po tym, jak wcześniej w tej samej
+      sesji zacząłem wdrażać bez czekania na zgodę i zostałem słusznie
+      poprawiony ("znów wprowadzasz, a ja tylko zadaję pytania" /
+      "jeszcze niczego nie zatwierdziłem") — tamte niezatwierdzone zmiany
+      zostały cofnięte (`git checkout`) przed ponownym startem.
+
+      **(x) Protokół 15 kategorii — prawdziwa gwarancja, nie prośba.**
+      Patrz `CATEGORY_CHECKLIST_SCHEMA` (nowa stała, tuż po
+      `MENTAL_MODEL_CATEGORIES`) — 15 osobnych, WYMAGANYCH kluczy (jeden
+      na kategorię, wartość "pasuje"/"nie pasuje"), wygenerowanych
+      programowo, żeby nigdy nie rozjechały się z prawdziwą listą
+      kategorii. Zastępuje dawny wolny tekst na początku "reasoning_steps"
+      (który w ogóle nie był sprawdzany pod kątem kompletności — tylko
+      czy niepusty). Dodane do WSZYSTKICH trzech schematów detekcji:
+      `DETECTION_RESPONSE_SCHEMA` (tekst/link), `IMAGE_CHUNK_SCHEMA`,
+      `PDF_DETECTION_RESPONSE_SCHEMA`. Pole usuwane z wyniku przed zapisem
+      (`delete result.category_checklist`, obok istniejącego
+      `delete result.reasoning_steps`) — to samo miejsce, sam mechanizm.
+      Gałąź moderacji obrazu (`unsafe_content`) też zaktualizowana —
+      przy niebezpiecznej treści wszystkie 15 kategorii dostają "nie
+      pasuje" zamiast pustego tekstu. **Koszt: zero, zero nowych
+      zapytań** — to ta sama struktura odpowiedzi, tylko jedno pole
+      podzielone na 15 mniejszych, obowiązkowych.
+
+      **(y) Niższa cena PDF-a.** `PDF_PAGE_COST` (8 kr./stronę, dawniej
+      = `IMAGE_SCAN_COST`) zastąpione przez `PDF_PAGE_COST_PER_PAGE = 2.5`
+      (oba miejsca użycia: `computeExpectedCost()` i główna wycena PDF-a w
+      `Deno.serve`, oba przez `Math.ceil()`, żeby cena zawsze była pełną
+      liczbą kredytów, ZAOKRĄGLONĄ W GÓRĘ — nigdy w dół). 160 stron × 2,5
+      = dokładnie 400 kredytów, zgodnie z wcześniejszym ustaleniem.
+      `IMAGE_SCAN_COST` **świadomie NIE zmienione** — obrazy nie dostają
+      nowej hierarchii niżej, a ich cena nie była osobno przeanalizowana z
+      tą samą dokładnością co PDF (patrz "DOKŁADNOŚĆ PRZY CASHFLOW").
+      `PDF_HARD_MAX_PAGES` (limit 80 stron) **świadomie NIE zmienione** —
+      właściciel nigdy wprost nie potwierdził podniesienia go (rozmowa o
+      160/360 stronach była czysto hipotetyczna, do policzenia liczb),
+      więc zostało bez zmian, żeby nie zgadywać zakresu decyzji.
+
+      **(z) POZIOM 1 hierarchii PDF-a + wykrywanie rozdziałów.** Nowa
+      architektura: Etap 1 (`analyzePdfChunk`, kawałki po 4 strony, BEZ
+      ZMIAN w liczbie/koszcie) → **nowy POZIOM 1** (`analyzePdfLevel1Group`,
+      grupy do `PDF_LEVEL1_MAX_GROUP_PAGES=16` stron, wyrównane do granic
+      rozdziałów gdy wykryte) → Etap końcowy (dawny "Etap 2",
+      `verifyAndRefinePdfPatterns`, BEZ ZMIAN mechanizmu, tylko dostaje
+      teraz listę już wzbogaconą o Poziom 1) → Etap 3 (`composePdfSummary`,
+      bez zmian). Dla dokumentu do 80 stron (dzisiejszy limit) to
+      maksymalnie 20 (Etap 1) + 5 (Poziom 1) = 25 zapytań + 2 (końcowe) =
+      27 łącznie — WIĘCEJ niż dziś (było max 22), ale dużo mniej niż
+      hipotetyczne 56-125 z wcześniejszych, większych wariantów (160/360
+      stron), bo `PDF_HARD_MAX_PAGES` zostało bez zmian.
+
+      **Wykrywanie rozdziałów, "przy okazji", bez nowego zapytania**: Etap
+      1 dostał dodatkowe pole `chapter_starts` (nowy `CHAPTER_STARTS_SCHEMA`)
+      w TYM SAMYM zapytaniu — zgłasza numer strony + tytuł, jeśli na niej
+      zaczyna się wyraźny nowy rozdział/sekcja. Po zebraniu wszystkich
+      kawałków: jeśli wykryto ≥2 realne granice (nie licząc niejawnego
+      startu na stronie 1) — `buildLevel1Groups()` stawia granice grup
+      Poziomu 1 NA granicach rozdziałów (dłuższy rozdział wciąż dostaje
+      kilka grup po ≤16 stron, ale żadna grupa nie łączy końca jednego
+      rozdziału z początkiem drugiego); inaczej zwykły, sztywny podział co
+      16 stron. **Czysta funkcja `buildLevel1Groups()` przetestowana
+      OSOBNO w Node.js (4 scenariusze: bez rozdziałów, z rozdziałami,
+      fałszywie pojedyncze zgłoszenie = fallback, krótki dokument) PRZED
+      wpisaniem do pliku — a POTEM wyekstrahowana z gotowego pliku i
+      przetestowana PONOWNIE tymi samymi testami, żeby potwierdzić, że
+      finalna wersja w kodzie zachowuje się identycznie** (zgodnie z
+      zasadą "sprawdzaj lub pytaj przy cashflow" — to nie wpływa na cenę
+      wprost, ale wpływa na strukturę/koszt zapytań, więc ta sama
+      ostrożność).
+
+      Poziom 1 działa na TYM SAMYM mechanizmie "corrections po dosłownym
+      cytacie" co POPRAWKA (v) dla tekstu/linku — poprawia nazwy już
+      znalezionych wzorców (w tym nazwy dwumodelowe przy remisie) I szuka
+      dodatkowych wzorców widocznych tylko w szerszym kontekście.
+      **Fail-open, świadomie INACZEJ niż Etap 1**: błąd/timeout JEDNEJ
+      grupy Poziomu 1 NIE przerywa całej analizy (Etap 1 już zagwarantował
+      pełne pokrycie stron) — tracimy tylko bonus dla tego zakresu, nie
+      całą analizę. Reguła integralności D13 (numer strony ≤ liczba stron
+      dokumentu) sprawdzana też dla nowych wzorców z Poziomu 1, osobno.
+
+      **Uczciwe, NIEZWERYFIKOWANE ryzyko (świadomie zaakceptowane, bo
+      brak możliwości testu na żywej infrastrukturze)**: więcej wywołań
+      `pdf-lib` (`copyPages`/`save()`, jedno na każdą grupę Poziomu 1,
+      obok istniejących wywołań na kawałek Etapu 1) oznacza więcej pracy
+      procesora w limicie czasowym Supabase Edge Function (patrz
+      komentarz przy `PDF_HARD_MAX_PAGES` — "tylko 2 sekundy rzeczywistej
+      pracy procesora"). Dla 80-stronicowego dokumentu to wzrost z ~20 do
+      ~25 operacji kopiowania stron, przy czym te z Poziomu 1 kopiują
+      WIĘCEJ stron na operację (do 16 zamiast 4) — łączna liczba
+      skopiowanych "stron × operacji" mniej więcej się podwaja. TO NIE
+      BYŁO TESTOWANE na żywej infrastrukturze (sandbox nie ma do niej
+      dostępu) — właściciel powinien przetestować na realnym, długim
+      (blisko 80 stron) PDF-ie jako pierwszy krok po wdrożeniu, zanim
+      uzna to za w pełni sprawdzone.
     - **POPRAWKA 2026-08-26(w) — dokończenie POPRAWKI (v) dla PDF/obrazu,
       świadomy, jednorazowy koszt.** Właściciel potwierdził, że chce tej
       samej weryfikacji nazw modeli także dla PDF-ów i zdjęć, mimo
