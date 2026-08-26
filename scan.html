@@ -479,7 +479,16 @@
                                     .map((p) => ({ quote: p.quote, isReasoning: p.pattern_type === 'reasoning' }))
                                 : (r.source_quote ? [{ quote: r.source_quote, isReasoning: false }] : []);
                             const textSourceEl = document.getElementById('scanTextSource');
-                            document.getElementById('scanTextSourceSummary').innerText = icon + ' ' + t('scan_text_source_label');
+                            // POPRAWKA 2026-08-26(c) — liczba znaków WPROST przy nagłówku
+                            // panelu, licząc dokładnie z `data.text_content` (tej samej
+                            // wartości, którą kopiuje przycisk "Kopiuj" i którą serwer
+                            // zahaszował) — narzędzie diagnostyczne dla dokładnie tego
+                            // problemu, co POPRAWKA 2026-08-26(b): pozwala PORÓWNAĆ na oko
+                            // liczbę znaków dwóch "tej samej" analizy (link vs tekst) bez
+                            // dostępu do bazy danych, żeby od razu było widać, czy to
+                            // naprawdę identyczna treść, czy jednak nie.
+                            document.getElementById('scanTextSourceSummary').innerText =
+                                icon + ' ' + t('scan_text_source_label') + ' (' + t('scan_text_source_char_count', { count: data.text_content.length }) + ')';
                             document.getElementById('scanTextSourceContent').appendChild(
                                 buildHighlightedText(data.text_content, quoteEntries)
                             );
