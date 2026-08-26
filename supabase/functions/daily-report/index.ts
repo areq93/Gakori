@@ -164,6 +164,31 @@ Deno.serve(async (req: Request) => {
     // metryka kredytów niedostępna
   }
 
+  // --- POPRAWKA 2026-08-26(u) — realny koszt AI dziś (USD), do tej pory
+  // ZUPEŁNIE nieobecny w raporcie. Właściciel wprost poprosił, żeby zawsze
+  // móc "znać przepływ cashflow bez niespodzianek" — dotąd raport pokazywał
+  // wyłącznie kredyty (przybliżenie przychodu), NIGDY prawdziwego kosztu
+  // Gemini w dolarach, mimo że ten koszt jest już liczony i zapisywany
+  // (patrz `system_daily_spend`, reguła 10 głównego wyłącznika w
+  // `analyze/index.ts`) — po prostu nikt wcześniej nie dociągnął go tutaj.
+  // Świadome ograniczenie: system prawdziwych płatności jeszcze nie
+  // istnieje, więc na razie to nie jest "koszt vs przychód" 1:1 — to sam
+  // koszt, do obserwowania trendu dzień po dniu, zanim będzie z czym
+  // dokładnie porównać.
+  let aiCostTodayUsd: number | null = null
+  try {
+    const todayKeyWarsaw = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(new Date())
+    const { data, error } = await supabase
+      .from('system_daily_spend')
+      .select('total_usd')
+      .eq('spend_date', todayKeyWarsaw)
+      .maybeSingle()
+    if (error) throw error
+    aiCostTodayUsd = data?.total_usd ?? 0
+  } catch (_err) {
+    // metryka kosztu AI niedostępna — reszta raportu leci dalej
+  }
+
   // --- Maile: dziś i suma od początku miesiąca (wg statystyk Brevo) ---
   let emailsSentToday: number | null = null
   let emailsSentThisMonth: number | null = null
@@ -264,6 +289,11 @@ Deno.serve(async (req: Request) => {
 
   // --- Budowanie treści maila ---
   const fmt = (v: number | null, unit = '') => (v === null ? 'brak danych' : `${Math.round(v * 10) / 10}${unit}`)
+  // POPRAWKA 2026-08-26(u) — `fmt()` zaokrągla do 1 miejsca po przecinku,
+  // co dla kwot w dolarach rzędu $0,01-$0,50 (typowy dzienny koszt AI na
+  // wczesnym etapie) pokazywałoby "$0.0" — bezużyteczne. Osobny formatter
+  // z 4 miejscami po przecinku, żeby drobne kwoty wciąż było widać.
+  const fmtUsd = (v: number | null) => (v === null ? 'brak danych' : `$${v.toFixed(4)}`)
   const dateStr = new Date().toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' })
 
   const card = (label: string, bodyHtml: string) => `
@@ -288,8 +318,9 @@ Deno.serve(async (req: Request) => {
   )
 
   const creditsCard = card(
-    'Kredyty',
-    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(creditsSpentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wydanych dziś</span></div>`
+    'Kredyty i koszt AI',
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(creditsSpentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">kredytów wydanych dziś</span></div>
+<div style="font-size:14px;color:#374151;margin-top:6px;">realny koszt AI dziś: <strong>${fmtUsd(aiCostTodayUsd)}</strong> (dzienny limit bezpieczeństwa: $125 — patrz system_thresholds.daily_budget_usd)</div>`
   )
 
   const retriesHtml =

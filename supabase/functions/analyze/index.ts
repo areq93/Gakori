@@ -597,8 +597,7 @@ BIBLIOTEKA MODELI MENTALNYCH: Masz do dyspozycji poniższą pełną bibliotekę 
 
 SPÓJNOŚĆ WYBORU MODELU PRZY REMISIE (KRYTYCZNIE WAŻNE): czasem dany fragment pasuje podobnie dobrze do kilku różnych modeli naraz. Żeby ta sama treść, przeanalizowana ponownie, zawsze dostała tę samą nazwę wzorca (zamiast za każdym razem innej z grona równie trafnych), rozstrzygaj remis w TEJ kolejności kryteriów:
 1. NAJPIERW licz DOWODY w całym tekście, nie tylko w tym jednym fragmencie: który z pasujących modeli ma WIĘCEJ osobnych, wyraźnych przykładów/wystąpień w całej analizowanej treści (nie tylko w tym jednym cytacie)? Ten model wygrywa — to NIE jest dowolny wybór, tylko odzwierciedlenie tego, co faktycznie dominuje w tekście.
-2. Jeśli liczba dowodów też jest identyczna (prawdziwy, pełny remis pod każdym względem) — DOPIERO WTEDY, jako absolutnie ostateczne rozstrzygnięcie, wybierz model wymieniony w bibliotece niżej JAKO PIERWSZY (licząc od góry listy, potem od lewej do prawej w obrębie jednej kategorii).
-Kolejność w bibliotece to WYŁĄCZNIE "rozjemca ostatniej szansy" — nigdy pierwsze kryterium. Jeśli jeden model wyraźnie trafniej opisuje mechanizm ALBO ma więcej wspierających go fragmentów w tekście, wybierz jego, niezależnie od tego, gdzie w bibliotece się znajduje.
+2. PRZYPADEK WIELOMODELOWY — jeśli liczba dowodów też jest identyczna (prawdziwy, pełny remis pod każdym względem), NIE wybieraj sztucznie jednego zwycięzcy losowo/dowolnie. Zamiast tego ustaw pole "name" jako połączenie OBU pasujących modeli w formacie "Model A / Model B" (oba przetłumaczone na język ${langName}, w tej samej kolejności co w bibliotece niżej) — to jawnie pokazuje czytelnikowi, że fragment naprawdę tak samo dobrze pasuje do dwóch modeli naraz, zamiast udawać fałszywą pewność co do jednego. To rozwiązanie deterministyczne (ten sam prawdziwy remis zawsze daje tę samą parę nazw w tej samej kolejności), więc nie psuje spójności między analizami. Używaj go RZADKO — tylko przy prawdziwym, pełnym remisie z kroku 1, nigdy jako wygodny skrót przy zwykłej niepewności.
 
 BIBLIOTEKA:
 ${mentalModelsLibrary}
@@ -968,8 +967,24 @@ const ADDITIONAL_PATTERNS_SCHEMA = {
   type: 'object',
   properties: {
     patterns: RESPONSE_SCHEMA.properties.patterns,
+    // POPRAWKA 2026-08-26(v) — patrz uzasadnienie przy findAdditionalPatterns()
+    // niżej. Osobne, krótkie pole zamiast przepisywania całych "patterns" —
+    // model MUSI podać dosłowny "quote" istniejącego wzorca, którego dotyczy
+    // poprawka (dopasowujemy po treści cytatu w kodzie, nie licząc na to, że
+    // model odtworzy resztę pól identycznie).
+    corrections: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          quote: { type: 'string' },
+          name: { type: 'string' },
+        },
+        required: ['quote', 'name'],
+      },
+    },
   },
-  required: ['patterns'],
+  required: ['patterns', 'corrections'],
 }
 
 // ETAP 3 (NOWY, POPRAWKA 2026-08-20(b)) — "druga runda szukania", TYLKO dla
@@ -991,6 +1006,17 @@ const ADDITIONAL_PATTERNS_SCHEMA = {
 // Świadomie NIE ma tu wymuszonego minimum liczby wzorców (ta sama zasada co
 // w verifyAndRefinePdfPatterns) — jeśli naprawdę nic więcej nie ma, model ma
 // zwrócić pustą listę, nie wymyślać na siłę.
+//
+// POPRAWKA 2026-08-26(v) — WERYFIKACJA WYBORU MODELU dopisana do TEGO
+// SAMEGO zapytania, bez żadnego nowego wywołania Gemini. Właściciel zapytał
+// wprost, czy warto raz jeszcze sprawdzić już wybrane modele mentalne na
+// podstawie wzbogaconej (od POPRAWKI (r)) biblioteki z przykładami — ten
+// telefon i tak już dostaje pełną bibliotekę (w `systemPrompt`) ORAZ listę
+// już znalezionych wzorców (`compactExisting` niżej), więc dopisanie
+// instrukcji "sprawdź też, czy nazwy wciąż pasują" kosztuje tylko dłuższy
+// prompt, ZERO dodatkowych zapytań/kosztu. Wynik trafia do NOWEGO pola
+// "corrections" (nie do "patterns"), żeby jednoznacznie odróżnić "znalazłem
+// coś nowego" od "poprawiam nazwę czegoś, co już było" — merge niżej.
 async function findAdditionalPatterns(
   originalContent: string,
   existingPatterns: Array<Record<string, unknown>>,
@@ -1006,9 +1032,11 @@ async function findAdditionalPatterns(
       : '(na razie nic nie znaleziono)'
   const prompt = `${systemPrompt}
 
-DRUGA RUNDA SZUKANIA (KRYTYCZNIE WAŻNE): Poniżej jest ten sam tekst, który już raz przeanalizowałeś, oraz lista wzorców, które już znalazłeś. Przeczytaj tekst PONOWNIE, od nowa, świeżym okiem, akapit po akapicie — Twoje jedyne zadanie teraz to znaleźć DODATKOWE wzorce, których zabrakło na tej liście, szczególnie w twierdzeniach/fragmentach, które nie mają jeszcze przypisanego cytatu. NIE powtarzaj wzorców już znalezionych (patrz lista niżej, porównaj cytaty). Jeśli po uważnym sprawdzeniu naprawdę nic więcej nie ma — zwróć pustą listę, nie wymyślaj na siłę słabych/naciąganych wzorców.
+DRUGA RUNDA SZUKANIA (KRYTYCZNIE WAŻNE): Poniżej jest ten sam tekst, który już raz przeanalizowałeś, oraz lista wzorców, które już znalazłeś. Przeczytaj tekst PONOWNIE, od nowa, świeżym okiem, akapit po akapicie — Twoje pierwsze zadanie to znaleźć DODATKOWE wzorce, których zabrakło na tej liście, szczególnie w twierdzeniach/fragmentach, które nie mają jeszcze przypisanego cytatu. NIE powtarzaj wzorców już znalezionych (patrz lista niżej, porównaj cytaty). Jeśli po uważnym sprawdzeniu naprawdę nic więcej nie ma — zwróć pustą listę w polu "patterns", nie wymyślaj na siłę słabych/naciąganych wzorców.
 
-JUŻ ZNALEZIONE WZORCE (nie powtarzaj):
+WERYFIKACJA JUŻ WYBRANYCH NAZW (drugie zadanie, ważne): dla KAŻDEGO wzorca z listy niżej sprawdź, patrząc na opis i przykład danego modelu w BIBLIOTECE wyżej, czy przypisana nazwa naprawdę trafnie opisuje ten cytat. Jeśli nazwa jest wyraźnie słabym dopasowaniem — dodaj wpis do pola "corrections" z tym samym, dosłownym cytatem i LEPSZĄ nazwą z biblioteki. Jeśli po namyśle dwa różne modele z biblioteki pasują NAPRAWDĘ tak samo dobrze (patrz sekcja PRZYPADEK WIELOMODELOWY wyżej) — też dodaj korektę, ustawiając nazwę na "Model A / Model B". Jeśli nazwa już dobrze pasuje — NIE dodawaj jej do "corrections" (zostaw bez zmian, pusta lista w "corrections" jest częstym, poprawnym wynikiem, jeśli wszystko już pasuje).
+
+JUŻ ZNALEZIONE WZORCE (nie powtarzaj w "patterns", ale sprawdź nazwy dla "corrections"):
 ${compactExisting}
 
 TEKST DO ANALIZY:
@@ -1032,7 +1060,28 @@ ${originalContent}`
   try {
     const parsed = JSON.parse(text)
     const additional = Array.isArray(parsed.patterns) ? parsed.patterns : []
-    return [...existingPatterns, ...additional]
+    const corrections = Array.isArray(parsed.corrections) ? parsed.corrections : []
+    // Mapa cytat -> poprawiona nazwa. Dopasowanie po DOSŁOWNEJ treści cytatu
+    // (ten sam, sprawdzony w tej sesji wzorzec co przy scaleniu wyników w
+    // "Sprawdź, czy coś się zmieniło", patrz POPRAWKA 2026-08-26(t)) — jeśli
+    // model zwróci cytat, którego nie ma na oryginalnej liście (np. lekko
+    // sparafrazowany), po prostu nic się nie zmienia dla tego wzorca —
+    // fail-open, nigdy nie psuje istniejącego wyniku.
+    const correctionByQuote = new Map<string, string>()
+    for (const c of corrections) {
+      if (typeof c?.quote === 'string' && typeof c?.name === 'string' && c.name.trim()) {
+        correctionByQuote.set(c.quote, c.name.trim())
+      }
+    }
+    const correctedExisting =
+      correctionByQuote.size === 0
+        ? existingPatterns
+        : existingPatterns.map((p) => {
+            const quote = typeof p.quote === 'string' ? p.quote : null
+            const correctedName = quote ? correctionByQuote.get(quote) : undefined
+            return correctedName ? { ...p, name: correctedName } : p
+          })
+    return [...correctedExisting, ...additional]
   } catch {
     return existingPatterns
   }

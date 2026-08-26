@@ -2464,6 +2464,74 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(v) — nazwa dwumodelowa przy prawdziwym remisie +
+      weryfikacja już wybranych nazw, PRAWIE za darmo dla tekstu/linku.**
+      Dwie połączone zmiany, obie w `buildSystemPrompt()`/
+      `findAdditionalPatterns()`:
+
+      **1) "PRZYPADEK WIELOMODELOWY" zamiast arbitralnego rozjemcy.**
+      Sekcja "SPÓJNOŚĆ WYBORU MODELU PRZY REMISIE" (POPRAWKA (n)/(n2))
+      miała krok 2: przy PRAWDZIWYM, pełnym remisie (ten sam poziom
+      dowodów) wybierz model wymieniony w bibliotece jako pierwszy. To
+      wciąż był arbitralny wybór — tylko deterministyczny, nie losowy.
+      Właściciel zaproponował lepsze rozwiązanie: zamiast zmuszać model do
+      wybrania jednego zwycięzcy przy prawdziwym remisie, niech NAZWA
+      wprost pokaże obie pasujące etykiety, format "Model A / Model B"
+      (kolejność z biblioteki, więc wciąż deterministyczna). Uczciwsze niż
+      udawanie pewności co do jednego wyboru, i wciąż w pełni spójne
+      między powtórzonymi analizami tej samej treści.
+
+      **2) Weryfikacja wyboru modelu — piggyback na Etapie 3, ZERO nowych
+      zapytań dla tekstu/linku.** Właściciel zapytał, czy warto dodać krok
+      sprawdzający już wybrane nazwy modeli na podstawie wzbogaconej (od
+      POPRAWKI (r)) biblioteki z przykładami. Etap 3 (`findAdditionalPatterns`,
+      "druga runda szukania") i tak JUŻ dostaje pełną bibliotekę (w
+      `systemPrompt`) i listę już znalezionych wzorców w JEDNYM zapytaniu —
+      dopisano więc drugie zadanie do TEGO SAMEGO promptu: "sprawdź każdą
+      już wybraną nazwę względem opisu/przykładu w bibliotece; jeśli słabo
+      pasuje, popraw; jeśli dwa modele pasują naprawdę tak samo dobrze,
+      ustaw nazwę dwumodelową." Nowe pole odpowiedzi `corrections` (osobne
+      od `patterns`, dopasowywane po dosłownej treści cytatu — fail-open:
+      cytat, którego nie ma na oryginalnej liście, jest po prostu
+      ignorowany, nic się nie psuje). **Koszt: praktycznie zero** — to
+      dokładnie to samo zapytanie co już istniało, tylko dłuższa instrukcja
+      i nieco większy schemat odpowiedzi.
+
+      **PDF/obraz — NIE zrobione w tej turze.** Świadomie odłożone: te
+      tryby mają OSOBNY mechanizm czyszczenia (`verifyAndRefinePdfPatterns`/
+      `verifyAndRefineImagePatterns`), który dziś w ogóle NIE dostaje
+      biblioteki modeli w swoim prompcie — dodanie tam tej samej
+      weryfikacji wymagałoby doklejenia biblioteki do promptu, który
+      wcześniej jej nie miał, czyli realnego dodatkowego kosztu (~$0,0006
+      raz na całą analizę PDF/zdjęć, nie mnożone przez liczbę stron/obrazów
+      — bo te funkcje uruchamiają się raz, po scaleniu wszystkich części).
+      Mały koszt, ale NIE zerowy jak w tekście/linku — do zrobienia w
+      kolejnej turze, jeśli właściciel potwierdzi, że wciąż tego chce.
+
+      **Zgodnie z nową zasadą "kill switch przy każdej zmianie kosztowej"
+      (patrz "Zasady współpracy" niżej)**: nowy koszt (i tak $0 dla
+      tekstu/linku) przechodzi przez ten sam `costTracker`, którym
+      `findAdditionalPatterns()` posługiwało się już wcześniej — więc
+      automatycznie podlega regule 8 ($6,25/zapytanie) i regule 10
+      ($125/dzień) bez żadnej dodatkowej pracy.
+    - **POPRAWKA 2026-08-26(u) — realny koszt AI (USD) w raporcie dziennym,
+      wcześniej całkowicie nieobecny.** Właściciel wprost: chce znać
+      przepływ cashflow bez niespodzianek. Dotąd `daily-report` pokazywał
+      WYŁĄCZNIE kredyty wydane (przybliżenie strony przychodu) — mimo że
+      prawdziwy koszt Gemini w dolarach jest już liczony i zapisywany co
+      dzień (`system_daily_spend`, reguła 10 głównego wyłącznika), nikt
+      wcześniej nie dociągnął go do samego raportu. Naprawa: karta
+      "Kredyty" w mailu pokazuje teraz też realny koszt AI dziś (USD),
+      obok limitu bezpieczeństwa $125/dzień dla porównania. Nowy formatter
+      `fmtUsd()` (4 miejsca po przecinku) — istniejący `fmt()` zaokrąglał
+      do 1 miejsca, co dla kwot rzędu $0,01-$0,50 (typowy dzienny koszt na
+      wczesnym etapie) pokazywałoby bezużyteczne "$0.0".
+
+      **Uczciwe zastrzeżenie**: system prawdziwych płatności jeszcze nie
+      istnieje (patrz "Do dopisania w przyszłości" przy opisie
+      `daily-report`), więc to na razie sam koszt do obserwowania trendu
+      dzień po dniu, nie pełne zestawienie "koszt vs przychód" — to drugie
+      dopiero gdy powstanie prawdziwy system płatności.
     - **POPRAWKA 2026-08-26(t) — scalanie wyników przy "Sprawdź, czy coś się
       zmieniło" zamiast bezwarunkowego zastąpienia.** Żywe zgłoszenie:
       właściciel wykonał tę akcję dwa razy pod rząd na tej samej stronie i
@@ -4209,6 +4277,25 @@ zupełnie inna liczba, i to ta druga jest poprawna.
   (zasoby/przepływy, sprzężenia zwrotne wzmacniające i równoważące,
   "zawory bezpieczeństwa") — użytkownik świadomie przyjął tę ramę do
   podejmowania decyzji.
+- **KAŻDA zmiana zwiększająca koszt/ryzyko finansowe MUSI mieć w tej samej
+  turze rozważony/zbudowany mechanizm odcięcia (ustalone wprost
+  2026-08-26, po tym jak właściciel zauważył, że dawno tego nie robiłem).**
+  Cytat wprost: "zawsze musisz takie rzeczy rozważać na myśl sprzężeń
+  zwrotnych w naszym systemie i tworzenia od razu możliwości odcięcia gdy
+  wykryte będzie zagrożenie, dawno tego nie robiłeś a chciałem żebyś robił
+  zawsze." W praktyce, przy KAŻDEJ propozycji dodającej nowe wywołanie
+  Gemini/nowy koszt: (1) sprawdzić i jawnie potwierdzić, że koszt
+  przechodzi przez współdzielony `costTracker` (patrz "Etap 2 — reguły
+  A8/A10" niżej) — dzięki temu automatycznie łapie go już istniejący
+  główny wyłącznik (reguła 8: $6,25/zapytanie, reguła 10: $125/dzień) bez
+  budowania niczego nowego; (2) jeśli zmiana wprowadza NOWY rodzaj ryzyka,
+  którego istniejące reguły 1-10 nie łapią (np. nowy typ pętli, nowy
+  zewnętrzny zasób) — zaprojektować dla niego osobny próg/regułę w tej
+  samej turze, nie "później"; (3) jeśli to zmiana kosztowa, ale nie
+  ryzyko awarii (np. świadomy, zaakceptowany wzrost kosztu jak POPRAWKA
+  (r) — biblioteka modeli), zadbać o WIDOCZNOŚĆ (raport/dashboard), a nie
+  o twardy wyłącznik — "kill switch" jest dla ANOMALII, nie dla
+  świadomie zaakceptowanego, zwykłego kosztu.
 - **KOMPLETNOŚĆ WDROŻENIA (ustalone wprost 2026-08-20, po realnym
   incydencie): żadna zmiana nie jest "zrobiona", dopóki NIE działa na
   żywo u właściciela.** Właściciel nie ma jak sam sprawdzić, czy coś
