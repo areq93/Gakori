@@ -2464,6 +2464,46 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(l) — filtr "Najpopularniejsze [portal]" (lista
+      niepowiązanych artykułów na końcu strony), rozpoznawany po wzorcu
+      dat, nie po klasie HTML.** Największe dotąd znalezione źródło szumu
+      w tej sesji: właściciel porównał analizę linku z Business Insider
+      (10818 znaków) z ręcznym tekstem TEGO SAMEGO artykułu (5502 znaków)
+      — **prawie dwukrotna różnica**. Przyczyna: sekcja "Najpopularniejsze
+      w BUSINESS INSIDER" na samym końcu strony — dziesiątki
+      niepowiązanych nagłówków, każdy z osobną datą i podpisem autora, bez
+      rozpoznawalnej klasy HTML pasującej do `NOISE_CLASS_TOKENS` (portal
+      używa własnych, nieprzewidzianych nazw klas). Cała ta lista trafiała
+      do analizy jako "treść artykułu", rozwadniając uwagę modelu —
+      bezpośrednio tłumaczy, dlaczego link (droższy, bo cena zależy od
+      liczby znaków) dawał WYRAŹNIE gorszy wynik (mniej wykrytych wzorców)
+      niż ta sama treść bez szumu ("cena za link jest większa a wynik jest
+      gorszy" — właściciel).
+
+      **Naprawa — rozpoznanie po WZORCU, nie po klasie** (bo klasa jest z
+      definicji różna na każdej stronie): taka lista to zawsze wiele (3+)
+      samodzielnych akapitów będących WYŁĄCZNIE datą/znacznikiem czasu
+      ("dzisiaj 06:05", "wczoraj 16:06", "poniedziałek 19:11",
+      "19.08.2026") — coś, co w prawdziwej prozie artykułu praktycznie się
+      nie zdarza (prawdziwa data publikacji na górze artykułu ma inny,
+      pełniejszy format, np. "26 sierpnia 2026, 6:14" — nie koliduje z tym
+      wzorcem). Znajdujemy NAJWCZEŚNIEJSZY taki akapit i ucinamy WSZYSTKO
+      od dwóch akapitów przed nim (żeby złapać też nagłówek tej pierwszej
+      pozycji listy) do końca tekstu — ta sekcja zawsze jest na samym
+      końcu strony.
+
+      **Zweryfikowane na prawdziwym, pełnym tekście artykułu wklejonym
+      przez właściciela** (odtworzonym w Node, z zachowaniem realnej
+      tabeli zwolnień podatkowych w środku artykułu): filtr poprawnie
+      usuwa całą listę "Najpopularniejsze", NIE rusza tabeli (żadna
+      komórka tabeli — "Za 2027 r. i 2028 r." itp. — nie pasuje do wzorca
+      daty listy), zostawia tylko nieszkodliwy nagłówek sekcji i krótki
+      podpis autora na końcu (kilkadziesiąt znaków, bez wpływu na jakość
+      oceny). **Świadome ograniczenie**: wymaga co najmniej 3 takich
+      "samotnych" akapitów-dat w tekście, żeby się uruchomić (celowo, dla
+      uniknięcia fałszywego trafienia na pojedynczą, prawdziwą datę w
+      treści) — strony z inaczej sformatowaną lub krótszą listą
+      "polecanych" mogą nadal przeciekać częściowo; do dalszej obserwacji.
     - **POPRAWKA 2026-08-26(k) — trzy przyciski ("Zgłoś niezgodność"/
       "Sprawdź, czy coś się zmieniło"/"Wklej własną treść") rozszerzone
       na KAŻDĄ analizę linku, nie tylko ręcznie wklejoną treść.**

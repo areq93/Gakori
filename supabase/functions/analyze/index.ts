@@ -1506,8 +1506,37 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // końcu tuż przed podpisem autora).
     const TEASER_LINE_PREFIXES_UNLESS_FIRST_PARAGRAPH = ['wideo:']
     const EXACT_NOISE_LINES = new Set(['czytaj więcej', 'czytaj dalej', 'zobacz więcej'])
-    const text = paragraphsWithNoise
-      .split('\n\n')
+    let paragraphs = paragraphsWithNoise.split('\n\n')
+
+    // POPRAWKA 2026-08-26(l) — żywy przypadek, prawie DWUKROTNIE wydłużający
+    // tekst: sekcja "Najpopularniejsze w [nazwa portalu]" na samym końcu
+    // strony — dziesiątki niepowiązanych nagłówków, każdy z osobną datą i
+    // podpisem autora, bez rozpoznawalnej klasy HTML (portal właściciela nie
+    // pasował do żadnego tokenu w NOISE_CLASS_TOKENS). Właściciel porównał
+    // analizę linku (10818 znaków) z ręcznym tekstem tego samego artykułu
+    // (5502 znaków) — prawie DWA RAZY więcej, bo cała ta lista trafiała do
+    // analizy jako część "treści artykułu", rozwadniając uwagę modelu i
+    // dając WYRAŹNIE gorszy wynik (mniej wykrytych wzorców) niż ta sama
+    // treść bez szumu. Rozpoznajemy to PO WZORCU, nie po klasie: taka lista
+    // to zawsze wiele (3+) samodzielnych akapitów będących WYŁĄCZNIE datą/
+    // znacznikiem czasu ("dzisiaj 06:05", "wczoraj 16:06", "19.08.2026") —
+    // rzecz, która w prawdziwej prozie artykułu praktycznie się nie
+    // zdarza (prawdziwa data publikacji na górze artykułu ma inny,
+    // pełniejszy format, np. "26 sierpnia 2026, 6:14"). Znajdujemy
+    // NAJWCZEŚNIEJSZY taki akapit i ucinamy WSZYSTKO od dwóch akapitów
+    // przed nim (żeby złapać też nagłówek tej konkretnej pozycji listy) do
+    // końca tekstu — ta sekcja zawsze jest na samym końcu strony, nigdy w
+    // środku prawdziwej treści.
+    const TRAILING_LIST_DATE_RE = /^(?:dzisiaj|wczoraj|poniedziałek|wtorek|środa|czwartek|piątek|sobota|niedziela),?\s*\d{1,2}[:.]\d{2}$|^\d{1,2}\.\d{2}\.\d{4}$/i
+    const dateParagraphIndices = paragraphs
+      .map((p, i) => (TRAILING_LIST_DATE_RE.test(p.trim()) ? i : -1))
+      .filter((i) => i !== -1)
+    if (dateParagraphIndices.length >= 3) {
+      const cutAt = Math.max(0, dateParagraphIndices[0] - 2)
+      paragraphs = paragraphs.slice(0, cutAt)
+    }
+
+    const text = paragraphs
       .filter((para, index) => {
         const lower = para.trim().toLowerCase()
         if (EXACT_NOISE_LINES.has(lower)) return false
