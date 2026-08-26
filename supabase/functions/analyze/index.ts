@@ -1111,12 +1111,58 @@ ${compactList}`
 // podciągu) — inaczej np. polskie "adres" zostałoby błędnie potraktowane
 // jako reklama ("ad"). Nie jest to lista wyczerpująca (każda strona nazywa
 // to nieco inaczej) — pokrywa zdecydowaną większość typowych przypadków.
+// POPRAWKA 2026-08-25(f) — rozszerzone o "tag"/"tags"/"keywords"/"teaser"
+// po żywym przykładzie: lista tagów/tematów pod artykułem ("JURATA KAROL
+// NAWROCKI MARTA NAWROCKA MŁODZIEŻ POLSKA...") i fragment "Czytaj więcej"
+// przetrwały wcześniejsze czyszczenie i myliły model (tekst uznany za
+// "czysty", bo szum rozcieńczył prawdziwą treść) — patrz GAKORI_CONTEXT.md.
+// Świadomie NIE dodajemy tu ogólnych słów jak "more"/"więcej" — zbyt duże
+// ryzyko przypadkowego dopasowania do niewinnej klasy zawierającej to
+// słowo jako część nazwy (np. "more-content"), skupiamy się na precyzyjnych,
+// mało prawdopodobnych do pomylenia tokenach.
 const NOISE_CLASS_TOKENS = new Set([
   'ad', 'ads', 'advert', 'advertisement', 'banner', 'cookie', 'cookies',
   'consent', 'gdpr', 'newsletter', 'subscribe', 'subscription', 'comment',
   'comments', 'related', 'recommended', 'sponsor', 'sponsored', 'promo',
-  'promotion', 'popup', 'share', 'social',
+  'promotion', 'popup', 'share', 'social', 'tag', 'tags', 'keyword',
+  'keywords', 'teaser',
 ])
+
+// Zamienia jedno dopasowanie numerycznej encji HTML (`&#321;` albo
+// `&#x141;`) na prawdziwy znak — fail-open: jeśli punkt kodowy jest
+// nieprawidłowy (np. samotna surogatowa połówka), zostawia oryginalny,
+// niezmieniony tekst zamiast wywalać całe pobranie strony.
+function decodeNumericEntity(original: string, digits: string, radix: number): string {
+  try {
+    return String.fromCodePoint(parseInt(digits, radix))
+  } catch {
+    return original
+  }
+}
+
+// POPRAWKA 2026-08-25(f) — żywy przykład: JEDNA strona miesza NAZWANE
+// encje HTML (`&oacute;` = "ó" — standardowy zestaw HTML4/Latin-1) z
+// NUMERYCZNYMI (`&#322;` = "ł" — bo "ł" nie ma własnej nazwanej encji,
+// nie należy do Latin-1). Bez tej tabeli "niekt&oacute;rym" wychodziło
+// jako dosłowne "niektoacuterym" zamiast "niektórym". Nie jest to
+// kompletny zestaw wszystkich encji HTML (tych jest kilkaset) — tylko
+// najczęstsze akcentowane litery europejskie i typograficzne znaki
+// (myślniki, cudzysłowy), które realnie widzieliśmy na żywo.
+const HTML_NAMED_ENTITIES: Record<string, string> = {
+  aacute: 'á', Aacute: 'Á', eacute: 'é', Eacute: 'É', iacute: 'í', Iacute: 'Í',
+  oacute: 'ó', Oacute: 'Ó', uacute: 'ú', Uacute: 'Ú', ntilde: 'ñ', Ntilde: 'Ñ',
+  ccedil: 'ç', Ccedil: 'Ç', agrave: 'à', Agrave: 'À', egrave: 'è', Egrave: 'È',
+  igrave: 'ì', Igrave: 'Ì', ograve: 'ò', Ograve: 'Ò', ugrave: 'ù', Ugrave: 'Ù',
+  acirc: 'â', Acirc: 'Â', ecirc: 'ê', Ecirc: 'Ê', ocirc: 'ô', Ocirc: 'Ô',
+  ucirc: 'û', Ucirc: 'Û', auml: 'ä', Auml: 'Ä', euml: 'ë', Euml: 'Ë',
+  iuml: 'ï', Iuml: 'Ï', ouml: 'ö', Ouml: 'Ö', uuml: 'ü', Uuml: 'Ü',
+  yacute: 'ý', Yacute: 'Ý', aring: 'å', Aring: 'Å', aelig: 'æ', AElig: 'Æ',
+  oslash: 'ø', Oslash: 'Ø', szlig: 'ß',
+  mdash: '—', ndash: '–', hellip: '…',
+  ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’',
+  laquo: '«', raquo: '»', middot: '·', deg: '°', sect: '§', para: '¶',
+  copy: '©', reg: '®', trade: '™',
+}
 function hasNoiseClass(openTagHtml: string): boolean {
   const tokens: string[] = []
   for (const m of openTagHtml.matchAll(/(?:class|id)="([^"]*)"/gi)) {
@@ -1215,6 +1261,15 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // sama treść artykułu, więc usuwamy KAŻDE wystąpienie <nav>, bez
     // sprawdzania klasy.
     html = stripElementsByTag(html, 'nav', () => true)
+    // POPRAWKA 2026-08-25(f) — żywy przykład: osadzony odtwarzacz wideo
+    // NIEPOWIĄZANEGO tematu w środku artykułu ("WIDEO: ...Miller o decyzji
+    // Tuska" w artykule o zupełnie innej sprawie) — jego "treść" to zawsze
+    // tylko techniczny komunikat zastępczy ("Twoja przeglądarka nie
+    // wspiera odtwarzacza wideo..."), nigdy prawdziwy tekst artykułu, więc
+    // bezpiecznie usuwamy całe <video>/<iframe> (osadzone tweety, mapy,
+    // odtwarzacze) i <noscript> (fallback dla wyłączonego JS) — bez
+    // sprawdzania klasy, tak jak <nav> wyżej.
+    html = stripElementsByTag(html, 'video|iframe|noscript', () => true)
     // Reklamy, baner cookie, newsletter, komentarze, "czytaj też" itp. —
     // rozpoznawane po typowych, powtarzalnych nazwach klas/id (patrz
     // NOISE_CLASS_TOKENS wyżej). ŚWIADOMIE NIE usuwamy <header>/<footer>/
@@ -1242,9 +1297,24 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
       .replace(/&quot;/g, '"')
-      .replace(/&#0?39;/g, "'")
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
+      // POPRAWKA 2026-08-25(f) — dekodowanie NUMERYCZNYCH encji HTML
+      // (`&#321;`/`&#x141;` → "Ł" itd.) — dawniej dekodowaliśmy tylko kilka
+      // nazwanych encji, więc polskie znaki specjalne zapisane w ten
+      // sposób (częste na starszych/nietypowych stronach) wychodziły jako
+      // zniekształcone "M#321;ODZIE#379;" zamiast "MŁODZIEŻ". Ten sam
+      // wzór obejmuje też `&#39;` (apostrof), więc osobna reguła dla niego
+      // nie jest już potrzebna. `decodeNumericEntity()` fail-open na
+      // pojedynczym błędnym dopasowaniu (nieprawidłowy punkt kodowy) —
+      // zostawia ten jeden fragment nietknięty zamiast wywalać całe
+      // pobranie strony.
+      .replace(/&#x([0-9a-fA-F]+);/g, (m, hex) => decodeNumericEntity(m, hex, 16))
+      .replace(/&#(\d+);/g, (m, dec) => decodeNumericEntity(m, dec, 10))
+      // Nazwane encje (patrz HTML_NAMED_ENTITIES wyżej) — fail-open: nazwa
+      // spoza tabeli zostaje nietknięta (np. rzadka encja, na którą nie
+      // trafiliśmy jeszcze na żywo).
+      .replace(/&([a-zA-Z]+);/g, (m, name) => HTML_NAMED_ENTITIES[name] ?? m)
       .replace(/[ \t]+/g, ' ')
       .replace(/ *\n */g, '\n')
       .replace(/\n{3,}/g, '\n\n')

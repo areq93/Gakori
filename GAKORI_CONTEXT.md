@@ -2361,6 +2361,63 @@ zanim założysz, że działa.
       POPRAWKI 2026-08-25(b)) nadal zdarzały się rozjazdy dla tekstów
       różniących się w niewielkim zakresie — do oceny po tym, jak te dwie
       poprawki się "ułożą" w praktyce.
+    - **POPRAWKA 2026-08-25(f) — dalsze oczyszczanie linku: dekodowanie
+      encji HTML + usuwanie odtwarzaczy wideo/list tagów.** Bezpośrednia
+      kontynuacja POPRAWKI 2026-08-25 — właściciel przetestował ten sam
+      link na żywo, wkleił pełny "Pokaż pełny tekst źródłowy" z linku i
+      dla porównania pełny tekst, jaki dałoby ręczne kopiowanie ze strony.
+      Różnica pokazała dwa konkretne, nowe źródła szumu.
+
+      1. **Zniekształcone polskie znaki**: strona miesza NAZWANE encje
+         HTML (`&oacute;` = "ó" — standardowy zestaw HTML4/Latin-1, w
+         którym NIE MA polskich liter) z NUMERYCZNYMI (`&#322;` = "ł",
+         `&#380;` = "ż" — bo tych liter nie ma w Latin-1, więc strona
+         musiała użyć zapisu numerycznego). Dekodowaliśmy dotąd tylko
+         numeryczne — "niekt&oacute;rym" wychodziło jako dosłowne
+         "niektoacuterym". Naprawa: nowa tabela `HTML_NAMED_ENTITIES`
+         (najczęstsze akcentowane litery europejskie + typograficzne
+         znaki jak myślnik/wielokropek/cudzysłowy) — NIE jest to
+         kompletny zestaw wszystkich kilkuset encji HTML, tylko te, na
+         które realnie trafiliśmy na żywo; fail-open (nieznana nazwa
+         zostaje nietknięta).
+      2. **Osadzony odtwarzacz wideo NIEPOWIĄZANEGO tematu** w środku
+         artykułu ("WIDEO: ...Miller o decyzji Tuska" — zupełnie inna
+         sprawa niż analizowany artykuł) — jego "treść" to zawsze tylko
+         techniczny komunikat zastępczy ("Twoja przeglądarka nie wspiera
+         odtwarzacza wideo..."), nigdy prawdziwy tekst. `<video>`/
+         `<iframe>` (osadzone tweety, mapy, odtwarzacze)/`<noscript>`
+         (fallback dla wyłączonego JS) usuwane teraz w całości, bez
+         sprawdzania klasy — tak jak `<nav>` — bo te typy tagów z
+         DEFINICJI nigdy nie zawierają wartościowej treści artykułu, to
+         bezpieczna, ogólna reguła (zero ryzyka fałszywego trafienia).
+      3. **Lista tagów/tematów pod artykułem** ("JURATA KAROL NAWROCKI
+         MARTA NAWROCKA MŁODZIEŻ POLSKA POMORSKIE PREZYDENT..." — luźne
+         słowa kluczowe, nie zdania) — dodane `tag`/`tags`/`keyword`/
+         `keywords`/`teaser` do `NOISE_CLASS_TOKENS`.
+
+      **Uczciwe zastrzeżenie, ważne dla oczekiwań na przyszłość**: test
+      pokazał też, że nawet po tych poprawkach zostaje DROBNY, szczątkowy
+      szum (np. osierocona linijka komunikatu odtwarzacza, gdy sam
+      `<video>` już zniknął, ale otaczający go kontener z podpisem nie
+      pasował do żadnego rozpoznawanego wzorca klasy) — świadomie NIE
+      dodaliśmy tokenu "video"/"embed" do listy szumu, bo ryzykowałoby to
+      przypadkowe usunięcie PRAWDZIWEJ treści przy artykułach, które
+      SĄ o jakimś wideo (klasa zawierająca słowo "video" nie zawsze
+      oznacza czysty szum). **To jest fundamentalne ograniczenie podejścia
+      heurystycznego (dopasowanie po nazwach klas), nie błąd do
+      "ostatecznego" naprawienia** — każda strona nazywa swoje elementy
+      inaczej, więc zawsze będzie jakiś nieprzewidziany przypadek. Cel
+      realistyczny: coraz bliżej jakości ręcznego kopiowania, nie 100%
+      matematyczna identyczność — stąd też istnieją "Zgłoś niezgodność" i
+      "Wklej własną treść" jako świadome, trwałe zabezpieczenia na
+      wypadek przypadków, których żadna heurystyka nie złapie.
+
+      Weryfikacja: bez dostępu do żywej strony z tego środowiska (limit
+      sieciowy sandboksa – brak dostępu do domen spoza dozwolonej listy),
+      więc zweryfikowane na syntetycznym HTML-u wiernie odwzorowującym
+      realną strukturę strony (na podstawie tekstów wklejonych przez
+      właściciela) — potwierdzone poprawne dekodowanie polskich znaków i
+      usunięcie odtwarzacza wideo.
     - **POPRAWKA 2026-08-21(d) — bfcache czyścił formularz ZA PÓŹNO
       (zostawał stary wklejony tekst).** Żywy przykład: po analizie i
       powrocie do menu wklejona wcześniej treść dalej "wisiała" w trybie
