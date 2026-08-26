@@ -4101,6 +4101,66 @@ blokady.**
    istnieje z poprzedniego uruchomienia, drugie uruchomienie da błąd
    "already exists" — to nieszkodliwe, oznacza że już działa.
 
+**POPRAWKA 2026-08-26(ag) — PRAWDZIWA przyczyna nieudanych analiz długich
+PDF-ów znaleziona: limit Gemini 15 zapytań/minutę (RPM), nie limit czasu
+procesora.** Właściciel zgłosił, że 69- i 90-stronicowe PDF-y (poniżej
+limitu 80 stron) regularnie zawodzą. Wcześniejsza hipoteza (limit 2s
+czasu procesora Supabase, patrz POPRAWKA (z)/(ab)) została odłożona po
+tym, jak właściciel sam znalazł w panelu Google AI Studio: model
+`gemini-3.5-flash-lite` ma limit **15 zapytań NA MINUTĘ** dla całego
+projektu/klucza API, a szczyt wykorzystania w tym miesiącu JUŻ go
+przekroczył (17/15).
+
+Potwierdzone w kodzie: hierarchia PDF-a wysyłała dotąd WSZYSTKIE swoje
+zapytania dla danego etapu naraz przez `Promise.all()` — Etap 1
+(`chunkResults`) dla 69 stron to 18 równoległych zapytań w ciągu kilku
+sekund (dla maksymalnego dopuszczalnego 80-stronicowego pliku — 20).
+Etap 1 jest CELOWO "wszystko albo nic" — jeden kawałek odrzucony przez
+Gemini (błąd rate limitu) wywala CAŁĄ analizę. To dobrze tłumaczy
+deterministyczne, powtarzalne awarie na dłuższych plikach. Osobny agent
+Explore potwierdził, że to jedyne dwa miejsca w pliku z takim ryzykiem —
+analiza obrazów (`MAX_IMAGES_PER_SCAN = 6`) zostaje bezpiecznie poniżej
+limitu nawet wysyłana naraz.
+
+**Naprawa**: nowa funkcja `runWithRateLimit()` (zaraz po `callGemini()`)
+— zamiast `Promise.all()`, każdy element listy startuje z góry
+wyliczonym opóźnieniem `i * minStartIntervalMs` względem początku
+wywołania. Świadomie NIE przez zwykłe ograniczenie współbieżności
+(`maxConcurrent`) połączone ze współdzieloną zmienną "czas ostatniego
+startu" — pierwsza taka wersja miała realny wyścig (sprawdzone w
+Node.js PRZED wpisaniem do pliku: kilku równoległych "workerów"
+odczytywało tę samą, jeszcze nieaktualną wartość i mimo to ruszało w tej
+samej chwili — 3 requesty co 6s zamiast jednego). Finalna wersja (każdy
+start ma z góry, niezależnie wyliczone opóźnienie, bez współdzielonego
+stanu) przetestowana w Node.js na symulacji 18 elementów: potwierdzone,
+że nigdy nie ma więcej niż `60000/minStartIntervalMs` startów w żadnym
+60-sekundowym oknie, i że kolejność wyników odpowiada kolejności wejścia.
+
+Nowa stała `PDF_GEMINI_MIN_START_INTERVAL_MS = 6000` (6s → maks. 10
+startów/minutę Z TEJ JEDNEJ analizy, świadomie poniżej limitu 15, z
+zapasem dla innych, równoległych użytkowników systemu w tym samym
+czasie — RPM jest wspólny dla całego projektu, nie osobny na request).
+Podmienione oba wywołania: `chunkResults` (Etap 1) i `level1Results`
+(Poziom 1) — reszta logiki (integralność D13, scalanie, fail-closed dla
+Etapu 1/fail-open dla Poziomu 1) bez zmian, `runWithRateLimit()` jest
+bezpośrednim zamiennikiem `Promise.all()`.
+
+**Konsekwencja dla użytkownika**: długie PDF-y analizują się teraz
+zauważalnie dłużej (dla 69 stron orientacyjnie +1,5-2 minuty łącznego
+czasu oczekiwania) — cena, jakość wyniku i reszta mechanizmu bez zmian.
+
+**Zastrzeżenie właściciela, zapisane na przyszłość**: gdy przejdzie na
+wyższy, płatny tier Google AI (wyższy limit RPM), wróci do tematu —
+wystarczy wtedy podnieść (albo obniżyć bliżej zera) samą stałą
+`PDF_GEMINI_MIN_START_INTERVAL_MS`, żadna inna zmiana w kodzie nie jest
+potrzebna.
+
+Weryfikacja: `node --experimental-strip-types --check` (poprawna
+składnia) oraz `tsc --noEmit --skipLibCheck` (te same dwa przedawnione
+błędy typów co wcześniej, niezwiązane z tą zmianą). Pełny test na żywo —
+na TYM SAMYM 69-stronicowym pliku, który dotąd zawodził — pozostaje po
+stronie właściciela (repo nie ma lokalnego środowiska Supabase CLI).
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
