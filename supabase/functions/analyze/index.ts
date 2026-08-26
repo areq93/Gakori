@@ -1292,7 +1292,7 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
       .replace(/<\/(p|div|li|h[1-6]|tr|blockquote)>/gi, '\n\n')
       .replace(/<br\s*\/?>/gi, '\n')
 
-    const text = html
+    const paragraphsWithNoise = html
       .replace(/<[^>]+>/g, ' ')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
@@ -1319,6 +1319,33 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
       .replace(/ *\n */g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim()
+
+    // POPRAWKA 2026-08-25(g) — żywy przykład, powtórzony na DWÓCH różnych
+    // artykułach: śródartykułowe zapowiedzi zupełnie INNEGO tekstu
+    // ("ZOBACZ: 25-letni Białorusin napadnięty..." w środku artykułu o
+    // czymś zupełnie innym) i samotne "Czytaj więcej" (etykieta
+    // przycisku, nie treść) — żaden z nich nie ma rozpoznawalnej klasy
+    // HTML (to zwykły akapit tekstu w środku artykułu), więc filtrujemy
+    // je PO TREŚCI, całymi akapitami. Świadomie NIE ma tu "WIDEO:" — to
+    // też bywa zapowiedzią niepowiązanego materiału, ale w polskiej
+    // prasie bywa też prawdziwym, legalnym nagłówkiem artykułu O samym
+    // wideo — zbyt duże ryzyko przypadkowego usunięcia prawdziwego
+    // tytułu. Świadome ograniczenie: to lista specyficzna dla języka
+    // polskiego, nie pomoże na stronach w innych językach.
+    const TEASER_LINE_PREFIXES = [
+      'zobacz:', 'zobacz też:', 'czytaj także:', 'czytaj też:',
+      'przeczytaj także:', 'przeczytaj też:', 'polecamy:',
+    ]
+    const EXACT_NOISE_LINES = new Set(['czytaj więcej', 'czytaj dalej', 'zobacz więcej'])
+    const text = paragraphsWithNoise
+      .split('\n\n')
+      .filter((para) => {
+        const lower = para.trim().toLowerCase()
+        return !EXACT_NOISE_LINES.has(lower) && !TEASER_LINE_PREFIXES.some((prefix) => lower.startsWith(prefix))
+      })
+      .join('\n\n')
+      .trim()
+
     // Zbyt krótki wynik to zwykle strona-zaślepka (np. "włącz obsługę
     // JavaScript"), nie prawdziwa treść — traktujemy to jak porażkę.
     if (text.length < 200) return null

@@ -2361,6 +2361,42 @@ zanim założysz, że działa.
       POPRAWKI 2026-08-25(b)) nadal zdarzały się rozjazdy dla tekstów
       różniących się w niewielkim zakresie — do oceny po tym, jak te dwie
       poprawki się "ułożą" w praktyce.
+    - **POPRAWKA 2026-08-25(g) — filtrowanie akapitów-zapowiedzi
+      "ZOBACZ:"/"Czytaj więcej" w treści linku.** Kontynuacja (f) — te same
+      dwa żywe przykłady artykułów pokazały jeszcze jeden rodzaj szumu:
+      śródartykułowe akapity-zapowiedzi INNEGO, niepowiązanego materiału
+      ("ZOBACZ: 25-letni Białorusin napadnięty w centrum Warszawy" w
+      środku zupełnie innego artykułu) oraz samotne etykiety przycisków
+      ("Czytaj więcej"/"Czytaj dalej"/"Zobacz więcej") wplecione w tekst.
+      Żaden z nich nie ma rozpoznawalnej klasy/id HTML (to zwykłe akapity
+      tekstu w środku artykułu, nie osobne elementy z klasą "related"czy
+      "teaser"), więc nie dało się ich złapać przez `NOISE_CLASS_TOKENS`
+      jak resztę szumu — trzeba je rozpoznać PO TREŚCI, całymi akapitami,
+      już po wyciągnięciu czystego tekstu.
+
+      **Naprawa**: nowy krok filtrowania w `fetchUrlAsText()`, PO
+      dekodowaniu encji — dzieli tekst na akapity (po `\n\n`, ten sam
+      podział, który już zachowujemy dla czytelności) i usuwa akapit
+      całkowicie, jeśli: (a) po obcięciu białych znaków i zamianie na
+      małe litery dokładnie pasuje do znanej etykiety przycisku
+      (`EXACT_NOISE_LINES`: "czytaj więcej", "czytaj dalej", "zobacz
+      więcej"), albo (b) zaczyna się od jednego ze znanych prefiksów
+      zapowiedzi (`TEASER_LINE_PREFIXES`: "zobacz:", "zobacz też:",
+      "czytaj także:", "czytaj też:", "przeczytaj także:", "przeczytaj
+      też:", "polecamy:"). Świadomie NIE ma na tej liście "wideo:" — to
+      też bywa zapowiedzią niepowiązanego materiału, ale w polskiej
+      prasie bywa też prawdziwym, legalnym tytułem artykułu O samym
+      wideo (np. "WIDEO: Migracja w politycznej wojence?" jako właściwy
+      nagłówek/lead) — ryzyko przypadkowego usunięcia prawdziwej treści
+      było zbyt duże, więc ten przypadek świadomie zostawiamy.
+
+      **Uczciwe zastrzeżenie**: to lista rozpoznawanych fraz SPECYFICZNA
+      dla języka polskiego — nie pomoże na stronach w innych językach
+      (ten sam, już wcześniej nazwany kompromis co reszta heurystyk
+      czyszczenia strony). Zweryfikowane syntetycznym testem w Node na
+      obu żywych przykładach wklejonych przez właściciela — usuwa
+      dokładnie zapowiedź i "Czytaj więcej", zostawia resztę treści (w
+      tym akapit zaczynający się od "WIDEO:") bez zmian.
     - **POPRAWKA 2026-08-25(f) — dalsze oczyszczanie linku: dekodowanie
       encji HTML + usuwanie odtwarzaczy wideo/list tagów.** Bezpośrednia
       kontynuacja POPRAWKI 2026-08-25 — właściciel przetestował ten sam
