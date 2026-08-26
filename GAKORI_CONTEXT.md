@@ -2490,9 +2490,29 @@ zanim założysz, że działa.
       komentarza w BIBLIOTECE MODELI MENTALNYCH (mówił o "wstępnym
       zawężeniu do kategorii", którego już nie ma od POPRAWKI 2026-08-26).
 
-      **Uczciwe zastrzeżenie**: to nadal instrukcja tekstowa, nie twarda
-      gwarancja — model może jej nie zastosować idealnie za każdym razem,
-      zwłaszcza gdy "remis" jest subiektywną oceną samego modelu. To
+      **POPRAWKA 2026-08-26(n2) — korekta jeszcze tego samego dnia,
+      właściciel złapał realną wadę pierwszej wersji.** Pytanie wprost:
+      "co w przypadku gdy... w tekście znajdą się treści, które będą
+      pasowały do jednego i drugiego, będzie ich więcej — to zawsze
+      zostanie wybrany ten pierwszy w kolejności. to bzdura." Słuszne —
+      pierwsza wersja reguły pozwalała, żeby czysto ARBITRALNA pozycja w
+      bibliotece (nie mająca nic wspólnego z treścią) przebiła model
+      faktycznie lepiej wspierany dowodami w tekście. Naprawiono:
+      kolejność w bibliotece jest teraz WYŁĄCZNIE "rozjemcą ostatniej
+      szansy" (krok 2), NIGDY pierwszym kryterium — krok 1 każe najpierw
+      policzyć, który z remisujących modeli ma WIĘCEJ osobnych,
+      wyraźnych wystąpień/przykładów w CAŁYM analizowanym tekście (nie
+      tylko w jednym spornym cytacie) — to on wygrywa remis, bo
+      odzwierciedla to, co faktycznie dominuje w treści, nie przypadkową
+      pozycję na liście. Kolejność w bibliotece włącza się tylko przy
+      PEŁNYM remisie pod każdym względem (rzadki, skrajny przypadek).
+
+      **Uczciwe zastrzeżenie (nadal aktualne)**: to nadal instrukcja
+      tekstowa, nie twarda gwarancja — model może jej nie zastosować
+      idealnie za każdym razem, zwłaszcza gdy "remis" jest subiektywną
+      oceną samego modelu, a "liczenie dowodów w całym tekście" to wciąż
+      osąd modelu, nie mechaniczne liczenie przez nasz kod — może się
+      różnić między przebiegami tak samo jak reszta rozumowania. To
       pierwszy, tani krok (zero nowych zapytań do Gemini, zero kosztu) —
       jeśli po obserwacji na żywo nadal będą się zdarzać podobne
       przypadki, kolejnym, droższym krokiem pozostaje "15+1" (patrz wyżej,
