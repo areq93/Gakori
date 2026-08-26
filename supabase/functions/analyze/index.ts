@@ -490,6 +490,62 @@ async function isUrlSafeToFetch(urlStr: string): Promise<boolean> {
   return true
 }
 
+// POPRAWKA 2026-08-26(j) — "czy strona się zmieniła" NIE MOŻE być
+// sprawdzane przez dokładne porównanie odcisku palca (sha256Hex) starej i
+// nowej treści — właściciel słusznie zauważył: strony prawie zawsze mają
+// jakiś DROBNY, nieistotny szum, który zmienia się przy każdym pobraniu
+// niezależnie od treści merytorycznej (rotujący widżet "podobne
+// artykuły", zegar publikacji typu "przed chwilą"/"5 minut temu", inny
+// baner reklamowy w treści) — dokładne porównanie odcisku palca uznałoby
+// to za "zmianę" przy KAŻDYM sprawdzeniu, więc "Sprawdź, czy coś się
+// zmieniło" nigdy nie byłoby darmowe, i luka (przeklikiwanie w nadziei na
+// inny wynik) zostałaby otwarta, tylko przez szum strony zamiast przez
+// świadomą edycję. Zamiast dokładnego dopasowania — podobieństwo treści:
+// dzielimy tekst na nakładające się "shingle" (5-wyrazowe fragmenty) i
+// liczymy, jaka część z nich jest wspólna dla starej i nowej wersji
+// (współczynnik Jaccarda). Drobny szum zmienia małą część shingli (wysokie
+// podobieństwo, blisko 1) — prawdziwa edycja treści zmienia dużo więcej.
+// SHINGLE_SIMILARITY_THRESHOLD to świadomy, ostrożny próg — POPRAWKA
+// 2026-08-26(j), test na prawdziwych artykułach z tej sesji: przy progu
+// 0,9 nawet spory, prawdziwy dopisany akapit (40 nowych słów, realna
+// zmiana) dawał podobieństwo 0,929 — czyli MYLNIE przeszedłby próg jako
+// "bez zmian". Podniesiony do 0,96, żeby wymagać wyraźnej bliskości do
+// identyczności, zanim uznamy stronę za niezmienioną — kosztem tego, że
+// czasem świeże sprawdzenie i tak będzie płatne mimo bardzo drobnej
+// zmiany merytorycznej (bezpieczniejszy błąd niż odwrotnie: fałszywe
+// "bez zmian" oznaczałoby oddanie NIEAKTUALNEGO wyniku za prawdziwy).
+// Nadal bez twardych danych z produkcji — do dalszej korekty po
+// zaobserwowaniu, jak to się sprawdza na żywych stronach (patrz
+// GAKORI_CONTEXT.md).
+const SHINGLE_SIZE = 5
+const SHINGLE_SIMILARITY_THRESHOLD = 0.96
+
+function textToShingles(text: string): Set<string> {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+  const shingles = new Set<string>()
+  for (let i = 0; i + SHINGLE_SIZE <= words.length; i++) {
+    shingles.add(words.slice(i, i + SHINGLE_SIZE).join(' '))
+  }
+  // Zbyt krótki tekst nie ma pełnego "shingla" — bierzemy całość jako
+  // jeden, żeby porównanie nadal miało sens zamiast pustego zbioru.
+  if (shingles.size === 0 && words.length > 0) shingles.add(words.join(' '))
+  return shingles
+}
+
+function shingleSimilarity(textA: string, textB: string): number {
+  const a = textToShingles(textA)
+  const b = textToShingles(textB)
+  if (a.size === 0 && b.size === 0) return 1
+  let intersection = 0
+  for (const s of a) if (b.has(s)) intersection++
+  const union = a.size + b.size - intersection
+  return union === 0 ? 1 : intersection / union
+}
+
 // Koduje bajty do base64 w kawałkach — bezpieczny sposób w Deno dla
 // większych plików. `String.fromCharCode(...bytes)` na dużej tablicy
 // (rozłożonej jako pojedyncze argumenty) potrafi przekroczyć limit
@@ -2184,6 +2240,39 @@ Deno.serve(async (req: Request) => {
         // wyżej po pełne uzasadnienie (ten sam artykuł wklejony ręcznie w
         // trybie "Tekst" musi trafić w ten sam wiersz cache'u).
         effectiveContentHash = await sha256Hex(preFetchedText)
+        // POPRAWKA 2026-08-26(j) — patrz shingleSimilarity() wyżej po
+        // pełne uzasadnienie. Jeśli to "Sprawdź, czy coś się zmieniło"
+        // (forceRefresh) dla znanego wiersza (refreshScanId), porównujemy
+        // PODOBIEŃSTWO nowo pobranej treści do już zapisanej — jeśli
+        // strona jest w praktyce niezmieniona (powyżej progu), oddajemy
+        // ISTNIEJĄCY wynik od razu, za darmo, BEZ pytania Gemini drugi
+        // raz i BEZ ekranu zgody na koszt. Domyka to realną lukę: bez
+        // tego ktoś mógłby wielokrotnie klikać "Sprawdź, czy coś się
+        // zmieniło" w nadziei na przypadkowo korzystniejszy wynik AI dla
+        // TEJ SAMEJ treści — teraz każde takie sprawdzenie niezmienionej
+        // strony daje dokładnie ten sam wynik, bo w ogóle nie dotrze do
+        // Gemini.
+        if (forceRefresh && refreshScanId) {
+          const { data: existingForRefresh } = await supabase
+            .from('scans')
+            .select('text_content, result, view_count')
+            .eq('id', refreshScanId)
+            .maybeSingle()
+          if (
+            existingForRefresh &&
+            typeof existingForRefresh.text_content === 'string' &&
+            shingleSimilarity(existingForRefresh.text_content, preFetchedText) >= SHINGLE_SIMILARITY_THRESHOLD
+          ) {
+            await supabase
+              .from('scans')
+              .update({ view_count: (existingForRefresh.view_count as number) + 1 })
+              .eq('id', refreshScanId)
+            return new Response(
+              JSON.stringify({ cached: true, cost: 0, id: refreshScanId, result: existingForRefresh.result, source_url }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+        }
       } else {
         // Własne pobranie zawiodło (np. strona wymaga JavaScriptu) — nie
         // znamy liczby znaków z góry, więc zostajemy przy starej, płaskiej

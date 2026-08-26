@@ -2464,6 +2464,50 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(j) — zamknięcie luki "przeklikiwania w nadziei
+      na inny wynik" przy "Sprawdź, czy coś się zmieniło" (podobieństwo
+      treści, nie dokładny odcisk palca).** Właściciel wprost postawił
+      pytanie strategiczne: skoro pojedyncze analizy mogą się (w
+      niewielkim stopniu) różnić nawet dla tej samej treści, ktoś mógłby
+      próbować budować sobie wizerunek, wielokrotnie klikając "Sprawdź,
+      czy coś się zmieniło" (płatne) w nadziei na przypadkowo
+      korzystniejszy wynik AI, i publikować tylko ten najlepszy. Rozwiązanie
+      strukturalne, nie punktowe: **jeśli świeżo pobrana treść linku jest w
+      praktyce IDENTYCZNA z tym, co już mamy zapisane, w ogóle NIE pytamy
+      Gemini drugi raz** — oddajemy istniejący wynik od razu, za darmo, bez
+      ekranu zgody na koszt. Bez nowego zapytania do AI nie ma nowego "rzutu
+      kostką" — każde sprawdzenie niezmienionej strony daje identyczny wynik.
+
+      **Ważna korekta w trakcie projektowania** (właściciel złapał to od
+      razu): DOKŁADNE porównanie odcisku palca (sha256Hex) starej i nowej
+      treści by nie zadziałało — strony niemal zawsze mają jakiś drobny,
+      nieistotny szum zmieniający się przy każdym pobraniu (rotujący
+      widżet "podobne artykuły", zegar publikacji "przed chwilą"/"X minut
+      temu", inny baner w treści), niezwiązany z rzeczywistą treścią. Przy
+      dokładnym dopasowaniu KAŻDE sprawdzenie wyglądałoby jak "zmiana" —
+      "Sprawdź, czy coś się zmieniło" nigdy nie byłoby darmowe, a luka
+      zostałaby otwarta, tylko przez szum strony zamiast przez świadomą
+      edycję. Naprawa: zamiast dokładnego dopasowania — **podobieństwo
+      treści** (dzielimy tekst na nakładające się 5-wyrazowe "shingle",
+      liczymy współczynnik Jaccarda między starą a nową wersją;
+      `SHINGLE_SIMILARITY_THRESHOLD`). Zweryfikowane na prawdziwych,
+      dłuższych artykułach z tej sesji: przy progu 0,9 nawet spory,
+      prawdziwy dopisany akapit (40 nowych słów) dawał podobieństwo 0,929
+      — mylnie przeszedłby próg jako "bez zmian". Podniesiony do **0,96**.
+      **Uczciwe zastrzeżenie**: to świadomy próg bez twardych danych z
+      produkcji, wybrany tak, żeby błądzić w bezpieczniejszą stronę
+      (czasem świeże sprawdzenie będzie płatne mimo bardzo drobnej zmiany
+      merytorycznej — lepsze niż odwrotnie, czyli oddanie NIEAKTUALNEGO
+      wyniku za prawdziwy) — do dalszej korekty po zaobserwowaniu, jak to
+      się sprawdza na żywych stronach.
+
+      **Uboczny efekt biznesowy, świadomie zaakceptowany przez
+      właściciela**: dziś "Sprawdź, czy coś się zmieniło" ZAWSZE kosztuje
+      kredyty, niezależnie od tego, czy strona faktycznie się zmieniła. Po
+      tej poprawce — kosztuje TYLKO gdy realnie coś się zmieniło. To
+      mniejszy przychód z tej jednej, wąskiej sytuacji, ale też jedyny
+      sposób, żeby naprawa faktycznie zamknęła lukę (a nie tylko
+      przestała kosztować NAS, dalej kusząc użytkownika płatnymi próbami).
     - **POPRAWKA 2026-08-26(i) — filtr "WIDEO:" (śródartykułowe zapowiedzi
       niepowiązanego materiału wideo), z zabezpieczeniem dla pierwszego
       akapitu.** Kontynuacja (g)/(f) — właściciel porównał ręczną kopię
