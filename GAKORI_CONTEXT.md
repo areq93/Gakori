@@ -2464,6 +2464,24 @@ zanim założysz, że działa.
       wdrożyć "15+1" dla tekstu/linku (jedna "porcja" treści, bez podziału
       na strony), zebrać dowody jakości i kosztu, dopiero potem rozważać
       PDF z ustalonym górnym limitem stron dla tego droższego trybu.
+    - **POPRAWKA 2026-08-26(b) — przycisk "Kopiuj" przy pełnym tekście
+      źródłowym (scan.html) + potwierdzenie na żywo naprawy A z (a).**
+      Pierwszy test naprawy A (odcisk palca liczony przez serwer) na żywo
+      NIE zadziałał — właściciel skopiował ręcznie tekst z małego,
+      przewijanego panelu "Pokaż pełny tekst źródłowy" i wkleił do trybu
+      "Tekst", ale dostał drugą, niezależną (płatną) analizę zamiast trafić
+      w cache. Diagnoza: ręczne zaznaczanie myszką w małym, przewijanym
+      okienku łatwo (niezauważalnie dla oka) pomija fragment poza widocznym
+      obszarem — nawet drobna różnica w białych znakach zmienia odcisk
+      palca treści, mimo że na oko tekst wygląda identycznie. Naprawa:
+      nowy przycisk "Kopiuj" (`navigator.clipboard.writeText`) kopiuje
+      programowo CAŁY `data.text_content` — bez ryzyka ręcznego błędu.
+      **Potwierdzone na żywo przez właściciela**: po użyciu przycisku
+      "Kopiuj" (zamiast ręcznego zaznaczania) ten sam tekst wklejony w
+      trybie "Tekst" poprawnie trafił w cache ("Za darmo — z pamięci",
+      licznik wyświetleń wzrósł do 2 na tym samym wierszu) — naprawa A z
+      POPRAWKI 2026-08-26 działa poprawnie, problem leżał wyłącznie w
+      ręcznym kopiowaniu, nie w logice serwera.
     - **POPRAWKA 2026-08-25(g) — filtrowanie akapitów-zapowiedzi
       "ZOBACZ:"/"Czytaj więcej" w treści linku.** Kontynuacja (f) — te same
       dwa żywe przykłady artykułów pokazały jeszcze jeden rodzaj szumu:
