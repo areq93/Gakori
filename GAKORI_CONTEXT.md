@@ -4328,6 +4328,40 @@ mimo tekstu "wczoraj" (drobna niespójność, teraz naprawiona razem z resztą).
 
 Weryfikacja: `tsc --noEmit --skipLibCheck` — brak błędów.
 
+**POPRAWKA 2026-08-27(czwarta) — naprawa pustego podsumowania PDF-a
+(punkt 1 z listy "opanujmy 1,2,3").** Właściciel zgłosił żywy przypadek:
+PDF z poprawnie wykrytymi wzorcami (test 26-stronicowego dokumentu z
+prawdziwymi rozdziałami — pierwszy udany test po naprawie limitu RPM,
+POPRAWKA (ag)/(ah)) dostał całkowicie PUSTE pole "Podsumowanie".
+Zlokalizowane: `composePdfSummary()` nie miała ŻADNEGO mechanizmu
+awaryjnego — jedno nieudane/puste zapytanie do Gemini kończyło się
+cichym `return ''`, bez ponowienia, bez zapisu do dziennika zdarzeń,
+mimo że reszta analizy (wzorce, cytaty) i tak dochodziła do skutku
+normalnie — stąd kompletny wynik z pustym tylko tym jednym polem.
+Uczciwie przyznane właścicielowi: NIE MA pewności, co dokładnie zawiodło
+przy tej jednej próbie (brak było jakiegokolwiek śladu w logach) — dwie
+prawdopodobne przyczyny to (1) to zapytanie leci jako OSTATNIE w całej
+analizie PDF-a, więc mogło akurat przebić współdzielony limit 15
+RPM Gemini, jeśli w tym samym momencie działo się coś jeszcze w
+systemie, albo (2) zwykła, jednorazowa "czkawka" zewnętrznego API.
+
+**Naprawa**: `composePdfSummary()` próbuje teraz DWA razy (pętla,
+ponowienie tylko gdy pierwsza odpowiedź jest pusta/nieudana) — koszt
+pomijalny (to bardzo tanie zapytanie: krótka lista nazw wzorców + prośba
+o dwa zdania, rzędu $0,0004 za próbę, czyli maks. ok. $0,0008 nawet z
+ponowieniem — właściciel świadomie zaakceptował ten koszt po
+przedstawieniu dokładnej liczby). Jeśli MIMO ponowienia wynik dalej jest
+pusty — miejsce wywołania (`Deno.serve`) zapisuje to jako nowy typ
+zdarzenia systemowego, `logSystemIncident('pdf_summary_empty')` —
+świadomie NIE wywala całej analizy z tego powodu (wzorce są ważniejsze
+niż dwuzdaniowy opis, użytkownik i tak dostaje kompletny, użyteczny
+wynik) — tylko daje wreszcie WIDOCZNOŚĆ, jeśli to się powtórzy, zamiast
+znikać bez śladu jak dotąd.
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` (te same dwa przedawnione
+błędy typów co wcześniej, niezwiązane z tą zmianą) oraz `node
+--experimental-strip-types --check` — brak błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

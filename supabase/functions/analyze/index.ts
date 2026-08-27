@@ -1337,14 +1337,29 @@ q_score: ${qScore}
 Wykryte wzorce:
 ${compactList}`
 
-  const data = await callGemini(
-    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } },
-    geminiKey,
-    GEMINI_TIMEOUT_MS,
-    costTracker
-  )
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  return typeof text === 'string' && text.trim() ? text.trim() : ''
+  // POPRAWKA 2026-08-27 — zgłoszone przez właściciela: PDF z realnymi
+  // wynikami (wykryte wzorce) dostał całkowicie PUSTE podsumowanie. Ta
+  // funkcja wcześniej nie miała ŻADNEGO mechanizmu awaryjnego — jedno
+  // nieudane/puste zapytanie do Gemini kończyło się cichym `return ''`,
+  // bez ponowienia i bez śladu w dzienniku zdarzeń, mimo że reszta
+  // analizy (wzorce) i tak dochodziła do skutku normalnie. Teraz: JEDNA
+  // dodatkowa próba przy pustej/nieudanej odpowiedzi (koszt pomijalny —
+  // to bardzo tanie zapytanie, krótka lista nazw + dwa zdania odpowiedzi,
+  // rzędu ułamka centa nawet z ponowieniem) — jeśli i ta zawiedzie,
+  // funkcja WYWOŁUJĄCA (patrz miejsce wywołania w Deno.serve) zapisuje to
+  // do `system_incident_log`, żeby było to wreszcie widoczne, zamiast
+  // znikać bez śladu.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const data = await callGemini(
+      { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } },
+      geminiKey,
+      GEMINI_TIMEOUT_MS,
+      costTracker
+    )
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+    if (typeof text === 'string' && text.trim()) return text.trim()
+  }
+  return ''
 }
 
 // ETAP 2 obrazu — ten sam mechanizm i uzasadnienie co verifyAndRefinePdfPatterns()
@@ -3518,6 +3533,15 @@ ${compactExisting}`
           geminiKey!,
           costTracker
         )
+        // POPRAWKA 2026-08-27 — patrz uzasadnienie w composePdfSummary()
+        // wyżej: jeśli MIMO ponowienia dalej wróciło puste podsumowanie,
+        // zapisujemy to jako zdarzenie systemowe (widoczne w raporcie
+        // dziennym poprzez ogólną liczbę incydentów) — świadomie NIE
+        // wywalamy całej analizy z tego powodu (wzorce są ważniejsze niż
+        // dwuzdaniowy opis, a użytkownik i tak dostaje kompletny wynik).
+        if (!pdfSummary) {
+          await logSystemIncident('pdf_summary_empty')
+        }
         // Ustawiamy `result` BEZPOŚREDNIO (z pominięciem współdzielonego
         // `geminiData` niżej) — PDF ma teraz inną architekturę (wiele
         // zapytań + scalanie), więc generyczna ścieżka "jedno zapytanie →
