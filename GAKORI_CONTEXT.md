@@ -4203,6 +4203,66 @@ błędem), czy coś innego — **wymaga potwierdzenia przy następnym teście**
 (czy komunikat "nie znaleziono" pojawia się BEZPOŚREDNIO po świeżym
 kliknięciu "Analizuj", czy dotyczy starej karty/linku).
 
+## Funkcja daily-changelog-report — dodane 2026-08-27
+
+Nowa Edge Function, trzecia w rodzinie "raportów mailowych" (obok
+`daily-report` i `weekly-model-report`). Wysyła RAZ DZIENNIE, rano, mail
+z podsumowaniem zmian wprowadzonych w Gakori POPRZEDNIEGO DNIA — w
+trzech kategoriach: "Naprawy", "Nowe funkcje", "Ustalenia" (format
+wyraźnie potwierdzony i wybrany przez właściciela). **Wysyła się TYLKO
+w dni, gdy faktycznie coś się zmieniło** — cisza w spokojne dni, na
+wyraźną prośbę właściciela ("nie ma po co spalać pieniędzy").
+
+**Skąd bierze treść**: NIE z surowego `git diff` całego repozytorium
+(za dużo szumu technicznego, trudne do streszczenia) — tylko z fragmentów
+DOPISANYCH w ostatnich 24h do `GAKORI_CONTEXT.md` (ten sam plik, w którym
+piszę te słowa — po każdej wdrożonej zmianie dopisuję tu ludzki, opisowy
+wpis "POPRAWKA [data]([litera])"). Funkcja pyta GitHub API o commity
+dotykające tego pliku na branchu `main` w ostatnich 24h, dla każdego bierze
+"patch" (diff) i wyciąga WYŁĄCZNIE dopisane linie (prefiks `+` w diffie).
+Świadomie przez PRAWDZIWE znaczniki czasu commitów, NIE przez parsowanie
+dat wpisanych ręcznie w tekście (POPRAWKA "2026-08-26" itd.) — te mogłyby
+się pomylić albo nie zostać zaktualizowane, prawdziwy czas commita nigdy
+nie kłamie.
+
+Zebrany tekst leci do Gemini (ten sam model co reszta systemu,
+`gemini-3.5-flash-lite`, wymuszona struktura JSON przez `responseSchema`)
+z prośbą o posortowanie na 3 kategorie i streszczenie KAŻDEGO punktu w
+jednym, prostym zdaniu bez żargonu — dokładnie tak, jak ja tłumaczę
+zmiany właścicielowi w rozmowie. Jeśli commitów nie ma, albo Gemini uzna,
+że nic z wczorajszych wpisów nie jest warte pokazania (np. same
+techniczne poprawki nazw zmiennych) — mail się NIE wysyła.
+
+**Wymagany NOWY sekret** (oprócz tych już istniejących dla
+daily-report/weekly-model-report): `GITHUB_TOKEN` — Personal Access Token
+z uprawnieniem TYLKO do odczytu zawartości repozytorium `areq93/Gakori`
+(Fine-grained token, "Contents: Read-only", zakres ograniczony do TEGO
+JEDNEGO repozytorium — właściciel generuje go sam na github.com, nigdy
+nie jest wpisywany na stałe w kod). Reużywa: `CRON_REPORT_SECRET`,
+`REPORT_RECIPIENT_EMAIL`, `GEMINI_API_KEY`, `BREVO_API_KEY`,
+`BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`. Ma WYŁĄCZONĄ weryfikację JWT
+(Edge Functions → daily-changelog-report → Settings → "Verify JWT with
+legacy secret" → OFF), sama sprawdza `x-cron-secret` — dokładnie jak
+siostrzane funkcje raportowe.
+
+Harmonogram (Supabase SQL Editor, ten sam mechanizm co pozostałe raporty
+— `pg_cron` + `pg_net`):
+```sql
+select cron.schedule(
+  'gakori-daily-changelog-report',
+  '0 9 * * *', -- 9:00 UTC = 11:00 w Polsce latem / 10:00 zimą
+  $$
+  select net.http_post(
+    url := 'https://daulljwdoerclborpctb.supabase.co/functions/v1/daily-changelog-report',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '<TU_WKLEJ_CRON_REPORT_SECRET>'),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+(Ten sam sekret `CRON_REPORT_SECRET`, którego już używają
+`daily-report`/`weekly-model-report` — nie trzeba nowego.)
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
