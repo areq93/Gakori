@@ -236,13 +236,19 @@ const PDF_PAGE_COST_PER_PAGE = 2.5
 // procesora, i to na SŁABSZYM/współdzielonym sprzęcie serwera, nie na
 // komputerze deweloperskim — dla dużego, złożonego pliku mogłoby to realnie
 // zbliżyć się do tego limitu.
-// POPRAWKA 2026-08-26(aa) — krótko podniesione do 160, ale WYCOFANE tego
-// samego dnia (patrz POPRAWKA (ab) w GAKORI_CONTEXT.md): realny test na
-// żywo na 90-stronicowym PDF-ie zakończył się błędem — potwierdzone realne
-// ryzyko z komentarza wyżej (limit procesora), nie hipoteza. Wracamy do
-// 80 — jedynej wartości faktycznie sprawdzonej w produkcji — do czasu aż
-// albo zmniejszymy pracę procesora na stronę, albo znajdziemy inny sposób.
-const PDF_HARD_MAX_PAGES = 80
+// POPRAWKA 2026-08-26(aa)/(ab) — krótko podniesione do 160, potem
+// wycofane do 80 po nieudanym teście na 90 stronach (patrz
+// GAKORI_CONTEXT.md) — wtedy hipotezą był limit procesora.
+// POPRAWKA 2026-08-26(ah) — PRAWDZIWA przyczyna (patrz POPRAWKA (ag)):
+// limit Gemini to 15 zapytań/minutę (RPM), a hierarchia PDF-a (Etap 1 +
+// Poziom 1) wysyła je naraz. Zamiast rozkładać zapytania w czasie
+// (POPRAWKA (ag), WYCOFANE — właściciel wybrał tę drugą opcję), limit
+// stron obniżony tak, żeby SUMA zapytań obu etapów naraz (Etap 1: co
+// PDF_CHUNK_PAGES=4 strony, Poziom 1: co PDF_LEVEL1_MAX_GROUP_PAGES=16
+// stron) zawsze mieściła się WYRAŹNIE poniżej 15 — z zapasem, bo limit
+// RPM jest wspólny dla całego systemu, nie osobny na tę jedną analizę.
+// 36 stron = 9 (Etap 1) + 3 (Poziom 1) = 12 zapytań, zapas 3 poniżej 15.
+const PDF_HARD_MAX_PAGES = 36
 const MAX_PDF_BYTES = 10 * 1024 * 1024 // 10 MB (świadomie mniej niż 20 MB limit obrazów — patrz wyżej)
 // PDF-y (zwłaszcza bliżej PDF_HARD_MAX_PAGES) bywają zauważalnie dłuższe do
 // przetworzenia dla Gemini niż zwykły tekst/obraz — osobny, dłuższy limit
@@ -277,17 +283,6 @@ const PDF_GEMINI_TIMEOUT_MS = 60000 // 60s
 // największych dozwolonych plików) obniżone z 8 na 4: mniejsza część to
 // jeszcze mocniejsza gwarancja, że model nie "zgubi" żadnego fragmentu.
 const PDF_CHUNK_PAGES = 4
-
-// POPRAWKA 2026-08-26(ag) — patrz pełne uzasadnienie przy `runWithRateLimit()`
-// wyżej: limit Gemini to 15 zapytań/minutę (RPM) dla całego projektu, a
-// wysyłanie wszystkich kawałków PDF-a naraz go przebijało. 6000ms = maks.
-// 10 startów/minutę Z TEJ JEDNEJ analizy — świadomie poniżej 15, z
-// zapasem na innych, równoległych użytkowników systemu w tym samym
-// czasie (RPM jest wspólny dla całego klucza API, nie osobny na
-// request). GDY właściciel przejdzie na wyższy, płatny tier Google AI z
-// wyższym limitem RPM — wystarczy podnieść (albo obniżyć bliżej zera) tę
-// JEDNĄ liczbę, żadna inna zmiana w kodzie nie jest wtedy potrzebna.
-const PDF_GEMINI_MIN_START_INTERVAL_MS = 6000
 
 // Nazwy języków (po polsku, w formie "w języku X") używane do parametryzacji
 // instrukcji językowej promptu — patrz buildSystemPrompt(). Klucze muszą się
@@ -1068,51 +1063,6 @@ async function callGemini(
     // aż do zewnętrznego catch (który zwróciłby mniej czytelny komunikat).
     return {}
   }
-}
-
-// POPRAWKA 2026-08-26(ag) — PRAWDZIWA przyczyna nieudanych analiz długich
-// PDF-ów (zgłoszone: 69, 90 stron), znaleziona przez właściciela w panelu
-// Google AI Studio: limit Gemini (`gemini-3.5-flash-lite`) to zaledwie
-// 15 zapytań NA MINUTĘ (RPM) dla całego projektu/klucza API — a szczyt
-// wykorzystania w tym miesiącu już przekroczył ten limit (17/15).
-// Hierarchia PDF-a (Etap 1 — `chunkResults`, Poziom 1 — `level1Results`)
-// wysyłała dotąd WSZYSTKIE swoje zapytania naraz przez `Promise.all()` —
-// dla 69-stronicowego pliku to 18 zapytań Etapu 1 w ciągu kilku sekund,
-// momentalnie i wielokrotnie przebijające limit 15/min. Gemini odpowiada
-// wtedy błędem "za dużo zapytań", a Etap 1 jest CELOWO "wszystko albo
-// nic" (patrz uzasadnienie przy `PDF_CHUNK_PAGES` wyżej) — jeden
-// odrzucony kawałek wywala całą analizę. TO jest przyczyna, nie limit
-// czasu procesora (który był tylko hipotezą, nigdy potwierdzoną).
-//
-// Naprawa: zamiast `Promise.all()`, każdy kolejny element w liście
-// STARTUJE nie wcześniej niż `minStartIntervalMs` po poprzednim —
-// dokładnie jeden nowy start co tyle milisekund, bez względu na to, ile
-// requestów jest już "w locie". To NIE jest to samo co zwykłe
-// ograniczenie współbieżności (`maxConcurrent`) — próba połączenia obu
-// przez wspólną zmienną "czas ostatniego startu" odczytywaną/zapisywaną
-// przez wiele równoległych "workerów" ma wyścig (sprawdzone i odrzucone
-// w Node.js PRZED wpisaniem tutaj — kilku workerów naraz odczytuje tę
-// samą, jeszcze nie zaktualizowaną wartość i rusza w tej samej chwili).
-// Ta wersja unika tego, bo każdy start ma z góry, niezależnie wyliczone
-// opóźnienie (`i * minStartIntervalMs`) — bez współdzielonego stanu
-// odczytywanego asynchronicznie.
-async function runWithRateLimit<T, R>(
-  items: T[],
-  worker: (item: T, index: number) => Promise<R>,
-  options: { minStartIntervalMs: number }
-): Promise<R[]> {
-  const results = new Array<R>(items.length)
-  await Promise.all(
-    items.map(
-      (item, i) =>
-        new Promise<void>((resolve) => setTimeout(resolve, i * options.minStartIntervalMs))
-          .then(() => worker(item, i))
-          .then((r) => {
-            results[i] = r
-          })
-    )
-  )
-  return results
 }
 
 // Tłumaczy GOTOWY wynik analizy na inny język — nie analizuje treści od nowa.
@@ -3392,11 +3342,7 @@ Deno.serve(async (req: Request) => {
         // częścią, nie sumą wszystkich (patrz uzasadnienie przy
         // PDF_CHUNK_PAGES wyżej, dlaczego to bezpiecznie mieści się w
         // limicie 400s Supabase).
-        const chunkResults = await runWithRateLimit(
-          chunkRanges,
-          (r) => analyzePdfChunk(r.start, r.end),
-          { minStartIntervalMs: PDF_GEMINI_MIN_START_INTERVAL_MS }
-        )
+        const chunkResults = await Promise.all(chunkRanges.map((r) => analyzePdfChunk(r.start, r.end)))
 
         if (chunkResults.some((r) => r === null)) {
           await logFailedAttempt()
@@ -3515,11 +3461,7 @@ ${compactExisting}`
           }
         }
 
-        const level1Results = await runWithRateLimit(
-          level1Groups,
-          (g) => analyzePdfLevel1Group(g),
-          { minStartIntervalMs: PDF_GEMINI_MIN_START_INTERVAL_MS }
-        )
+        const level1Results = await Promise.all(level1Groups.map((g) => analyzePdfLevel1Group(g)))
 
         // Scalenie — ten sam wzorzec "corrections po dosłownym cytacie" co
         // POPRAWKA 2026-08-26(v) dla tekstu/linku: fail-open, cytat którego

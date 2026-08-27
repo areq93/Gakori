@@ -4161,6 +4161,48 @@ błędy typów co wcześniej, niezwiązane z tą zmianą). Pełny test na żywo 
 na TYM SAMYM 69-stronicowym pliku, który dotąd zawodził — pozostaje po
 stronie właściciela (repo nie ma lokalnego środowiska Supabase CLI).
 
+**POPRAWKA 2026-08-26(ah) — WYCOFANIE (ag): zamiast rozkładać zapytania w
+czasie, obniżony limit stron PDF-a tak, żeby zmieściły się pod limitem
+RPM WSZYSTKIE NARAZ.** Po teście POPRAWKI (ag) (69-stronicowy PDF trafił
+na inny, osobny problem — "nie znaleziono analizy" mimo braku odjętych
+kredytów, patrz niżej — źródło tego drugiego problemu NIE zostało
+znalezione w tej sesji, wymaga dalszego śledztwa) właściciel zaproponował
+prostszą alternatywę: zamiast czekać między zapytaniami (wolniej, ale
+duży limit stron), po prostu obniżyć limit stron na tyle, żeby SUMA
+zapytań Etapu 1 + Poziomu 1 wysłana NARAZ (jak przed POPRAWKĄ (ag))
+zawsze mieściła się wyraźnie pod limitem 15 RPM — szybciej, kosztem
+maksymalnego rozmiaru obsługiwanego PDF-a. Właściciel wybrał zapas 3
+zapytań (12 zamiast maks. 15) — co odpowiada **36 stronom**
+(`ceil(36/4)=9` zapytań Etapu 1 + `ceil(36/16)=3` zapytania Poziomu 1 =
+12).
+
+Zmiany: `PDF_HARD_MAX_PAGES` 80 → 36. Funkcja `runWithRateLimit()` i
+stała `PDF_GEMINI_MIN_START_INTERVAL_MS` z POPRAWKI (ag) — CAŁKOWICIE
+usunięte (nieużywany kod) — oba wywołania (`chunkResults`,
+`level1Results`) wróciły do zwykłego `Promise.all()`, dokładnie jak
+przed POPRAWKĄ (ag). Zaktualizowany też napis w panelu PDF (`index.html`
++ wszystkie 10 języków w `i18n.js`) — "(maksymalnie 36 stron)".
+
+**Świadomie zaakceptowany kompromis**: maksymalny rozmiar obsługiwanego
+PDF-a spadł z 80 do 36 stron — to celowa decyzja właściciela na etapie
+testowania MVP, priorytetem jest szybkość i pewność działania nad
+rozmiarem pliku. Właściciel zastrzegł, że gdy w przyszłości przejdzie na
+wyższy, płatny tier Google AI (wyższy limit RPM) — wróci do tematu i
+prawdopodobnie podniesie ten limit z powrotem.
+
+**Nierozwiązany, osobny problem, zgłoszony przy tej samej okazji**:
+podczas testowania POPRAWKI (ag) na 69-stronicowym pliku, po ~4 minutach
+oczekiwania, właściciel trafił na komunikat "Nie znaleziono takiej
+analizy" (scan.html) — ale kredyty NIE zostały odjęte, i nie znaleziono
+odpowiadającego wiersza w tabeli `scans` o pasującym czasie. To wyklucza
+zarówno "udana płatna analiza z niedziałającym przyznaniem dostępu", jak
+i "trafienie w cache z tym samym problemem" — obie teorie sprawdzone i
+odrzucone w tej sesji. Nie ustalono, czy to był stary link z wcześniejszej,
+faktycznie nieudanej próby (co byłoby oczekiwanym zachowaniem, nie
+błędem), czy coś innego — **wymaga potwierdzenia przy następnym teście**
+(czy komunikat "nie znaleziono" pojawia się BEZPOŚREDNIO po świeżym
+kliknięciu "Analizuj", czy dotyczy starej karty/linku).
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
