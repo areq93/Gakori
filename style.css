@@ -538,6 +538,20 @@ a { color: var(--accent); }
 }
 .result-summary { margin: 0; line-height: 1.6; }
 
+/* POPRAWKA 2026-08-27(b) — 2-3 świeże, całościowe sugestie z composePdfSummary(),
+   ten sam wzorzec bloku co .summary-block wyżej. */
+.suggested-actions-list { margin: 0; padding-left: 20px; line-height: 1.6; }
+.suggested-actions-list li { margin-bottom: 6px; }
+.suggested-actions-list li:last-child { margin-bottom: 0; }
+
+/* POPRAWKA 2026-08-27(b) — nagłówek rozdziału nad grupą kart wzorców, gdy PDF
+   ma wykryte rozdziały (result.chapters, patrz scan.html). */
+.chapter-heading {
+    font-weight: 700; font-size: 14px; color: var(--ink); margin: 22px 0 10px 0;
+    padding-bottom: 6px; border-bottom: var(--border-w) solid var(--card-border);
+}
+.chapter-heading:first-child { margin-top: 0; }
+
 /* Przeglądarka publicznych analiz (dla niezalogowanych) — lista klikalnych wierszy */
 #publicScansSearch { margin-top: 0; }
 #publicScansList {

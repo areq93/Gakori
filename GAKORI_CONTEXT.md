@@ -4362,6 +4362,93 @@ Weryfikacja: `tsc --noEmit --skipLibCheck` (te same dwa przedawnione
 błędy typów co wcześniej, niezwiązane z tą zmianą) oraz `node
 --experimental-strip-types --check` — brak błędów.
 
+**POPRAWKA 2026-08-27(piąta) — punkt 2 z listy "opanujmy 1,2,3": grupowanie
+kart wzorców PDF po rozdziałach (z prawdziwymi tytułami) + wzbogacone
+podsumowanie o 2-3 świeże, całościowe sugerowane działania.** Właściciel,
+patrząc na żywy test 26-stronicowego PDF-a z rozdziałami, poprosił o dwie
+rzeczy: (1) żeby karty wykrytych wzorców były wizualnie pogrupowane pod
+prawdziwymi tytułami rozdziałów z pliku, przy czym TEN SAM wzorzec w
+RÓŻNYCH rozdziałach ma zostać pokazany OSOBNO (nie łączyć się w jedną
+kartę — grupowanie "×N" w obrębie jednego rozdziału zostaje bez zmian);
+(2) żeby jedyne, dotychczasowe podsumowanie całości dostało dodatkowo 2-3
+NOWE, całościowo zsyntetyzowane sugerowane działania — WYRAŹNIE NIE kopię
+pojedynczych porad "tip" z kart wzorców (te są już widoczne osobno przy
+każdej karcie), tylko wniosek widoczny dopiero patrząc na całą analizę
+razem. Właściciel świadomie ODŁOŻYŁ osobne PISANE podsumowania dla
+każdego rozdziału (nowe zapytanie do Gemini na rozdział) do momentu
+przejścia na wyższy płatny tier Google AI — to by ponownie zbliżyło
+system do limitu 15 RPM, który właśnie naprawiliśmy (POPRAWKA (ag)/(ah))
+— **do przypomnienia właścicielowi, gdy zgłosi zmianę tieru**.
+
+**Zero nowych zapytań do Gemini w tej poprawce** — obie części
+wykorzystują dane, które system i tak już zbierał:
+
+1. **Rozdziały** (`analyze/index.ts`): `analyzePdfChunk()` już zwracał
+   `chapterStarts: Array<{page, title}>` per kawałek Etapu 1 (POPRAWKA
+   2026-08-26(z)), ale dotychczasowy `aggregatedChapterStarts` (wejście
+   dla `buildLevel1Groups()`) DYSKARDOWAŁ tytuły, zostawiając same numery
+   stron. Dopisana mapa `chapterTitleByPage` (strona → pierwszy niepusty
+   tytuł zgłoszony dla tej strony) oraz — PO `buildLevel1Groups()` —
+   grupowanie istniejących `level1Groups` po polu `chapter` (min. `start`
+   / maks. `end` dla każdego numeru rozdziału), z dołączonym tytułem z
+   `chapterTitleByPage`. Wynik trafia do NOWEGO pola `result.chapters:
+   Array<{chapter, title, page_start, page_end}>` — puste, gdy
+   `buildLevel1Groups()` nie wykrył wystarczająco wyraźnego podziału
+   (mniej niż 3 granice łącznie z niejawnym startem strony 1) — wtedy
+   frontend po prostu pokazuje płaską listę jak dotychczas. Pierwszy
+   rozdział (numer 1) może mieć pusty tytuł, jeśli jego granica to
+   niejawny start strony 1, a nie prawdziwie zgłoszony nagłówek — frontend
+   ma na ten wypadek tekst zastępczy "Rozdział {numer}" (klucz i18n
+   `chapter_fallback_title`, 10 języków).
+2. **Wzbogacone podsumowanie + sugerowane działania** (`analyze/index.ts`,
+   `composePdfSummary()`): to NADAL to samo jedno, pojedyncze zapytanie co
+   dotychczas, tylko: (a) wejściowa lista wzorców dostaje teraz dopisane
+   pole "tip" (poradę) przy każdej pozycji — wcześniej Gemini "widziało"
+   tylko typ i nazwę wzorca, bez porad; (b) `responseMimeType`/
+   `responseSchema` zmienione ze zwykłego tekstu na JSON
+   (`PDF_SUMMARY_SCHEMA`: `{summary: string, suggested_actions:
+   string[]}`), z promptem wprost proszącym o 2-3 KRÓTKIE, całościowe
+   sugestie, WYRAŹNIE zakazującym kopiowania pojedynczych porad z listy —
+   ma to być wniosek widoczny dopiero z perspektywy całej analizy (np.
+   powtarzający się mechanizm w kilku miejscach dokumentu). Istniejący
+   mechanizm ponowienia (POPRAWKA 2026-08-27) zachowany bez zmian —
+   ponawia teraz przy pustym/nieudanym/niesparsowalnym JSON-ie, nie tylko
+   pustym tekście. `result.suggested_actions: string[]` — nowe pole obok
+   `result.summary`.
+
+**Frontend** (`scan.html`): dotychczasowe grupowanie kart "po nazwie"
+(`groups`/`groupIndexByName`) wydzielone do osobnej funkcji
+`buildGroups()`, wywoływanej TERAZ OSOBNO w obrębie każdego rozdziału
+(gdy `result.chapters` niepuste i `input_type === 'pdf'`) zamiast raz dla
+całej płaskiej listy — stąd ten sam wzorzec w dwóch różnych rozdziałach
+dostaje dwie osobne karty. Budowanie pojedynczej karty wydzielone do
+`renderGroup()` (zwraca element zamiast od razu go dołączać) — pozwala
+wywołać ją zarówno z pętli po rozdziałach, jak i (dla PDF-ów bez
+wykrytych rozdziałów, oraz dla trybu tekst/link/obraz) w dotychczasowej,
+płaskiej ścieżce, bez duplikacji kodu samej karty. Wzorce, których strona
+z jakiegoś powodu nie mieści się w żadnym zgłoszonym zakresie rozdziału
+(nie powinno się zdarzać, ale — zgodnie ze stałą zasadą tego projektu:
+nigdy nie gubić wyniku po cichu) trafiają na koniec listy bez nagłówka
+rozdziału, zamiast zniknąć. Tylko PIERWSZA karta na całej stronie
+(niezależnie od rozdziału) zostaje domyślnie rozwinięta — bez zmian
+względem dotychczasowego zachowania. Nowy blok `#scanSuggestedActionsBlock`
+pod istniejącym podsumowaniem — ukryty, gdy `result.suggested_actions`
+puste/brak (starsze, zcache'owane analizy sprzed tej zmiany).
+
+**Nowe klucze i18n** (10 języków): `suggested_actions_label` ("Sugerowane
+działania"), `chapter_fallback_title` ("Rozdział {number}"). Nowe klasy
+CSS w `style.css`: `.chapter-heading`, `.suggested-actions-list`.
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` na `analyze/index.ts` (te same
+dwa przedawnione błędy typów co wcześniej, przesunięte tylko o numer
+linii, niezwiązane z tą zmianą) oraz `node --experimental-strip-types
+--check` — brak błędów. Składnia JS w `scan.html` sprawdzona osobno
+(wyciągnięta z bloków `<script>` i przepuszczona przez `node --check`) —
+brak błędów. Pełny test na żywo wymaga ręcznego wdrożenia w Supabase
+Dashboard (backend) + wypchnięcia frontendu (`scan.html`/`style.css`/
+`i18n.js`) na `main` — właściciel przetestuje na PDF-ie z realnymi
+rozdziałami.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

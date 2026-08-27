@@ -1319,19 +1319,44 @@ ${JSON.stringify(patterns)}`
 // wysyłamy tu ponownie treści PDF-a (drogie, zbędne) — tylko krótką listę
 // już wykrytych wzorców (typ + nazwa) i ogólny wynik, więc to tanie,
 // szybkie zapytanie.
+// POPRAWKA 2026-08-27(b) — schemat odpowiedzi dla composePdfSummary()
+// rozszerzony o "suggested_actions": właściciel poprosił o 2-3 ŚWIEŻO
+// zsyntetyzowane, całościowe sugerowane działania (patrząc na CAŁĄ
+// analizę razem — wzorce + ich indywidualne porady "tip"), WYRAŹNIE NIE
+// kopię pojedynczych "tip" z kart wzorców (te już są widoczne osobno na
+// każdej karcie). Nadal JEDNO zapytanie do Gemini, ten sam koszt co
+// dotychczasowe samo podsumowanie — patrz uzasadnienie w prompt() niżej.
+const PDF_SUMMARY_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string' },
+    suggested_actions: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['summary', 'suggested_actions'],
+}
+
 async function composePdfSummary(
-  patterns: Array<{ pattern_type: string; name: string }>,
+  patterns: Array<{ pattern_type: string; name: string; tip?: string }>,
   qScore: number,
   langCode: string,
   geminiKey: string,
   costTracker?: CostTracker
-): Promise<string> {
+): Promise<{ summary: string; suggested_actions: string[] }> {
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const compactList =
     patterns.length > 0
-      ? patterns.map((p) => `- [${p.pattern_type}] ${p.name}`).join('\n')
+      ? patterns
+          .map((p) => `- [${p.pattern_type}] ${p.name}${p.tip ? ` — porada: ${p.tip}` : ''}`)
+          .join('\n')
       : '(brak wykrytych wzorców)'
-  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych w dokumencie PDF, oraz ogólny wynik rzetelności (q_score, 0-100, gdzie 100 = w pełni merytoryczny dokument bez manipulacji). Napisz DWUZDANIOWE podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek — konkretne, bez lania wody, bez żargonu. NIGDY nie pisz "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko neutralny opis tego, co znaleziono (patrz zasada NEUTRALNOŚĆ). Zwróć WYŁĄCZNIE sam tekst podsumowania, bez cudzysłowów i bez dodatkowego komentarza.
+  // POPRAWKA 2026-08-27(b) — dołączamy teraz też "tip" (poradę) z każdej
+  // pojedynczej karty wzorca, nie tylko typ/nazwę jak dotychczas — Gemini
+  // pisząc podsumowanie i sugerowane działania "widzi" wcześniej ustalone
+  // porady, więc nowe sugestie mogą z nich realnie korzystać, zamiast
+  // zgadywać na podstawie samych nazw wzorców.
+  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych w dokumencie PDF, wraz z poradą przypisaną do każdego z nich, oraz ogólny wynik rzetelności (q_score, 0-100, gdzie 100 = w pełni merytoryczny dokument bez manipulacji). Masz dwa zadania, oba w języku ${langName}:
+1. Napisz DWUZDANIOWE podsumowanie całości w polu "summary", tak proste, żeby zrozumiał je nawet 12-latek — konkretne, bez lania wody, bez żargonu. NIGDY nie pisz "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko neutralny opis tego, co znaleziono (patrz zasada NEUTRALNOŚĆ).
+2. W polu "suggested_actions" podaj listę 2-3 KRÓTKICH, całościowych sugerowanych działań — spójrz na CAŁĄ analizę razem (wszystkie wzorce i ich porady) i wyciągnij z niej ogólny wniosek, co czytelnik powinien zrobić dalej. To NIE MOŻE być kopia ani przeróbka pojedynczej porady z listy niżej — to ma być coś, co widać dopiero patrząc na całość, np. powtarzający się mechanizm w kilku miejscach dokumentu. Jeśli lista wzorców jest pusta, zwróć pustą listę w "suggested_actions".
 
 q_score: ${qScore}
 Wykryte wzorce:
@@ -1351,15 +1376,29 @@ ${compactList}`
   // znikać bez śladu.
   for (let attempt = 0; attempt < 2; attempt++) {
     const data = await callGemini(
-      { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } },
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: PDF_SUMMARY_SCHEMA },
+      },
       geminiKey,
       GEMINI_TIMEOUT_MS,
       costTracker
     )
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-    if (typeof text === 'string' && text.trim()) return text.trim()
+    if (typeof text === 'string' && text.trim()) {
+      try {
+        const parsed = JSON.parse(text)
+        const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : ''
+        const suggestedActions = Array.isArray(parsed.suggested_actions)
+          ? parsed.suggested_actions.filter((a: unknown): a is string => typeof a === 'string' && a.trim().length > 0)
+          : []
+        if (summary) return { summary, suggested_actions: suggestedActions }
+      } catch {
+        // nieudany parsing traktujemy tak samo jak pustą odpowiedź — ponów
+      }
+    }
   }
-  return ''
+  return { summary: '', suggested_actions: [] }
 }
 
 // ETAP 2 obrazu — ten sam mechanizm i uzasadnienie co verifyAndRefinePdfPatterns()
@@ -3402,6 +3441,44 @@ Deno.serve(async (req: Request) => {
         // nazwy już znalezionych, jeśli źle dopasowane.
         const aggregatedChapterStarts = chunkResults.flatMap((r) => r!.chapterStarts.map((c) => c.page))
         const level1Groups = buildLevel1Groups(pdfPageCount, aggregatedChapterStarts)
+        // POPRAWKA 2026-08-27(b) — tytuł każdego rozdziału, zebrany z tych
+        // samych `chapterStarts` co wyżej (zero nowego zapytania). Gdy ta
+        // sama strona zgłoszona jako początek rozdziału przez więcej niż
+        // jeden kawałek Etapu 1 (nie powinno się zdarzać, ale na wszelki
+        // wypadek) — zostaje pierwszy niepusty tytuł.
+        const chapterTitleByPage = new Map<number, string>()
+        for (const r of chunkResults) {
+          for (const c of r!.chapterStarts) {
+            if (c.title && !chapterTitleByPage.has(c.page)) chapterTitleByPage.set(c.page, c.title)
+          }
+        }
+        // POPRAWKA 2026-08-27(b) — finalna lista rozdziałów dla frontendu
+        // (grupowanie kart wzorców na scan.html), zbudowana WYŁĄCZNIE z
+        // `level1Groups` (ma już poprawnie wyliczone granice, patrz
+        // buildLevel1Groups() wyżej) — bez żadnego nowego zapytania do
+        // Gemini. Puste, gdy `buildLevel1Groups()` nie wykrył wystarczająco
+        // wyraźnego podziału na rozdziały (`chapter: null` dla wszystkich
+        // grup) — wtedy frontend ma po prostu pokazać płaską listę, jak
+        // dotychczas.
+        const chapterRanges = new Map<number, { start: number; end: number }>()
+        for (const g of level1Groups) {
+          if (g.chapter === null) continue
+          const existing = chapterRanges.get(g.chapter)
+          if (existing) {
+            existing.start = Math.min(existing.start, g.start)
+            existing.end = Math.max(existing.end, g.end)
+          } else {
+            chapterRanges.set(g.chapter, { start: g.start, end: g.end })
+          }
+        }
+        const resultChapters = [...chapterRanges.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([chapterNum, range]) => ({
+            chapter: chapterNum,
+            title: chapterTitleByPage.get(range.start) || '',
+            page_start: range.start,
+            page_end: range.end,
+          }))
 
         async function analyzePdfLevel1Group(
           group: { start: number; end: number; chapter: number | null }
@@ -3526,8 +3603,8 @@ ${compactExisting}`
           0
         )
         const pdfQScore = Math.round(weightedScoreSum / pdfPageCount)
-        const pdfSummary = await composePdfSummary(
-          verifiedPatterns as Array<{ pattern_type: string; name: string }>,
+        const { summary: pdfSummary, suggested_actions: pdfSuggestedActions } = await composePdfSummary(
+          verifiedPatterns as Array<{ pattern_type: string; name: string; tip?: string }>,
           pdfQScore,
           outputLanguage,
           geminiKey!,
@@ -3546,7 +3623,17 @@ ${compactExisting}`
         // `geminiData` niżej) — PDF ma teraz inną architekturę (wiele
         // zapytań + scalanie), więc generyczna ścieżka "jedno zapytanie →
         // jeden JSON" go już nie dotyczy (patrz `if (!result)` niżej).
-        result = { q_score: pdfQScore, patterns: verifiedPatterns, summary: pdfSummary }
+        // POPRAWKA 2026-08-27(b) — nowe pola "chapters" (grupowanie kart na
+        // scan.html, puste gdy brak wykrytych rozdziałów) i
+        // "suggested_actions" (2-3 świeże, całościowe sugestie z
+        // composePdfSummary() wyżej — patrz uzasadnienie tam).
+        result = {
+          q_score: pdfQScore,
+          patterns: verifiedPatterns,
+          summary: pdfSummary,
+          suggested_actions: pdfSuggestedActions,
+          chapters: resultChapters,
+        }
       } else {
         // POPRAWKA 2026-08-26: bez etapu kategoryzacji — patrz komentarz
         // przy buildMentalModelsLibrary() i w gałęzi "url" wyżej.

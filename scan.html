@@ -84,6 +84,10 @@
                 <p class="summary-label" data-i18n="summary_label">Podsumowanie</p>
                 <p id="scanSummary" class="result-summary"></p>
             </div>
+            <div id="scanSuggestedActionsBlock" class="summary-block" style="display:none;">
+                <p class="summary-label" data-i18n="suggested_actions_label">Sugerowane działania</p>
+                <ul id="scanSuggestedActionsList" class="suggested-actions-list"></ul>
+            </div>
             <p id="scanCostNotice" style="margin-top:10px; font-size:12px; color:var(--ink-soft);"></p>
             <p id="scanViewCount" style="margin-top:4px; font-size:12px; color:var(--ink-soft);"></p>
         </div>
@@ -762,17 +766,20 @@
                             // liście. Nazwa bez wartości (stare, zcache'owane analizy sprzed
                             // pola "name") dostaje unikalny klucz per element, żeby przypadkiem
                             // nie zlepić niepowiązanych wzorców w jedną grupę.
-                            const groups = [];
-                            const groupIndexByName = new Map();
-                            r.patterns.forEach((p, idx) => {
-                                const key = p.name || ('__unnamed_' + idx);
-                                if (groupIndexByName.has(key)) {
-                                    groups[groupIndexByName.get(key)].items.push(p);
-                                } else {
-                                    groupIndexByName.set(key, groups.length);
-                                    groups.push({ name: p.name || '', items: [p] });
-                                }
-                            });
+                            function buildGroups(patternList) {
+                                const groups = [];
+                                const groupIndexByName = new Map();
+                                patternList.forEach((p, idx) => {
+                                    const key = p.name || ('__unnamed_' + idx);
+                                    if (groupIndexByName.has(key)) {
+                                        groups[groupIndexByName.get(key)].items.push(p);
+                                    } else {
+                                        groupIndexByName.set(key, groups.length);
+                                        groups.push({ name: p.name || '', items: [p] });
+                                    }
+                                });
+                                return groups;
+                            }
 
                             // Dopisuje treść JEDNEGO wystąpienia wzorca (opcjonalnie odznaka
                             // strony/obrazu, cytat, wyjaśnienie, podpowiedź) do podanego
@@ -841,7 +848,11 @@
                                 });
                             }
 
-                            groups.forEach((group, groupIndex) => {
+                            // Buduje jedną kartę (zwiniętą/pojedynczą) dla grupy — wydzielone z
+                            // dawnej pętli groups.forEach(), żeby dało się wywołać osobno per
+                            // rozdział (patrz POPRAWKA 2026-08-27(b) niżej) albo płasko, bez zmiany
+                            // samej treści karty.
+                            function renderGroup(group, expandedByDefault) {
                                 const first = group.items[0];
                                 // Starsze, już zcache'owane analizy sprzed tej zmiany nie mają
                                 // pattern_type/tip — domyślnie traktujemy je jako "manipulation"
@@ -914,9 +925,56 @@
                                 }
                                 item.appendChild(body);
 
-                                attachToggle(item, header, groupIndex === 0);
-                                patternsEl.appendChild(item);
-                            });
+                                attachToggle(item, header, expandedByDefault);
+                                return item;
+                            }
+
+                            // POPRAWKA 2026-08-27(b) — PDF-y z wykrytymi rozdziałami
+                            // (result.chapters, patrz analyze/index.ts) grupują karty pod
+                            // nagłówkiem z prawdziwym tytułem rozdziału z pliku. Grupowanie po
+                            // nazwie (buildGroups) dzieje się OSOBNO w obrębie każdego
+                            // rozdziału — ten sam wzorzec w różnych rozdziałach NIE łączy się w
+                            // jedną kartę, tak jak ustalone z właścicielem. Tylko PIERWSZA karta
+                            // na całej stronie (niezależnie od rozdziału) jest domyślnie
+                            // rozwinięta, reszta zwinięta — bez zmian względem dotychczasowego
+                            // zachowania.
+                            const hasChapters = data.input_type === 'pdf' && Array.isArray(r.chapters) && r.chapters.length > 0;
+                            let renderedAny = false;
+                            if (hasChapters) {
+                                const matchedPatterns = new Set();
+                                r.chapters.forEach((chapter) => {
+                                    const chapterPatterns = r.patterns.filter((p) => {
+                                        const inRange = typeof p.page === 'number' && p.page >= chapter.page_start && p.page <= chapter.page_end;
+                                        if (inRange) matchedPatterns.add(p);
+                                        return inRange;
+                                    });
+                                    if (chapterPatterns.length === 0) return;
+                                    const heading = document.createElement('h3');
+                                    heading.className = 'chapter-heading';
+                                    heading.innerText = chapter.title || t('chapter_fallback_title', { number: chapter.chapter });
+                                    patternsEl.appendChild(heading);
+                                    buildGroups(chapterPatterns).forEach((group) => {
+                                        patternsEl.appendChild(renderGroup(group, !renderedAny));
+                                        renderedAny = true;
+                                    });
+                                });
+                                // Wzorce, których strona z jakiegoś powodu nie mieści się w
+                                // żadnym zgłoszonym zakresie rozdziału (nie powinno się zdarzać,
+                                // ale nigdy nie gubimy wyniku po cichu) — dokładane na końcu, bez
+                                // nagłówka rozdziału.
+                                const leftover = r.patterns.filter((p) => !matchedPatterns.has(p));
+                                if (leftover.length > 0) {
+                                    buildGroups(leftover).forEach((group) => {
+                                        patternsEl.appendChild(renderGroup(group, !renderedAny));
+                                        renderedAny = true;
+                                    });
+                                }
+                            } else {
+                                buildGroups(r.patterns).forEach((group) => {
+                                    patternsEl.appendChild(renderGroup(group, !renderedAny));
+                                    renderedAny = true;
+                                });
+                            }
                         } else if (r.source_quote) {
                             const quote = document.createElement('blockquote');
                             quote.className = 'result-quote';
@@ -925,6 +983,24 @@
                         }
 
                         document.getElementById('scanSummary').innerText = r.summary || '';
+
+                        // POPRAWKA 2026-08-27(b) — 2-3 świeże, całościowe sugestie z
+                        // composePdfSummary() (patrz analyze/index.ts) — tylko PDF, ukryte
+                        // gdy pole puste/brak (starsze, zcache'owane analizy sprzed tej
+                        // zmiany go nie mają).
+                        const suggestedBlock = document.getElementById('scanSuggestedActionsBlock');
+                        const suggestedList = document.getElementById('scanSuggestedActionsList');
+                        if (Array.isArray(r.suggested_actions) && r.suggested_actions.length > 0) {
+                            suggestedList.innerHTML = '';
+                            r.suggested_actions.forEach((action) => {
+                                const li = document.createElement('li');
+                                li.innerText = action;
+                                suggestedList.appendChild(li);
+                            });
+                            suggestedBlock.style.display = 'block';
+                        } else {
+                            suggestedBlock.style.display = 'none';
+                        }
 
                         document.getElementById('scanLoading').style.display = 'none';
                         document.getElementById('scanContent').style.display = 'block';
