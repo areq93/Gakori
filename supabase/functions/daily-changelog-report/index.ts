@@ -64,6 +64,41 @@ const CATEGORY_SCHEMA = {
 
 type Categorized = { naprawy: string[]; nowe_funkcje: string[]; ustalenia: string[] }
 
+// POPRAWKA 2026-08-27 — ta sama, dokładna logika co w `daily-report`
+// (`warsawYesterdayRange()`), na wyraźną prośbę właściciela o spójność
+// dobową między wszystkimi trzema raportami: liczymy DOKŁADNIE pełną
+// WCZORAJSZĄ dobę czasu polskiego (00:00-24:00 Europe/Warsaw), nie
+// "ostatnie 24 godziny licząc od momentu uruchomienia" jak wcześniej —
+// sprawdzamy przesunięcie strefy czasowej W POŁUDNIE danego dnia
+// (bezpieczny punkt sondujący, z dala od zmiany czasu, która zawsze
+// zdarza się nad ranem), żeby poprawnie obsłużyć oba przesunięcia
+// (UTC+1 zimą, UTC+2 latem) bez twardo wpisanej stałej. Duplikat tej
+// samej funkcji w `daily-report/index.ts` — świadomie, bo każda Edge
+// Function w tym projekcie jest wdrażana i uruchamiana niezależnie
+// (osobne wklejenie kodu w Supabase), nie dzielą wspólnych plików.
+function warsawMidnightUtcIso(dateStr: string): string {
+  const noonUtc = new Date(`${dateStr}T12:00:00Z`)
+  const tzPart =
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Warsaw', timeZoneName: 'shortOffset' })
+      .formatToParts(noonUtc)
+      .find((p) => p.type === 'timeZoneName')?.value || 'GMT+1'
+  const offsetHours = parseInt(tzPart.match(/GMT([+-]\d+)/)?.[1] ?? '1', 10)
+  const utcMidnight = new Date(`${dateStr}T00:00:00Z`)
+  return new Date(utcMidnight.getTime() - offsetHours * 60 * 60 * 1000).toISOString()
+}
+
+function warsawDateStr(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(date)
+}
+
+function warsawYesterdayRange(): { start: string; end: string; dateStr: string } {
+  const todayStr = warsawDateStr(new Date())
+  const todayStart = warsawMidnightUtcIso(todayStr)
+  const yesterdayStr = warsawDateStr(new Date(new Date(todayStart).getTime() - 12 * 60 * 60 * 1000))
+  const yesterdayStart = warsawMidnightUtcIso(yesterdayStr)
+  return { start: yesterdayStart, end: todayStart, dateStr: yesterdayStr }
+}
+
 Deno.serve(async (req: Request) => {
   const expectedSecret = Deno.env.get('CRON_REPORT_SECRET')
   const gotSecret = req.headers.get('x-cron-secret')
@@ -88,16 +123,17 @@ Deno.serve(async (req: Request) => {
     'User-Agent': 'gakori-changelog-bot',
   }
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const yr = warsawYesterdayRange()
 
-  // 1. Które commity w ostatnich 24h dotknęły GAKORI_CONTEXT.md na branchu
+  // 1. Które commity z DOKŁADNIE wczorajszej doby polskiej (`yr.start`
+  // włącznie, `yr.end` wyłącznie) dotknęły GAKORI_CONTEXT.md na branchu
   // main? (main jest zawsze fast-forwardowany do tego samego stanu co
   // branch roboczy — patrz GAKORI_CONTEXT.md, "KOMPLETNOŚĆ WDROŻENIA" —
   // więc main ma zawsze pełną, aktualną historię, bez duplikatów.)
   let commits: Array<{ sha: string }> = []
   try {
     const commitsRes = await fetch(
-      `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits?path=${encodeURIComponent(CHANGELOG_FILE_PATH)}&since=${since}&sha=main`,
+      `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits?path=${encodeURIComponent(CHANGELOG_FILE_PATH)}&since=${yr.start}&until=${yr.end}&sha=main`,
       { headers: githubHeaders }
     )
     if (!commitsRes.ok) {
@@ -237,7 +273,10 @@ ${addedText}`
 </div>`
   }
 
-  const dateStr = new Date().toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' })
+  // POPRAWKA 2026-08-27 — data w treści/temacie to teraz zawsze WCZORAJSZA
+  // data (`yr.dateStr`), nie dzisiejsza — mail przychodzi rano, ale opisuje
+  // poprzednią dobę (ten sam powód co w `daily-report`).
+  const dateStr = new Date(`${yr.dateStr}T12:00:00Z`).toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' })
   const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto, co zmieniło się w Gakori wczoraj — ${dateStr}.</p>
 ${renderSection('🔧 Naprawy', naprawy, '#b45309')}
 ${renderSection('✨ Nowe funkcje', noweFunkcje, '#15803d')}

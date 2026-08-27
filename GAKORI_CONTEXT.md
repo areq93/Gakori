@@ -4312,6 +4312,22 @@ Weryfikacja: `tsc --noEmit --skipLibCheck` — brak błędów. `node
 górze, więc nie dotyczy go usterka node opisana przy POPRAWCE (ah) dla
 pliku bez importów).
 
+**POPRAWKA 2026-08-27(trzecia) — ta sama precyzja dla
+`daily-changelog-report`, dla spójności.** Właściciel poprosił o dokładnie
+tę samą poprawkę co przy `daily-report` wyżej — funkcja liczyła dotąd
+"ostatnie 24h licząc od momentu uruchomienia" (`since = Date.now() - 24h`)
+zamiast pełnej wczorajszej doby polskiej. Dopisane te same funkcje
+`warsawMidnightUtcIso()`/`warsawDateStr()`/`warsawYesterdayRange()`
+(świadomy duplikat z `daily-report/index.ts` — każda Edge Function w tym
+projekcie jest wdrażana niezależnie, nie dzielą wspólnych plików).
+Zapytanie do GitHub API o commity dostało teraz oba parametry —
+`since=${yr.start}&until=${yr.end}` (wcześniej tylko `since`, bez górnej
+granicy) — dokładnie wyznaczając wczorajszą dobę. Data w treści/temacie
+maila (`dateStr`) też poprawiona — wcześniej pokazywała DZISIEJSZĄ datę
+mimo tekstu "wczoraj" (drobna niespójność, teraz naprawiona razem z resztą).
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` — brak błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
