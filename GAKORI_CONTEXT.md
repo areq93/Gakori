@@ -4263,6 +4263,55 @@ select cron.schedule(
 (Ten sam sekret `CRON_REPORT_SECRET`, którego już używają
 `daily-report`/`weekly-model-report` — nie trzeba nowego.)
 
+**POPRAWKA 2026-08-27(druga) — `daily-report` przesunięty na rano +
+100% dokładne liczenie "wczoraj" (pełna doba polska).** Właściciel
+zauważył, że `daily-report` (statystyki: rejestracje, analizy, kredyty,
+koszt AI...) leciał o 14:00 UTC = 16:00 w Polsce, nie rano jak nowy
+`daily-changelog-report` — i słusznie zauważył, że skoro oba maile mają
+teraz przychodzić rano, ten drugi powinien też opisywać PEŁNĄ,
+WCZORAJSZĄ dobę polską (00:00-24:00 Europe/Warsaw), a nie "ostatnie 24h
+liczone od momentu uruchomienia" (dawne `since(24)`/`dayKey()` na
+surowym UTC — dawało inne okno w zależności od godziny uruchomienia).
+
+Zmiany w `daily-report/index.ts`:
+- Nowe funkcje `warsawMidnightUtcIso()`/`warsawDateStr()`/
+  `warsawYesterdayRange()` — liczą DOKŁADNE granice wczorajszej doby
+  polskiej jako instanty UTC, sprawdzając rzeczywiste przesunięcie strefy
+  czasowej (`Intl.DateTimeFormat` z `timeZoneName: 'shortOffset'`) W
+  POŁUDNIE danego dnia (bezpieczny punkt sondujący, z dala od zmiany
+  czasu, która zawsze zdarza się nad ranem) — poprawnie obsługuje zarówno
+  UTC+1 (zima), jak i UTC+2 (lato), bez twardo wpisanej stałej.
+- WSZYSTKIE zapytania liczące "ostatnie 24h" (analizy, kredyty, zgłoszenia
+  niezgodności, niedostarczone maile, ponowienia po błędzie platformy)
+  zamienione z `since(24)` na dokładny zakres `.gte(yr.start).lt(yr.end)`.
+- Rejestracje: grupowanie po DACIE WARSZAWSKIEJ każdego konta (nie
+  surowym UTC) — dotyczy też 7-dniowej średniej porównawczej, żeby
+  liczyła się z tym samym rodzajem doby.
+- Realny koszt AI (`system_daily_spend`) i statystyki Brevo: kluczowane
+  teraz datą WCZORAJSZĄ (`yr.dateStr`), nie dzisiejszą. Świadome
+  zastrzeżenie: Brevo liczy swoje własne statystyki dobowe wg WŁASNEJ
+  strefy czasowej konta, nie naszej — to jedyne miejsce w tym pliku, gdzie
+  100% precyzji nie zależy tylko od nas.
+- Cała treść maila zmieniona z "dziś"/"dzisiaj" na "wczoraj" (etykiety,
+  nagłówek, temat) — data w mailu to teraz zawsze data WCZORAJSZA, nie
+  dzisiejsza (mail przychodzi rano, ale opisuje poprzednią dobę).
+- Zmienne przemianowane dla jasności: `newToday`→`newYesterday`,
+  `scansToday`→`scansYesterday`, `creditsSpentToday`→`creditsSpentYesterday`,
+  `aiCostTodayUsd`→`aiCostYesterdayUsd`, `emailsSentToday`→`emailsSentYesterday`.
+  Stare funkcje `since()`/`dayKey()` (na surowym UTC) usunięte —
+  zastąpione w 100% przez `warsawYesterdayRange()`.
+
+**Harmonogram** — zadanie `gakori-daily-report` (jobid 9) przestawione z
+`0 14 * * *` na `0 9 * * *` (to samo co `daily-changelog-report`):
+```sql
+select cron.alter_job(job_id := 9, schedule := '0 9 * * *');
+```
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` — brak błędów. `node
+--experimental-strip-types --check` — brak błędów (ten plik ma import na
+górze, więc nie dotyczy go usterka node opisana przy POPRAWCE (ah) dla
+pliku bez importów).
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

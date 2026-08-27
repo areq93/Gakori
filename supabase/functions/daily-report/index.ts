@@ -42,12 +42,41 @@ const LANGUAGES: { code: string; name: string }[] = [
   { code: 'ar', name: 'arabski' },
 ]
 
-function since(hours: number): string {
-  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+// POPRAWKA 2026-08-27 — właściciel poprosił o 100% dokładność: raport ma
+// opisywać DOKŁADNIE pełną WCZORAJSZĄ dobę czasu polskiego (00:00-24:00
+// Europe/Warsaw), nie "ostatnie 24 godziny licząc od momentu uruchomienia"
+// (dawne `since(24)`/`dayKey()` na surowym UTC — dawało co innego zależnie
+// od godziny uruchomienia funkcji). Sprawdzamy przesunięcie strefy czasowej
+// W POŁUDNIE danego dnia (bezpieczny "sondujący" punkt, z dala od
+// ewentualnej zmiany czasu letni/zimowy, która zawsze zdarza się nad ranem)
+// — dzięki temu poprawnie obsługuje oba przesunięcia (UTC+1 zimą, UTC+2
+// latem), bez twardo wpisanej stałej.
+function warsawMidnightUtcIso(dateStr: string): string {
+  const noonUtc = new Date(`${dateStr}T12:00:00Z`)
+  const tzPart =
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Warsaw', timeZoneName: 'shortOffset' })
+      .formatToParts(noonUtc)
+      .find((p) => p.type === 'timeZoneName')?.value || 'GMT+1'
+  const offsetHours = parseInt(tzPart.match(/GMT([+-]\d+)/)?.[1] ?? '1', 10)
+  const utcMidnight = new Date(`${dateStr}T00:00:00Z`)
+  return new Date(utcMidnight.getTime() - offsetHours * 60 * 60 * 1000).toISOString()
 }
 
-function dayKey(iso: string): string {
-  return iso.slice(0, 10) // YYYY-MM-DD (UTC)
+function warsawDateStr(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(date)
+}
+
+// Zwraca dokładne granice WCZORAJSZEJ doby polskiej jako instanty UTC
+// (`start` włącznie, `end` wyłącznie) — do użycia z `.gte(start).lt(end)`
+// w każdym zapytaniu, które ma liczyć "wczoraj", oraz samą datę (do
+// pokazania w treści/temacie maila — raport teraz zawsze opisuje
+// WCZORAJSZY dzień, bo przychodzi rano).
+function warsawYesterdayRange(): { start: string; end: string; dateStr: string } {
+  const todayStr = warsawDateStr(new Date())
+  const todayStart = warsawMidnightUtcIso(todayStr)
+  const yesterdayStr = warsawDateStr(new Date(new Date(todayStart).getTime() - 12 * 60 * 60 * 1000))
+  const yesterdayStart = warsawMidnightUtcIso(yesterdayStr)
+  return { start: yesterdayStart, end: todayStart, dateStr: yesterdayStr }
 }
 
 function avg(nums: number[]): number | null {
@@ -67,8 +96,13 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  // --- Rejestracje: dziś, średnia z ostatnich 7 dni (do wykrywania nietypowych skoków) ---
-  let newToday: number | null = null
+  // Cały raport opisuje teraz DOKŁADNIE jedną, pełną dobę: WCZORAJSZY dzień
+  // czasu polskiego (patrz `warsawYesterdayRange()` wyżej) — nie "ostatnie
+  // 24h od momentu uruchomienia".
+  const yr = warsawYesterdayRange()
+
+  // --- Rejestracje: wczoraj, średnia z 7 dni SPRZED wczoraj (do wykrywania nietypowych skoków) ---
+  let newYesterday: number | null = null
   let avg7d: number | null = null
   let burstWarning = false
   try {
@@ -83,29 +117,31 @@ Deno.serve(async (req: Request) => {
       page++
     }
 
-    const todayKey = dayKey(new Date().toISOString())
-    newToday = allUsers.filter((u) => dayKey(u.created_at) === todayKey).length
+    newYesterday = allUsers.filter((u) => u.created_at >= yr.start && u.created_at < yr.end).length
 
+    // Grupowanie po DACIE WARSZAWSKIEJ (nie surowym UTC) każdego konta —
+    // żeby 7-dniowa średnia porównywała się z tym samym rodzajem doby, co
+    // liczba "wczoraj" wyżej.
     const perDay: Record<string, number> = {}
     for (const u of allUsers) {
-      const k = dayKey(u.created_at)
-      if (k === todayKey) continue
+      const k = warsawDateStr(new Date(u.created_at))
       perDay[k] = (perDay[k] || 0) + 1
     }
     const last7Keys: string[] = []
     for (let i = 1; i <= 7; i++) {
-      last7Keys.push(dayKey(new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString()))
+      const d = new Date(new Date(yr.start).getTime() - i * 24 * 60 * 60 * 1000)
+      last7Keys.push(warsawDateStr(d))
     }
     avg7d = avg(last7Keys.map((k) => perDay[k] || 0))
-    if (avg7d !== null && newToday !== null && newToday > Math.max(5, avg7d * 3)) {
+    if (avg7d !== null && newYesterday !== null && newYesterday > Math.max(5, avg7d * 3)) {
       burstWarning = true
     }
   } catch (_err) {
     // metryka rejestracji niedostępna — reszta raportu leci dalej
   }
 
-  // --- Analizy (scans) dziś: rozbicie zalogowani/anonimowi, nowe/tłumaczenia ---
-  let scansToday: number | null = null
+  // --- Analizy (scans) wczoraj: rozbicie zalogowani/anonimowi, nowe/tłumaczenia ---
+  let scansYesterday: number | null = null
   let loggedScans: number | null = null
   let anonScans: number | null = null
   let newAnalyses: number | null = null
@@ -114,16 +150,17 @@ Deno.serve(async (req: Request) => {
     const { data, error } = await supabase
       .from('scans')
       .select('discovered_by, is_translation')
-      .gte('created_at', since(24))
+      .gte('created_at', yr.start)
+      .lt('created_at', yr.end)
     if (error) throw error
     const rows = data as { discovered_by: string | null; is_translation: boolean }[]
-    scansToday = rows.length
+    scansYesterday = rows.length
     loggedScans = rows.filter((r) => r.discovered_by).length
-    anonScans = scansToday - loggedScans
+    anonScans = scansYesterday - loggedScans
     translations = rows.filter((r) => r.is_translation).length
-    newAnalyses = scansToday - translations
+    newAnalyses = scansYesterday - translations
   } catch (_err) {
-    // metryki dzisiejszych analiz niedostępne — reszta raportu leci dalej
+    // metryki wczorajszych analiz niedostępne — reszta raportu leci dalej
   }
 
   // --- Najpopularniejsze analizy (top 5 wg wyświetleń) w każdym języku, w którym coś jest ---
@@ -150,16 +187,17 @@ Deno.serve(async (req: Request) => {
     // ranking popularności niedostępny — reszta raportu leci dalej
   }
 
-  // --- Kredyty wydane dziś ---
-  let creditsSpentToday: number | null = null
+  // --- Kredyty wydane wczoraj ---
+  let creditsSpentYesterday: number | null = null
   try {
     const { data, error } = await supabase
       .from('wallet_transactions')
       .select('amount')
       .eq('type', 'spend')
-      .gte('created_at', since(24))
+      .gte('created_at', yr.start)
+      .lt('created_at', yr.end)
     if (error) throw error
-    creditsSpentToday = data.reduce((sum: number, r: any) => sum + Math.abs(r.amount || 0), 0)
+    creditsSpentYesterday = data.reduce((sum: number, r: any) => sum + Math.abs(r.amount || 0), 0)
   } catch (_err) {
     // metryka kredytów niedostępna
   }
@@ -175,32 +213,37 @@ Deno.serve(async (req: Request) => {
   // istnieje, więc na razie to nie jest "koszt vs przychód" 1:1 — to sam
   // koszt, do obserwowania trendu dzień po dniu, zanim będzie z czym
   // dokładnie porównać.
-  let aiCostTodayUsd: number | null = null
+  let aiCostYesterdayUsd: number | null = null
   try {
-    const todayKeyWarsaw = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(new Date())
     const { data, error } = await supabase
       .from('system_daily_spend')
       .select('total_usd')
-      .eq('spend_date', todayKeyWarsaw)
+      .eq('spend_date', yr.dateStr)
       .maybeSingle()
     if (error) throw error
-    aiCostTodayUsd = data?.total_usd ?? 0
+    aiCostYesterdayUsd = data?.total_usd ?? 0
   } catch (_err) {
     // metryka kosztu AI niedostępna — reszta raportu leci dalej
   }
 
-  // --- Maile: dziś i suma od początku miesiąca (wg statystyk Brevo) ---
-  let emailsSentToday: number | null = null
+  // --- Maile: wczoraj i suma od początku miesiąca (wg statystyk Brevo) ---
+  // POPRAWKA 2026-08-27 — daty przekazywane Brevo to teraz zawsze WCZORAJSZA
+  // data polska (`yr.dateStr`), zamiast "ostatni dzień licząc od teraz"
+  // (`?days=1`) — spójne z resztą raportu. Brevo liczy swoje statystyki
+  // dobowe wg WŁASNEJ strefy czasowej konta, nie naszej — to jedyne miejsce
+  // w tym pliku, gdzie 100% precyzji nie zależy tylko od nas.
+  let emailsSentYesterday: number | null = null
   let emailsSentThisMonth: number | null = null
   const brevoKey = Deno.env.get('BREVO_API_KEY')
   try {
     if (brevoKey) {
-      const res = await fetch('https://api.brevo.com/v3/smtp/statistics/aggregatedReport?days=1', {
-        headers: { accept: 'application/json', 'api-key': brevoKey },
-      })
+      const res = await fetch(
+        `https://api.brevo.com/v3/smtp/statistics/aggregatedReport?startDate=${yr.dateStr}&endDate=${yr.dateStr}`,
+        { headers: { accept: 'application/json', 'api-key': brevoKey } }
+      )
       if (res.ok) {
         const json = await res.json()
-        if (typeof json.requests === 'number') emailsSentToday = json.requests
+        if (typeof json.requests === 'number') emailsSentYesterday = json.requests
       }
     }
   } catch (_err) {
@@ -208,11 +251,9 @@ Deno.serve(async (req: Request) => {
   }
   try {
     if (brevoKey) {
-      const now = new Date()
-      const monthStart = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
-      const todayStr = now.toISOString().slice(0, 10)
+      const monthStart = `${yr.dateStr.slice(0, 7)}-01`
       const res = await fetch(
-        `https://api.brevo.com/v3/smtp/statistics/aggregatedReport?startDate=${monthStart}&endDate=${todayStr}`,
+        `https://api.brevo.com/v3/smtp/statistics/aggregatedReport?startDate=${monthStart}&endDate=${yr.dateStr}`,
         { headers: { accept: 'application/json', 'api-key': brevoKey } }
       )
       if (res.ok) {
@@ -245,7 +286,8 @@ Deno.serve(async (req: Request) => {
     const { count, error } = await supabase
       .from('link_mismatch_reports')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', since(24))
+      .gte('created_at', yr.start)
+      .lt('created_at', yr.end)
     if (error) throw error
     reports24h = count ?? 0
   } catch (_err) {
@@ -260,7 +302,8 @@ Deno.serve(async (req: Request) => {
     const { count, error } = await supabase
       .from('email_failures')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', since(24))
+      .gte('created_at', yr.start)
+      .lt('created_at', yr.end)
     if (error) throw error
     emailFailures24h = count ?? 0
   } catch (_err) {
@@ -280,7 +323,8 @@ Deno.serve(async (req: Request) => {
     const { count, error } = await supabase
       .from('edge_function_retries')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', since(24))
+      .gte('created_at', yr.start)
+      .lt('created_at', yr.end)
     if (error) throw error
     edgeRetries24h = count ?? 0
   } catch (_err) {
@@ -294,7 +338,11 @@ Deno.serve(async (req: Request) => {
   // wczesnym etapie) pokazywałoby "$0.0" — bezużyteczne. Osobny formatter
   // z 4 miejscami po przecinku, żeby drobne kwoty wciąż było widać.
   const fmtUsd = (v: number | null) => (v === null ? 'brak danych' : `$${v.toFixed(4)}`)
-  const dateStr = new Date().toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' })
+  // POPRAWKA 2026-08-27 — cały raport opisuje teraz WCZORAJSZY dzień
+  // (patrz `warsawYesterdayRange()`/`yr` wyżej) — data w treści/temacie to
+  // data WCZORAJSZA, nie dzisiejsza, żeby mail nie wprowadzał w błąd (mail
+  // przychodzi rano, ale liczby dotyczą poprzedniej doby).
+  const dateStr = new Date(`${yr.dateStr}T12:00:00Z`).toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' })
 
   const card = (label: string, bodyHtml: string) => `
 <div style="background:#f4f4f5;border-radius:12px;padding:16px 20px;margin-bottom:14px;">
@@ -303,43 +351,43 @@ Deno.serve(async (req: Request) => {
 </div>`
 
   const burstHtml = burstWarning
-    ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">Hej, uwaga — dzisiaj zarejestrowało się wyraźnie więcej osób niż zwykle (średnio ostatnio: ${fmt(avg7d)}/dzień). Warto rzucić okiem na listę kont w Supabase (Authentication → Users), czy to na pewno prawdziwi ludzie.</p>`
+    ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">Hej, uwaga — wczoraj zarejestrowało się wyraźnie więcej osób niż zwykle (średnio ostatnio: ${fmt(avg7d)}/dzień). Warto rzucić okiem na listę kont w Supabase (Authentication → Users), czy to na pewno prawdziwi ludzie.</p>`
     : ''
 
   const registrationsCard = card(
     'Rejestracje',
-    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(newToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">nowych kont dziś (średnio ostatnio: ${fmt(avg7d)}/dzień)</span></div>${burstHtml}`
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(newYesterday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">nowych kont wczoraj (średnio ostatnio: ${fmt(avg7d)}/dzień)</span></div>${burstHtml}`
   )
 
   const scansCard = card(
     'Analizy tekstu',
-    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(scansToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">dziś</span></div>
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(scansYesterday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wczoraj</span></div>
 <div style="font-size:14px;color:#374151;margin-top:6px;">zalogowani: ${fmt(loggedScans)} · anonimowi: ${fmt(anonScans)} · nowe: ${fmt(newAnalyses)} · tłumaczenia: ${fmt(translations)}</div>`
   )
 
   const creditsCard = card(
     'Kredyty i koszt AI',
-    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(creditsSpentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">kredytów wydanych dziś</span></div>
-<div style="font-size:14px;color:#374151;margin-top:6px;">realny koszt AI dziś: <strong>${fmtUsd(aiCostTodayUsd)}</strong> (dzienny limit bezpieczeństwa: $125 — patrz system_thresholds.daily_budget_usd)</div>`
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(creditsSpentYesterday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">kredytów wydanych wczoraj</span></div>
+<div style="font-size:14px;color:#374151;margin-top:6px;">realny koszt AI wczoraj: <strong>${fmtUsd(aiCostYesterdayUsd)}</strong> (dzienny limit bezpieczeństwa: $125 — patrz system_thresholds.daily_budget_usd)</div>`
   )
 
   const retriesHtml =
     edgeRetries24h && edgeRetries24h > 0
-      ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">Uwaga: ${edgeRetries24h}× w ostatnich 24h przeglądarka musiała sama ponowić zapytanie po błędzie platformy — każde takie ponowienie to ryzyko podwójnie opłaconego zapytania do Gemini. Jeśli ta liczba rośnie, warto to zbadać.</p>`
+      ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">Uwaga: ${edgeRetries24h}× wczoraj przeglądarka musiała sama ponowić zapytanie po błędzie platformy — każde takie ponowienie to ryzyko podwójnie opłaconego zapytania do Gemini. Jeśli ta liczba rośnie, warto to zbadać.</p>`
       : ''
   const retriesCard = card(
     'Ponowienia po błędzie platformy',
-    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(edgeRetries24h)} <span style="font-size:14px;font-weight:400;color:#6b7280;">w ostatnich 24h</span></div>${retriesHtml}`
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(edgeRetries24h)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wczoraj</span></div>${retriesHtml}`
   )
 
   const emailFailuresHtml =
     emailFailures24h && emailFailures24h > 0
-      ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">${emailFailures24h} mail(i) nie udało się wysłać w ostatnich 24h (prawdopodobnie limit Brevo) — użytkownicy mieli w aplikacji przycisk "wyślij ponownie", ale warto zerknąć, czy to się nie nasila.</p>`
+      ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">${emailFailures24h} mail(i) nie udało się wysłać wczoraj (prawdopodobnie limit Brevo) — użytkownicy mieli w aplikacji przycisk "wyślij ponownie", ale warto zerknąć, czy to się nie nasila.</p>`
       : ''
 
   const emailsCard = card(
     'Maile',
-    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(emailsSentToday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">dziś (limit dzienny Brevo: 300)</span></div>
+    `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(emailsSentYesterday)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wczoraj (limit dzienny Brevo: 300)</span></div>
 <div style="font-size:14px;color:#374151;margin-top:6px;">łącznie w tym miesiącu: ${fmt(emailsSentThisMonth)}</div>${emailFailuresHtml}`
   )
 
@@ -363,10 +411,10 @@ Deno.serve(async (req: Request) => {
   const trustCard = card(
     'Zaufanie do linków (punkt B)',
     `<div style="font-size:24px;font-weight:700;color:#111827;">${fmt(retractedTotal)} <span style="font-size:14px;font-weight:400;color:#6b7280;">wycofanych automatycznie łącznie</span></div>
-<div style="font-size:14px;color:#374151;margin-top:6px;">zgłoszeń niezgodności w ostatnich 24h: ${fmt(reports24h)} — to działa w pełni automatycznie, nic nie musisz robić.</div>`
+<div style="font-size:14px;color:#374151;margin-top:6px;">zgłoszeń niezgodności wczoraj: ${fmt(reports24h)} — to działa w pełni automatycznie, nic nie musisz robić.</div>`
   )
 
-  const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto Twój dzienny przegląd Gakori — ${dateStr}.</p>
+  const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto Twój przegląd Gakori za wczoraj — ${dateStr}.</p>
 ${registrationsCard}
 ${scansCard}
 ${creditsCard}
