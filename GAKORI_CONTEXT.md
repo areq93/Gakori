@@ -4449,6 +4449,85 @@ Dashboard (backend) + wypchnięcia frontendu (`scan.html`/`style.css`/
 `i18n.js`) na `main` — właściciel przetestuje na PDF-ie z realnymi
 rozdziałami.
 
+**POPRAWKA 2026-08-28 — "Metoda Sokratejska i 5x Dlaczego" (rozmowa
+strategiczna z właścicielem): nowe pole "stakes" (konkretna, policzalna
+stawka) + wzmocnione szukanie sprzeczności między twierdzeniami w CAŁYM
+tekście, zero nowych zapytań do Gemini.** Punkt wyjścia — właściciel
+przeprowadził ćwiczenie z pierwszych zasad (falsyfikowalność, twardy
+fakt ekonomiczno-behawioralny) i doszedł do wniosku: ludzie płacą za
+Gakori nie za samo NAZWANIE wzorca manipulacji (to potrafi każde
+darmowe AI jednym promptem), tylko za złapanie czegoś KONKRETNEGO i
+SPRAWDZALNEGO, czego ogólne narzędzie by nie wychwyciło — np. sprzeczną
+liczbę między dwoma miejscami dokumentu. Padło pytanie: "jak konkretnie
+wzmocnilibyśmy to w promptach?"
+
+**Ustalenia po analizie kodu** (żeby nie zgadywać, sprawdzone wprost w
+`analyze/index.ts`): tekst/link już dziś robią DWA zapytania po kolei
+(Etap 2 = główna analiza, Etap 3 = `findAdditionalPatterns()`, "druga
+runda szukania" — czyta cały tekst jeszcze raz). Ryzyko limitu RPM,
+które naprawiliśmy dla PDF-a (POPRAWKA (ag)/(ah)), brało się z
+RÓWNOLEGŁEGO wystrzelenia wielu kawałków na raz (`Promise.all()`) w
+JEDNEJ analizie — to zupełnie inna sytuacja niż dwa zapytania
+SEKWENCYJNIE jedno po drugim. Wniosek: dało się zrobić oba poniższe
+punkty, WYKORZYSTUJĄC istniejące zapytania zamiast dokładać nowe.
+
+**Zmiana 1 — nowe pole "stakes" w schemacie wzorca** (obok "tip"),
+dodane w JEDNYM miejscu (`RESPONSE_SCHEMA`/`IMAGE_RESPONSE_SCHEMA`/
+`PDF_RESPONSE_SCHEMA` — wszystkie inne schematy, np. `DETECTION_RESPONSE_SCHEMA`,
+`PDF_LEVEL1_SCHEMA`, `ADDITIONAL_PATTERNS_SCHEMA`, dziedziczą kształt
+wzorca przez `.properties.patterns`, więc zmiana automatycznie rozeszła
+się wszędzie). Jedno zdanie z KONKRETNĄ, POLICZALNĄ stawką (np. "Reklamowany
+zwrot to 40% miesięcznie — nawet najlepsze legalne fundusze dają ułamek
+tego w skali ROKU") oparte WYŁĄCZNIE na liczbach/faktach z tekstu —
+nowa sekcja "KONKRETNA STAWKA" w `buildSystemPrompt()` wprost zabrania
+wymyślania liczb, których w tekście nie ma (wtedy pole zostaje puste).
+To NIE jest ocena/wyrok (zasada NEUTRALNOŚĆ zostaje nienaruszona) — to
+twardy fakt, nie opinia. `translateResult()` zaktualizowany, żeby
+tłumaczyć też to pole (liczby w nim zostają nietknięte, tłumaczy się
+tylko otaczający tekst). Etap 2 obu weryfikacji (`verifyAndRefinePdfPatterns()`,
+`verifyAndRefineImagePatterns()`) dostał dopisane zadanie: uzupełnić
+puste "stakes", jeśli da się je skonstruować z już istniejącego
+cytatu/wyjaśnienia, albo wyczyścić je, jeśli jest zbyt ogólnikowe.
+
+**Zmiana 2 — wzmocnione szukanie sprzeczności między twierdzeniami**,
+zero nowych zapytań: nowa sekcja "SZUKANIE SPRZECZNOŚCI MIĘDZY
+TWIERDZENIAMI" w `buildSystemPrompt()` (więc automatycznie trafia do
+KAŻDEGO miejsca, które używa `systemPrompt` jako prefiksu — tekst, link,
+obraz, PDF Etap 1 i Poziom 1) instruuje: aktywnie porównuj konkretne
+liczby/daty/obietnice z RÓŻNYCH miejsc całego tekstu pod kątem
+sprzeczności, nie tylko w obrębie jednego fragmentu na raz. Dodatkowo
+wzmocnione dwa konkretne miejsca, które i tak już czytają SZERSZY
+kontekst: Etap 3 tekstu/linku (`findAdditionalPatterns()`, "DRUGA RUNDA
+SZUKANIA" — dopisane, że to najlepszy moment na zestawienie odległych od
+siebie liczb, bo model ma już w pamięci CAŁY tekst) i PDF Poziom 1
+(`analyzePdfLevel1Group()` — instrukcja "sprzeczność między wcześniejszą
+a późniejszą częścią" doprecyzowana o konkretne liczby/daty zamiast
+ogólnikowego sformułowania).
+
+**Frontend** (`scan.html`): nowy blok `.pattern-stakes` na karcie wzorca,
+tuż nad "Co teraz zrobić" (`.pattern-tip`) — celowo BEZ przerywanej ramki
+jak tip, żeby wizualnie odróżnić "co to znaczy" (twardy fakt) od "co
+teraz zrobić" (podpowiedź do działania). Ukryty, gdy pole puste (starsze
+analizy sprzed tej zmiany, albo wzorzec bez żadnych liczb w tekście).
+Nowy klucz i18n `stakes_label` ("Konkretnie:"), 10 języków.
+
+Osobno, przy tej samej rozmowie strategicznej, właściciel zaproponował
+DRUGI, niezależny kierunek: test popytu na koncepcję Gakori przez prostą
+stronę typu "fake door" na domenie `gakori.com` (przycisk zakupu bez
+realnego pobierania pieniędzy, zbieranie e-maili jako sygnał
+zainteresowania) — **odłożone na osobną rozmowę o zakresie strony,
+NIC jeszcze nie zbudowane**, połączone z odłożoną decyzją o samej
+domenie (zadanie #20 na liście roboczej).
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` na `analyze/index.ts` (te
+same dwa przedawnione błędy typów, niezwiązane z tą zmianą) oraz `node
+--experimental-strip-types --check` — brak błędów. Składnia JS
+`scan.html`/`i18n.js` sprawdzona osobno (wyciągnięta z bloków `<script>`,
+`node --check`) — brak błędów. Pełny test jakości (czy nowe pole
+"stakes" i wzmocnione szukanie sprzeczności realnie poprawiają analizę)
+wymaga żywych testów na prawdziwych dokumentach po ręcznym wdrożeniu w
+Supabase Dashboard.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

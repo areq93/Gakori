@@ -530,6 +530,21 @@ a { color: var(--accent); }
 }
 .pattern-tip-text { display: block; }
 
+/* POPRAWKA 2026-08-28 — konkretna, policzalna stawka wynikająca z wzorca
+   (pole "stakes", patrz analyze/index.ts) — celowo BEZ przerywanej ramki
+   jak .pattern-tip (to nie porada do wykonania, tylko twardy fakt), żeby
+   wizualnie było od razu widać różnicę między "co to znaczy" (stakes) a
+   "co teraz zrobić" (tip). */
+.pattern-stakes {
+    display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.55;
+    color: var(--ink); margin: 0 0 10px 0;
+}
+.pattern-stakes-label {
+    font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-soft);
+}
+.pattern-stakes-text { display: block; font-weight: 600; }
+
 /* Podsumowanie całości — osobny blok pod listą wzorców */
 .summary-block { margin-top: 18px; padding-top: 16px; border-top: var(--border-w) solid var(--card-border); }
 .summary-label {

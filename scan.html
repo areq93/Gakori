@@ -812,6 +812,19 @@
                                     explanation.innerText = p.explanation;
                                     container.appendChild(explanation);
                                 }
+                                if (p.stakes) {
+                                    const stakes = document.createElement('div');
+                                    stakes.className = 'pattern-stakes';
+                                    const stakesLabel = document.createElement('span');
+                                    stakesLabel.className = 'pattern-stakes-label';
+                                    stakesLabel.innerText = t('stakes_label');
+                                    stakes.appendChild(stakesLabel);
+                                    const stakesText = document.createElement('span');
+                                    stakesText.className = 'pattern-stakes-text';
+                                    stakesText.innerText = p.stakes;
+                                    stakes.appendChild(stakesText);
+                                    container.appendChild(stakes);
+                                }
                                 if (p.tip) {
                                     const tip = document.createElement('div');
                                     tip.className = 'pattern-tip';

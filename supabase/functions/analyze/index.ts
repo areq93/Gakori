@@ -668,6 +668,10 @@ TWOJA PODPOWIEDŹ TO NIE WYROK CO ROBIĆ Z ŻYCIEM CZYTELNIKA (KRYTYCZNIE WAŻNE
 
 MY JUŻ PRZECZYTALIŚMY CAŁY TEKST ZA CZYTELNIKA (KRYTYCZNIE WAŻNE): Cały sens tej usługi polega na tym, że TY już przeanalizowałeś każdy akapit tego tekstu przez całą bibliotekę modeli mentalnych — czytelnik NIE musi sam niczego w nim doszukiwać. Dlatego pole "tip" NIGDY nie odsyła czytelnika z powrotem DO TEGO SAMEGO analizowanego tekstu/artykułu po dodatkowe informacje (zabronione np.: "sprawdź w artykule/tekście, jakie inne problemy...", "sprawdź w tekście, kto dokładnie...", "przeczytaj uważniej, czy..."). Jeśli w tekście jest jeszcze coś istotnego do wskazania — to Twoje zadanie: znajdź to i opisz jako OSOBNY wzorzec na liście "patterns", nie chowaj tego w podpowiedzi jako pracę domową dla czytelnika. Podpowiedź kieruje WYŁĄCZNIE NA ZEWNĄTRZ tego tekstu — do wyszukiwarki, innego źródła, publicznie sprawdzalnego faktu — czyli do czegoś, czego Ty sam nie masz jak sprawdzić za czytelnika, bo wymaga to wyjścia poza treść, którą już przeanalizowałeś.
 
+KONKRETNA STAWKA (pole "stakes", KRYTYCZNIE WAŻNE — to jest sedno wartości Gakori): darmowe, ogólne narzędzia AI też potrafią nazwać wzorzec manipulacji jednym zdaniem — Gakori ma przewagę tylko wtedy, gdy pokazuje coś KONKRETNEGO i POLICZALNEGO, czego ogólnikowa nazwa wzorca sama nie pokazuje. Pole "stakes" to JEDNO zdanie z konkretną, mierzalną stawką (ile pieniędzy, ile czasu, jaka błędna decyzja) — oparte WYŁĄCZNIE na liczbach/faktach, które już są w analizowanym tekście, albo bezpośrednio i prosto z nich wynikające (proste porównanie/obliczenie, np. zestawienie z ogólnie znanym faktem). To NIE jest ocena ani wyrok (patrz NEUTRALNOŚĆ wyżej) — to twardy, sprawdzalny fakt, nie opinia. Dobry przykład: "Reklamowany zwrot to 40% miesięcznie — nawet najlepsze legalne fundusze inwestycyjne dają ułamek tego w skali całego ROKU." Zły przykład (za ogólnikowe, to nie jest stawka): "To ryzykowna obietnica, uważaj." Jeśli w tekście naprawdę nie ma żadnych liczb/faktów pozwalających skonstruować konkretną stawkę dla danego wzorca (to rzadkie — np. czysto stylistyczny chwyt bez żadnych danych liczbowych) — zostaw pole puste (pusty tekst), NIGDY nie wymyślaj liczb, których w tekście nie ma.
+
+SZUKANIE SPRZECZNOŚCI MIĘDZY TWIERDZENIAMI (WAŻNE): Oprócz nazwanych wzorców z biblioteki, aktywnie porównuj ze sobą konkretne, sprawdzalne twierdzenia (liczby, daty, obietnice, dane) rozsiane w RÓŻNYCH miejscach całego tekstu — nie tylko w jednym fragmencie na raz. Jeśli dwa twierdzenia z różnych części tego samego tekstu przeczą sobie nawzajem (np. wcześniej podana liczba nie zgadza się z późniejszą, albo obietnica w jednym miejscu jest podważona faktem w innym) — to osobny, ważny wzorzec do zgłoszenia (najczęściej pasujący do modelu "Błąd Narracji" z biblioteki, ale nie tylko), z polem "stakes" pokazującym wprost, na czym polega ta sprzeczność liczbowa/faktyczna.
+
 Zasady:
 - Zwróć wynik WYŁĄCZNIE w strukturze zgodnej ze schematem.
 - q_score: liczba 0-100, gdzie 100 = w pełni merytoryczny tekst bez manipulacji, 0 = czysta manipulacja bez wartości.
@@ -677,6 +681,7 @@ Zasady:
   - quote: dosłowny cytat pokazujący tę technikę, w ORYGINALNYM języku analizowanego tekstu (maks. 200 znaków) — patrz sekcja WIERNOŚĆ CYTATU wyżej, zero odstępstw.
   - explanation: jedno proste zdanie w języku ${langName}, zrozumiałe nawet dla 12-latka (patrz sekcja PROSTOTA wyżej) — dlaczego to zasługuje na tę nazwę, konkretnie odnosząc się do treści cytatu.
   - tip: jeden malutki, natychmiast wykonalny krok weryfikacji w języku ${langName} (patrz sekcje PROSTOTA, MIKRO-KROK, "TWOJA PODPOWIEDŹ TO NIE WYROK..." i "MY JUŻ PRZECZYTALIŚMY CAŁY TEKST..." wyżej) — NIGDY zadanie złożone z kilku czynności naraz. NIGDY nie pisz "ufaj", "nie ufaj", "to dobre", "to złe", "wiarygodne", "podejrzane" — ani "zamknij stronę", "przestań czytać", "zignoruj to", "zajmij się czymś innym" czy jakiekolwiek inne polecenie dotyczące dalszego zachowania czytelnika — ani "sprawdź w tekście/artykule..." czy jakiekolwiek inne odesłanie z powrotem DO TEGO SAMEGO analizowanego tekstu (to Twoja praca, nie czytelnika — jeśli jest tam coś ważnego, dodaj to jako osobny wzorzec, nie jako podpowiedź). Podpowiedź kieruje WYŁĄCZNIE na zewnątrz tego tekstu (patrz sekcja NEUTRALNOŚĆ wyżej). Dotyczy to również pattern_type "reasoning" — nawet tam podpowiedź ma zachęcać do dalszej weryfikacji, nie do rozluźnienia czujności.
+  - stakes: jedno zdanie z konkretną, policzalną stawką w języku ${langName} (patrz sekcja KONKRETNA STAWKA wyżej) — oparte na liczbach/faktach z tekstu, nigdy na wymyślonych danych. Pusty tekst, jeśli tekst naprawdę nie zawiera nic, z czego dałoby się skonstruować konkretną stawkę.
 - summary: dwuzdaniowe podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek (patrz sekcja PROSTOTA wyżej) — konkretne, bez lania wody i bez żargonu.`
 }
 
@@ -694,8 +699,9 @@ const RESPONSE_SCHEMA = {
           quote: { type: 'string' },
           explanation: { type: 'string' },
           tip: { type: 'string' },
+          stakes: { type: 'string' },
         },
-        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip'],
+        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip', 'stakes'],
       },
     },
     summary: { type: 'string' },
@@ -787,9 +793,10 @@ const IMAGE_RESPONSE_SCHEMA = {
           quote: { type: 'string' },
           explanation: { type: 'string' },
           tip: { type: 'string' },
+          stakes: { type: 'string' },
           image_index: { type: 'integer' },
         },
-        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip', 'image_index'],
+        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip', 'stakes', 'image_index'],
       },
     },
     summary: { type: 'string' },
@@ -857,9 +864,10 @@ const PDF_RESPONSE_SCHEMA = {
           quote: { type: 'string' },
           explanation: { type: 'string' },
           tip: { type: 'string' },
+          stakes: { type: 'string' },
           page: { type: 'integer' },
         },
-        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip', 'page'],
+        required: ['pattern_type', 'name', 'quote', 'explanation', 'tip', 'stakes', 'page'],
       },
     },
     summary: { type: 'string' },
@@ -1079,7 +1087,7 @@ async function translateResult(
 ): Promise<Record<string, unknown> | null> {
   const langName = LANGUAGE_NAMES[targetLangCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const prompt = `Przetłumacz poniższy JSON na język ${langName}. Zasady:
-- Przetłumacz WYŁĄCZNIE pola "name", "explanation", "tip" i "summary" — prostym, codziennym językiem, zrozumiałym nawet dla 12-latka, bez żargonu, bez akademickiego stylu. Nie tłumacz dosłownie/sztywno, jeśli robi to zdanie trudniejszym — sparafrazuj tak, żeby było równie proste jak oryginał. Pole "tip" NIGDY nie może zawierać słów "ufaj"/"nie ufaj"/"dobre"/"złe"/"wiarygodne" — jeśli oryginał ich nie ma, tłumaczenie też nie może ich dodać.
+- Przetłumacz WYŁĄCZNIE pola "name", "explanation", "tip", "stakes" i "summary" — prostym, codziennym językiem, zrozumiałym nawet dla 12-latka, bez żargonu, bez akademickiego stylu. Nie tłumacz dosłownie/sztywno, jeśli robi to zdanie trudniejszym — sparafrazuj tak, żeby było równie proste jak oryginał. Pole "tip" NIGDY nie może zawierać słów "ufaj"/"nie ufaj"/"dobre"/"złe"/"wiarygodne" — jeśli oryginał ich nie ma, tłumaczenie też nie może ich dodać. Pole "stakes" może być pustym tekstem — wtedy zostaje puste, nie wymyślaj treści. Liczby w polu "stakes" (jeśli występują) zostają dokładnie takie same jak w oryginale, tłumaczysz tylko otaczający tekst.
 - Pole "quote" NIE tłumacz — zostaje dokładnie w oryginalnym brzmieniu, bez żadnych zmian.
 - Pole "pattern_type" NIE tłumacz — zostaje dokładnie tą samą wartością co w oryginale ("manipulation" albo "reasoning").
 - Pole "q_score" zostaje dokładnie taką samą liczbą jak w oryginale.
@@ -1182,7 +1190,7 @@ async function findAdditionalPatterns(
       : '(na razie nic nie znaleziono)'
   const prompt = `${systemPrompt}
 
-DRUGA RUNDA SZUKANIA (KRYTYCZNIE WAŻNE): Poniżej jest ten sam tekst, który już raz przeanalizowałeś, oraz lista wzorców, które już znalazłeś. Przeczytaj tekst PONOWNIE, od nowa, świeżym okiem, akapit po akapicie — Twoje pierwsze zadanie to znaleźć DODATKOWE wzorce, których zabrakło na tej liście, szczególnie w twierdzeniach/fragmentach, które nie mają jeszcze przypisanego cytatu. NIE powtarzaj wzorców już znalezionych (patrz lista niżej, porównaj cytaty). Jeśli po uważnym sprawdzeniu naprawdę nic więcej nie ma — zwróć pustą listę w polu "patterns", nie wymyślaj na siłę słabych/naciąganych wzorców.
+DRUGA RUNDA SZUKANIA (KRYTYCZNIE WAŻNE): Poniżej jest ten sam tekst, który już raz przeanalizowałeś, oraz lista wzorców, które już znalazłeś. Przeczytaj tekst PONOWNIE, od nowa, świeżym okiem, akapit po akapicie — Twoje pierwsze zadanie to znaleźć DODATKOWE wzorce, których zabrakło na tej liście, szczególnie w twierdzeniach/fragmentach, które nie mają jeszcze przypisanego cytatu. Zwróć SZCZEGÓLNĄ uwagę na sekcję SZUKANIE SPRZECZNOŚCI MIĘDZY TWIERDZENIAMI wyżej — teraz, mając w pamięci CAŁY tekst po pierwszym przeczytaniu, jest to najlepszy moment, żeby zestawić ze sobą konkretne liczby/daty/obietnice z różnych, odległych od siebie miejsc tekstu i sprawdzić, czy któreś sobie nie przeczą. NIE powtarzaj wzorców już znalezionych (patrz lista niżej, porównaj cytaty). Jeśli po uważnym sprawdzeniu naprawdę nic więcej nie ma — zwróć pustą listę w polu "patterns", nie wymyślaj na siłę słabych/naciąganych wzorców.
 
 WERYFIKACJA JUŻ WYBRANYCH NAZW (drugie zadanie, ważne): dla KAŻDEGO wzorca z listy niżej sprawdź, patrząc na opis i przykład danego modelu w BIBLIOTECE wyżej, czy przypisana nazwa naprawdę trafnie opisuje ten cytat. Jeśli nazwa jest wyraźnie słabym dopasowaniem — dodaj wpis do pola "corrections" z tym samym, dosłownym cytatem i LEPSZĄ nazwą z biblioteki. Jeśli po namyśle dwa różne modele z biblioteki pasują NAPRAWDĘ tak samo dobrze (patrz sekcja PRZYPADEK WIELOMODELOWY wyżej) — też dodaj korektę, ustawiając nazwę na "Model A / Model B". Jeśli nazwa już dobrze pasuje — NIE dodawaj jej do "corrections" (zostaw bez zmian, pusta lista w "corrections" jest częstym, poprawnym wynikiem, jeśli wszystko już pasuje).
 
@@ -1279,7 +1287,7 @@ ${mentalModelsLibrary}
 
 Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych OSOBNO w kolejnych, sąsiadujących fragmentach jednego dokumentu PDF (każdy fragment analizowany był bez wiedzy o pozostałych) — dlatego ta sama treść mogła zostać przypadkiem wykryta dwukrotnie, zwłaszcza gdy pochodzi z bliskich, sąsiadujących numerów stron. Twoje zadanie:
 1. Znajdź i usuń duplikaty/prawie-duplikaty (ten sam albo bardzo podobny cytat/mechanizm, zwłaszcza z bliskich stron) — zostaw tylko JEDEN egzemplarz każdego.
-2. Jeśli któreś "explanation" lub "tip" jest zbyt ogólnikowe/niejasne, popraw je (prosty język, zrozumiały dla 12-latka, bez żargonu, "tip" bez słów "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko konkretna czynność do wykonania).
+2. Jeśli któreś "explanation" lub "tip" jest zbyt ogólnikowe/niejasne, popraw je (prosty język, zrozumiały dla 12-latka, bez żargonu, "tip" bez słów "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko konkretna czynność do wykonania). Sprawdź też pole "stakes" — jeśli jest puste, choć w cytacie/wyjaśnieniu widać konkretną liczbę/fakt pozwalający ją skonstruować, uzupełnij je; jeśli jest wypełnione, ale zbyt ogólnikowe (nie jest konkretną, policzalną stawką — patrz sekcja KONKRETNA STAWKA wyżej), popraw je albo wyczyść do pustego tekstu, jeśli naprawdę nie da się skonstruować niczego konkretnego.
 3. NIE DODAWAJ żadnych nowych wzorców, których nie ma na liście poniżej — to jest WYŁĄCZNIE czyszczenie i poprawianie istniejącej listy, nie nowa analiza. Pola "quote" i "page" zostają dokładnie takie same jak w oryginale (nie tłumacz/nie zmieniaj cytatów).
 4. Dla KAŻDEGO wzorca sprawdź, patrząc na opis i przykład w bibliotece wyżej, czy przypisana nazwa "name" naprawdę trafnie opisuje ten cytat — jeśli jest słabym dopasowaniem, popraw ją na lepszy model z biblioteki. Jeśli dwa modele pasują naprawdę tak samo dobrze (prawdziwy remis, nie zwykła niepewność) — nie wybieraj sztucznie jednego, tylko ustaw nazwę jako połączenie obu w formacie "Model A / Model B" (oba przetłumaczone na język ${langName}). Jeśli nazwa już dobrze pasuje, zostaw bez zmian.
 5. Język pól "name"/"explanation"/"tip": ${langName}.
@@ -1428,7 +1436,7 @@ ${mentalModelsLibrary}
 
 Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych OSOBNO na kolejnych obrazach przesłanych w jednym zestawie (każdy obraz analizowany był bez wiedzy o pozostałych) — dlatego ta sama treść mogła zostać przypadkiem wykryta na więcej niż jednym obrazie (np. dwa zrzuty ekranu tej samej rozmowy). Twoje zadanie:
 1. Znajdź i usuń duplikaty/prawie-duplikaty (ten sam albo bardzo podobny cytat/mechanizm) — zostaw tylko JEDEN egzemplarz każdego.
-2. Jeśli któreś "explanation" lub "tip" jest zbyt ogólnikowe/niejasne, popraw je (prosty język, zrozumiały dla 12-latka, bez żargonu, "tip" bez słów "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko konkretna czynność do wykonania).
+2. Jeśli któreś "explanation" lub "tip" jest zbyt ogólnikowe/niejasne, popraw je (prosty język, zrozumiały dla 12-latka, bez żargonu, "tip" bez słów "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko konkretna czynność do wykonania). Sprawdź też pole "stakes" — jeśli jest puste, choć w cytacie/wyjaśnieniu widać konkretną liczbę/fakt pozwalający ją skonstruować, uzupełnij je; jeśli jest wypełnione, ale zbyt ogólnikowe (nie jest konkretną, policzalną stawką — patrz sekcja KONKRETNA STAWKA wyżej), popraw je albo wyczyść do pustego tekstu, jeśli naprawdę nie da się skonstruować niczego konkretnego.
 3. NIE DODAWAJ żadnych nowych wzorców, których nie ma na liście poniżej — to jest WYŁĄCZNIE czyszczenie i poprawianie istniejącej listy, nie nowa analiza. Pola "quote" i "image_index" zostają dokładnie takie same jak w oryginale (nie zmieniaj ich).
 4. Dla KAŻDEGO wzorca sprawdź, patrząc na opis i przykład w bibliotece wyżej, czy przypisana nazwa "name" naprawdę trafnie opisuje ten cytat — jeśli jest słabym dopasowaniem, popraw ją na lepszy model z biblioteki. Jeśli dwa modele pasują naprawdę tak samo dobrze (prawdziwy remis, nie zwykła niepewność) — nie wybieraj sztucznie jednego, tylko ustaw nazwę jako połączenie obu w formacie "Model A / Model B" (oba przetłumaczone na język ${langName}). Jeśli nazwa już dobrze pasuje, zostaw bez zmian.
 5. Język pól "name"/"explanation"/"tip": ${langName}.
@@ -3500,7 +3508,7 @@ Deno.serve(async (req: Request) => {
           const prompt = `${systemPrompt}
 
 DRUGI PRZEGLĄD WIĘKSZEGO FRAGMENTU (KRYTYCZNIE WAŻNE): Ten fragment to strony ${group.start}-${group.end} z ${pdfPageCount}-stronicowego dokumentu (w polu "page" licz strony OD 1 W OBRĘBIE TEGO FRAGMENTU, czyli od 1 do ${groupPageCount}). Ten sam zakres stron był już czytany osobno, po kawałku po kilka stron — teraz widzisz go w CAŁOŚCI naraz. Masz dwa zadania:
-1. Poszukaj DODATKOWYCH wzorców widocznych DOPIERO gdy widzi się ten szerszy fragment razem (np. sprzeczność między wcześniejszą a późniejszą częścią tego zakresu) — NIE powtarzaj już znalezionych (lista niżej, porównaj cytaty).
+1. Poszukaj DODATKOWYCH wzorców widocznych DOPIERO gdy widzi się ten szerszy fragment razem — patrz sekcja SZUKANIE SPRZECZNOŚCI MIĘDZY TWIERDZENIAMI wyżej: zestaw ze sobą konkretne liczby/daty/obietnice z wcześniejszej i późniejszej części tego zakresu stron i sprawdź, czy sobie nie przeczą (np. inna liczba w podsumowaniu na początku niż w szczegółach dalej). NIE powtarzaj już znalezionych (lista niżej, porównaj cytaty).
 2. Dla KAŻDEGO już znalezionego wzorca z listy niżej sprawdź, patrząc na opis/przykład w bibliotece wyżej, czy przypisana nazwa naprawdę trafnie opisuje ten cytat — jeśli jest słabym dopasowaniem, dodaj wpis do "corrections" z dosłownym cytatem i lepszą nazwą. Jeśli dwa modele pasują naprawdę tak samo dobrze, ustaw nazwę w formacie "Model A / Model B". Jeśli nazwa już dobrze pasuje, nie dodawaj jej do "corrections" (pusta lista w "corrections" jest częstym, poprawnym wynikiem).
 
 JUŻ ZNALEZIONE W TYM ZAKRESIE (nie powtarzaj w "patterns", ale sprawdź nazwy dla "corrections"):
