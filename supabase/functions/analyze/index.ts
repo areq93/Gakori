@@ -2178,6 +2178,15 @@ Deno.serve(async (req: Request) => {
     // tak, jakby w cache'u jej po prostu nie było, i lecimy do pełnej,
     // płatnej analizy niżej.
     if (existing && !existing.retracted && !(forceRefresh && existing.is_manual_source)) {
+      // POPRAWKA 2026-08-28(c) — DIAGNOSTYKA TYMCZASOWA, patrz
+      // GAKORI_CONTEXT.md/POPRAWKA (c) niżej przy shingleSimilarity — ta
+      // sama potrzeba widoczności, dla DRUGIEGO możliwego miejsca, gdzie
+      // "Sprawdź, czy coś się zmieniło" mogło oddać cache PRZED ekranem
+      // z ceną (ten wczesny, ogólny cache po `content_hash`, zamiast
+      // ścieżki dla `forceRefresh`/`shingleSimilarity` niżej).
+      if (input_type === 'url' && forceRefresh) {
+        console.log(`[refresh-debug] wczesny cache po content_hash trafiony dla url=${source_url}, id=${existing.id}, is_manual_source=${existing.is_manual_source}`)
+      }
       await supabase
         .from('scans')
         .update({ view_count: existing.view_count + 1 })
@@ -2800,6 +2809,21 @@ Deno.serve(async (req: Request) => {
             .select('text_content, result, view_count')
             .eq('id', refreshScanId)
             .maybeSingle()
+          // POPRAWKA 2026-08-28(c) — DIAGNOSTYKA TYMCZASOWA, patrz
+          // GAKORI_CONTEXT.md: żywy przypadek, gdzie "Sprawdź, czy coś się
+          // zmieniło" dla interia.pl wracał od razu jako "bez zmian",
+          // BEZ pokazania ekranu z ceną (czyli PRZED linią niżej), mimo
+          // poprawki fetchUrlAsText() — nie mieliśmy żadnej widoczności,
+          // ile znaków faktycznie pobraliśmy przy TEJ próbie ani jaki
+          // wyszedł wynik porównania podobieństwa, więc nie dało się
+          // odróżnić "poprawka nie zadziałała" od "poprawka zadziałała,
+          // ale próg podobieństwa i tak uznał to za tę samą treść".
+          if (existingForRefresh && typeof existingForRefresh.text_content === 'string') {
+            const sim = shingleSimilarity(existingForRefresh.text_content, preFetchedText)
+            console.log(
+              `[refresh-debug] url=${source_url} stary_tekst_znaki=${existingForRefresh.text_content.length} nowy_tekst_znaki=${preFetchedText.length} podobienstwo=${sim.toFixed(4)} prog=${SHINGLE_SIMILARITY_THRESHOLD}`
+            )
+          }
           if (
             existingForRefresh &&
             typeof existingForRefresh.text_content === 'string' &&
