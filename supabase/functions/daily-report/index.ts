@@ -331,6 +331,93 @@ Deno.serve(async (req: Request) => {
     // metryka ponowień niedostępna
   }
 
+  // --- POPRAWKA 2026-08-28 — "wykrywanie botów" (punkt 3 z listy
+  // właściciela, "opanujmy 1,2,3"): dodatkowa WIDOCZNOŚĆ, NIEZALEŻNA od
+  // istniejącego już mechanizmu blokad (patrz RATE_LIMIT_* w
+  // analyze/index.ts — ten reaguje dopiero po przekroczeniu progu liczby
+  // nieudanych prób). Zasada: człowiek klika nieregularnie, skrypt/bot
+  // bijący w regularnych odstępach (np. co dokładnie 30s) zostawia bardzo
+  // NISKĄ zmienność odstępów między kolejnymi nieudanymi próbami tego
+  // samego konta. Mierzymy to współczynnikiem zmienności (odchylenie
+  // standardowe podzielone przez średnią z odstępów, w sekundach) —
+  // niska wartość = bardzo regularne odstępy = podejrzane. Właściciel
+  // potwierdził umieszczenie w tym samym, dziennym raporcie (nie osobny
+  // mail) — "skoro są blokady to raz dziennie wystarczy". Progi
+  // (BOT_MIN_ATTEMPTS/BOT_MAX_COEFFICIENT_OF_VARIATION) to na razie
+  // najlepsze wspólne oszacowanie, świadomie otwarte na dostrojenie po
+  // zobaczeniu żywych przypadków — dokładnie jak np. progi filtra
+  // gęstości linków w analyze/index.ts.
+  // POPRAWKA 2026-08-28 — próg 15% (pierwsza wersja) dawał fałszywy alarm
+  // w teście na przypadkowo dość regularnym "człowieku" (5 próbek, cv
+  // ~10,5%) — przy tak małej liczbie próbek zwykła losowość łatwo wygląda
+  // "regularnie". Zaostrzone do 10% po realnym teście (Node, scratchpad):
+  // prawdziwe boty w testach dawały cv ~2-4%, przypadkowo regularny
+  // człowiek ~10-11% — 10% zostawia bezpieczny margines między nimi.
+  const BOT_MIN_ATTEMPTS = 4 // potrzeba min. 3 odstępów, żeby zmienność miała sens
+  const BOT_MAX_COEFFICIENT_OF_VARIATION = 0.10 // 10% — bardzo ciasna regularność, typowa dla zegara skryptu
+
+  function stdDev(nums: number[], meanVal: number): number {
+    if (nums.length === 0) return 0
+    const variance = nums.reduce((sum, n) => sum + (n - meanVal) ** 2, 0) / nums.length
+    return Math.sqrt(variance)
+  }
+
+  let suspiciousBotAccounts: {
+    user_id: string
+    email: string
+    attempts: number
+    avgGapSeconds: number
+    coefficientOfVariation: number
+  }[] = []
+  try {
+    const { data, error } = await supabase
+      .from('failed_scan_attempts')
+      .select('user_id, created_at')
+      .gte('created_at', yr.start)
+      .lt('created_at', yr.end)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    const byUser: Record<string, string[]> = {}
+    for (const r of data as { user_id: string; created_at: string }[]) {
+      if (!byUser[r.user_id]) byUser[r.user_id] = []
+      byUser[r.user_id].push(r.created_at)
+    }
+    for (const [uid, timestamps] of Object.entries(byUser)) {
+      if (timestamps.length < BOT_MIN_ATTEMPTS) continue
+      const gaps: number[] = []
+      for (let i = 1; i < timestamps.length; i++) {
+        gaps.push((new Date(timestamps[i]).getTime() - new Date(timestamps[i - 1]).getTime()) / 1000)
+      }
+      const meanGap = avg(gaps)
+      if (meanGap === null || meanGap <= 0) continue
+      const coefficientOfVariation = stdDev(gaps, meanGap) / meanGap
+      if (coefficientOfVariation <= BOT_MAX_COEFFICIENT_OF_VARIATION) {
+        suspiciousBotAccounts.push({
+          user_id: uid,
+          email: uid,
+          attempts: timestamps.length,
+          avgGapSeconds: meanGap,
+          coefficientOfVariation,
+        })
+      }
+    }
+    suspiciousBotAccounts.sort((a, b) => b.attempts - a.attempts)
+    // Adres e-mail zamiast gołego UUID — tylko dla FLAGOWANYCH kont (mała
+    // liczba), żeby nie robić dodatkowego zapytania per użytkownik na co
+    // dzień. Fail-open na pojedyncze konto: zostaje UUID, jeśli nie uda
+    // się dociągnąć adresu.
+    for (const acc of suspiciousBotAccounts) {
+      try {
+        const { data: userData } = await supabase.auth.admin.getUserById(acc.user_id)
+        if (userData?.user?.email) acc.email = userData.user.email
+      } catch (_e) {
+        // zostaje user_id jako etykieta
+      }
+    }
+  } catch (_err) {
+    // metryka wykrywania botów niedostępna — reszta raportu leci dalej
+  }
+
   // --- Budowanie treści maila ---
   const fmt = (v: number | null, unit = '') => (v === null ? 'brak danych' : `${Math.round(v * 10) / 10}${unit}`)
   // POPRAWKA 2026-08-26(u) — `fmt()` zaokrągla do 1 miejsca po przecinku,
@@ -414,6 +501,22 @@ Deno.serve(async (req: Request) => {
 <div style="font-size:14px;color:#374151;margin-top:6px;">zgłoszeń niezgodności wczoraj: ${fmt(reports24h)} — to działa w pełni automatycznie, nic nie musisz robić.</div>`
   )
 
+  const botHtml =
+    suspiciousBotAccounts.length === 0
+      ? '<p style="color:#6b7280;font-size:14px;margin:0;">Brak podejrzanych wzorców wczoraj.</p>'
+      : `<p style="color:#b91c1c;font-weight:600;margin:0 0 8px;">Wykryto ${suspiciousBotAccounts.length} konto(-a) z bardzo regularnymi odstępami między nieudanymi próbami — może to być skrypt/bot, nie człowiek:</p>
+<ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;">
+${suspiciousBotAccounts
+  .map(
+    (a) =>
+      `<li style="margin-bottom:2px;">${a.email} — ${a.attempts} nieudanych prób, średni odstęp ${Math.round(a.avgGapSeconds)}s (zmienność ${(a.coefficientOfVariation * 100).toFixed(0)}%)</li>`
+  )
+  .join('')}
+</ul>
+<p style="color:#9ca3af;font-size:12px;margin-top:8px;">To WYŁĄCZNIE widoczność — mechanizm blokad już działa niezależnie od tego (patrz progi w analyze/index.ts), to konto mogło już zostać zablokowane samo.</p>`
+
+  const botCard = card('Wykrywanie botów (regularne odstępy prób)', botHtml)
+
   const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto Twój przegląd Gakori za wczoraj — ${dateStr}.</p>
 ${registrationsCard}
 ${scansCard}
@@ -421,6 +524,7 @@ ${creditsCard}
 ${retriesCard}
 ${emailsCard}
 ${trustCard}
+${botCard}
 ${topCard}
 <p style="color:#9ca3af;font-size:12px;margin-top:20px;">Ten raport wysyła się automatycznie raz dziennie. Wygenerowała go funkcja daily-report.</p>`
 

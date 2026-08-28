@@ -4800,6 +4800,39 @@ akceptowane jako koszt tego podejścia, do punktowego doprecyzowania
 TYLKO gdy pojawią się z realnymi danymi (żywy przykład + "Pokaż pełny
 tekst źródłowy"), nigdy przez zgadywanie na ślepo.
 
+**POPRAWKA 2026-08-28 — `daily-report`: wykrywanie botów (punkt 3 z
+listy "opanujmy 1,2,3", odłożony wcześniej w tej sesji).** Właściciel
+potwierdził dwie rzeczy: (1) definicja — dodatkowa WIDOCZNOŚĆ nieudanych
+prób analizy, które wyglądają na zautomatyzowane (regularne odstępy
+czasowe), NIEZALEŻNA od istniejącego już mechanizmu blokad
+(`RATE_LIMIT_*` w `analyze/index.ts` — ten reaguje dopiero po
+przekroczeniu progu liczby prób, nie patrzy na regularność); (2)
+umieszczenie — w tym samym, dziennym `daily-report` (nie osobny mail):
+"skoro są blokady to raz dziennie wystarczy razem z daily report".
+
+**Mechanizm**: dla każdego konta z 4+ nieudanymi próbami (`failed_scan_attempts`)
+we wczorajszej doby polskiej, liczymy odstępy czasowe między kolejnymi
+próbami i współczynnik zmienności (odchylenie standardowe / średnia
+odstępów, w sekundach) — człowiek klika nieregularnie (wysoki
+współczynnik), skrypt/bot bijący w regularnych odstępach zostawia bardzo
+NISKI współczynnik. Próg `BOT_MAX_COEFFICIENT_OF_VARIATION` ustalony na
+10% PO realnym teście w Node (scratchpad, nie zgadnięty): symulowane boty
+(regularne odstępy ±kilka%) dawały współczynnik ~2-4%, a przypadkowo dość
+regularny "człowiek" (mała próbka, 5 wartości) ~10-11% — pierwsza wersja
+progu (15%) dawała na TYM konkretnym teście fałszywy alarm, 10% zostawia
+bezpieczny margines. Konta powyżej progu trafiają do nowej sekcji „Wykrywanie
+botów" w mailu, z adresem e-mail (dociągniętym tylko dla flagowanych kont,
+żeby nie robić dodatkowego zapytania na co dzień), liczbą prób, średnim
+odstępem i współczynnikiem zmienności — WYŁĄCZNIE informacyjnie, żadna
+automatyczna akcja się z tego nie wyzwala (blokady istnieją już osobno).
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` (te same znane błędy
+środowiskowe: `jsr:`/`Deno`, niezwiązane z tą zmianą) oraz `node
+--experimental-strip-types --check` — brak błędów. Logika współczynnika
+zmienności przetestowana osobno w Node (scratchpad) na czterech
+syntetycznych przypadkach (dwa "boty", jeden wyraźnie nieregularny
+człowiek, jeden przypadkowo regularny człowiek) przed ustaleniem progu.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
