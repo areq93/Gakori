@@ -252,14 +252,26 @@ h2 {
     width: 100%; max-width: 400px; box-sizing: border-box;
     position: relative; z-index: 1;
 }
-input:not([type="checkbox"]):not([type="radio"]), textarea {
+/* POPRAWKA 2026-08-28(q) — `select` dopisany do tej wspólnej reguły.
+   Dotąd TYLKO `input`/`textarea` miały tu styl — każdy `<select>` w
+   appce dostawał go osobno, ręcznie skopiowanym stylem inline (patrz
+   `account.html`) — ALE selektor języka na ekranie logowania
+   (`#authLanguageSelect` w `index.html`) tego inline'owego stylu nigdy
+   nie dostał (przeoczenie), więc renderował się w domyślnym, białym
+   wyglądzie przeglądarki, rażąco niespójnym z resztą ciemnej aplikacji —
+   zgłoszone przez właściciela zrzutem ekranu logowania na telefonie.
+   Jeden wspólny wpis w arkuszu stylów, zamiast kopiowania tego samego
+   stylu inline przy każdym nowym `<select>`, eliminuje całą tę klasę
+   błędu na przyszłość. */
+input:not([type="checkbox"]):not([type="radio"]), textarea, select {
     width: 100%; padding: 13px 14px; margin: 10px 0;
     border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm); box-sizing: border-box;
     font-size: 16px; font-family: inherit; color: var(--ink); background: var(--input-bg);
     transition: border-color .15s ease, box-shadow .15s ease;
 }
-input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 textarea { resize: vertical; min-height: 100px; }
+select { cursor: pointer; }
 /* Zwykły, mały kwadracik — bez tego dziedziczyłby styl pól tekstowych
    wyżej (pełna szerokość, obramowanie, padding), co wyglądało jak
    rozjechana belka zamiast checkboxa (zgłoszone przez właściciela). */

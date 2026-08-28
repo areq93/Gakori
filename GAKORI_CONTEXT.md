@@ -5497,6 +5497,36 @@ oraz `node --check` dla wyciągniętego skryptu inline z `historia.html` —
 bez błędów. Czysto wizualna zmiana CSS/HTML/JS front-endu, bez zmian w
 backendzie — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(q) — selektor języka na ekranie logowania renderował
+się w domyślnym, białym wyglądzie przeglądarki.** Właściciel zgłosił
+zrzutem ekranu logowania na telefonie: pole wyboru języka ("Polski ▾")
+było jaskrawo białe, niespójne z resztą ciemnego motywu. Przyczyna:
+`<select>` NIGDY nie był częścią wspólnej reguły stylującej pola (`input,
+textarea`) — każdy `<select>` w appce dostawał styl osobno, wklejony
+ręcznie jako inline `style="..."` (patrz dwa selektory w `account.html`).
+Selektor języka na ekranie logowania (`#authLanguageSelect`,
+`index.html`) tego inline'owego stylu nigdy nie dostał — zwykłe
+przeoczenie przy jego dodawaniu, nie celowa decyzja.
+
+**Naprawa** (`style.css`): `select` dopisany wprost do wspólnej reguły
+`input:not(...), textarea` — teraz KAŻDY `<select>` w aplikacji (obecne i
+przyszłe) automatycznie dostaje ten sam ciemny wygląd, bez potrzeby
+kopiowania stylu inline za każdym razem. Przy okazji usunięte zbędne,
+zduplikowane style inline z dwóch selektorów w `account.html` (Język
+aplikacji / Motyw) — i tak pokrywane teraz przez regułę
+współdzieloną, trzymanie ich osobno groziło dokładnie tym samym
+przeoczeniem przy kolejnym nowym `<select>` w przyszłości. Właściciel
+zapytał też, czy sam wybór miejsca (selektor języka na ekranie logowania,
+przed zalogowaniem) jest zgodny z dobrymi praktykami — tak, to częsty i
+sensowny wzorzec (czytelność ekranu logowania nie powinna zależeć od
+tego, czy użytkownik już się zalogował) — bez zmian w rozmieszczeniu,
+wyłącznie naprawa wizualna.
+
+Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css`
+(130/130) oraz `node --check` dla wyciągniętego skryptu inline z
+`account.html` — bez błędów. Czysto wizualna zmiana CSS/HTML, bez zmian
+w backendzie — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
