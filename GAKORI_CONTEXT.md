@@ -5527,6 +5527,28 @@ Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css`
 `account.html` — bez błędów. Czysto wizualna zmiana CSS/HTML, bez zmian
 w backendzie — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(r) — pola formularzy (link/tekst/select/checkbox)
+wyśrodkowane, nie wyrównane do lewej.** Właściciel sprawdził POPRAWKĘ (p)
+na żywo na PC zrzutem ekranu — węższe pola (480px) faktycznie przestały
+się rozciągać na całą kartę, ALE zostały wyrównane do lewej krawędzi, co
+wyglądało źle: "urwane" po lewej, niesymetryczne względem wyśrodkowanego
+przycisku "Analizuj" tuż pod nimi. Potwierdził wprost, że dotyczy to
+WSZYSTKICH takich pól w całej aplikacji, nie tylko wyszukiwarki.
+
+**Naprawa** (`style.css`, wewnątrz `@media (min-width: 700px)`): pola
+(`input`/`textarea`/`select`) dostały `display: block; margin-left: auto;
+margin-right: auto;` — ten sam mechanizm centrowania co przyciski.
+Etykiety pól (`.field-label`) i wiersz checkboxa prywatności
+(`.checkbox-label`) dostały też `text-align: center`/`justify-content:
+center` — bez tego etykieta zostałaby przy lewej krawędzi, "wskazując"
+na pustą przestrzeń zamiast na wyśrodkowane pole pod spodem. Telefon
+(poniżej progu 700px) bez zmian — tam pola nadal na pełną szerokość, tak
+jak dotąd.
+
+Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css`
+(132/132) — czysta zmiana CSS, bez zmian HTML/JS/backendu — nic do
+wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

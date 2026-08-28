@@ -497,17 +497,27 @@ a { color: var(--accent); }
        źle" (zgłoszenie właściciela, kilka zrzutów ekranu na raz). Węższe
        niż karta, ale świadomie SZERSZE niż minimalna szerokość przycisku
        (480px, nie 240px) — pole do wpisania linku/tekstu z natury
-       potrzebuje więcej miejsca niż podpis przycisku. Zostają
-       wyrównane do lewej (pod etykietą pola, też wyrównaną do lewej) —
-       to przyciski dostały wyśrodkowanie, bo są pojedynczym wezwaniem do
-       działania, pola formularza zostają w naturalnym, czytelnym układzie
-       "etykieta nad polem". Telefon (poniżej progu) bez zmian.
-       `<select>` ma dziś `style="width:100%"` wprost w HTML (nie
-       `max-width`) — to nie koliduje: `max-width` zawsze ogranicza
-       policzoną szerokość, niezależnie od specyficzności/kolejności. */
+       potrzebuje więcej miejsca niż podpis przycisku. POPRAWKA (r) —
+       pierwsza wersja zostawiała je wyrównane do lewej (pod etykietą pola)
+       — właściciel to sprawdził na żywo na PC i to wyglądało źle
+       (pole "urwane" po lewej, niesymetryczne względem wyśrodkowanego
+       przycisku pod spodem) — poprawione na wyśrodkowane, jak przyciski.
+       Telefon (poniżej progu) bez zmian. `<select>` ma dziś
+       `style="width:100%"` wprost w HTML (nie `max-width`) — to nie
+       koliduje: `max-width` zawsze ogranicza policzoną szerokość,
+       niezależnie od specyficzności/kolejności. */
     input:not([type="checkbox"]):not([type="radio"]), textarea, select {
-        max-width: 480px;
+        max-width: 480px; display: block; margin-left: auto; margin-right: auto;
     }
+    /* Etykieta była wyrównana do lewej, dokładnie nad polem, które teraz
+       jest wyśrodkowane (wyżej) — bez tego etykieta "wskazywałaby" na
+       pustą przestrzeń zamiast na pole pod spodem. */
+    .field-label { text-align: center; }
+    /* Ten sam powód co przy etykietach wyżej — wiersz checkboxa
+       prywatności był przyklejony do lewej krawędzi, teraz wyśrodkowany
+       jako całość (sam checkbox + tekst obok niego zostają jeden przy
+       drugim, tylko cały wiersz przesuwa się na środek). */
+    .checkbox-label { justify-content: center; }
 }
 /* POPRAWKA 2026-08-18: odznaka wyniku i tagi wzorców (niżej) były płaskim,
    jednolitym kolorem — jedyny element w appce bez żadnej gry światła,
