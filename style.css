@@ -264,7 +264,7 @@ h2 {
    stylu inline przy każdym nowym `<select>`, eliminuje całą tę klasę
    błędu na przyszłość. */
 input:not([type="checkbox"]):not([type="radio"]), textarea, select {
-    width: 100%; padding: 15px 16px; margin: 12px 0;
+    width: 100%; padding: 17px 18px; margin: 13px 0;
     border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm); box-sizing: border-box;
     font-size: 16px; font-family: inherit; color: var(--ink); background: var(--input-bg);
     transition: border-color .15s ease, box-shadow .15s ease;

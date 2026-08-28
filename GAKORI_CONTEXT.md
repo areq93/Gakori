@@ -5747,6 +5747,15 @@ wbudowanych skryptów `index.html`/`scan.html` sprawdzona (`node --check`)
 — bez błędów. Czysta zmiana CSS/HTML, bez backendu — nic do wklejenia w
 Supabase.
 
+**POPRAWKA 2026-08-28(x) — pola do wpisywania jeszcze o 10% większe.**
+Doprecyzowanie po (w): właściciel poprosił o kolejne +10%, tym razem
+wyłącznie dla "pól wpisywalnych" (`input`/`textarea`/`select`) — NIE
+kart/przycisków/etykiet, które zostają na poziomie z POPRAWKI (w).
+`padding: 15px 16px` → `17px 18px`, `margin: 12px 0` → `13px 0`.
+
+Weryfikacja: nawiasy klamrowe w `style.css` sparowane (133/133) — czysta
+zmiana CSS, bez backendu — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
