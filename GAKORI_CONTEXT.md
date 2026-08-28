@@ -6019,6 +6019,44 @@ Weryfikacja: składnia wbudowanych skryptów `scan.html` sprawdzona
 funkcja `record-view` w Supabase NIE wymaga ponownego wdrożenia, zmienił
 się tylko kod wołający ją z przeglądarki.
 
+**POPRAWKA 2026-08-28(zc) — PILNA: POPRAWKA (za) zepsuła zapis KAŻDEJ
+nowej analizy (nie tylko tekstu — też obrazu, PDF-a, linku).** Właściciel
+zgłosił: 3 nieudane próby analizy zwykłego obrazu z rzędu, komunikat "Nie
+udało się zapisać wyniku analizy. Spróbuj ponownie."
+
+**Przyczyna**: SQL z POPRAWKI (za) zamienił zwykłe ograniczenie
+unikalności `UNIQUE (content_hash, language)` na CZĘŚCIOWY indeks —
+`WHERE is_private = false` (celowo, żeby prywatne kopie tej samej treści
+mogły współistnieć jako osobne wiersze). Ale zapis nowej analizy w
+`analyze/index.ts` dalej używał `.upsert(dane, {onConflict:
+'content_hash,language'})` — supabase-js generuje z tego zwykłe `ON
+CONFLICT (content_hash, language) DO UPDATE`, BEZ warunku WHERE. Postgres
+wymaga IDENTYCZNEGO warunku WHERE wprost w klauzuli `ON CONFLICT`, żeby
+dopasować częściowy indeks — a klient supabase-js nie ma jak takiego
+warunku dopisać. Efekt: KAŻDY zapis nowej analizy (każdego typu, nie
+tylko tekstu) kończył się błędem Postgresa "no unique or exclusion
+constraint matching the ON CONFLICT specification" → `save_failed`.
+Odkryte i przeoczone dopiero przy pierwszym żywym teście po wdrożeniu
+POPRAWKI (za) — nie zostało wcześniej przetestowane end-to-end na
+prawdziwej bazie (repo nie ma lokalnego środowiska Supabase, patrz
+"Proces wdrażania").
+
+**Naprawa**: zwykły `.insert()` zamiast `.upsert()` (nie potrzebuje
+żadnej klauzuli `ON CONFLICT`, więc częściowy indeks nie przeszkadza).
+Jedyna różnica funkcjonalna względem starego `upsert`: prawdziwy wyścig
+(dwie osoby publikujące DOKŁADNIE tę samą, NOWĄ treść w tej samej
+chwili) — obsłużony ręcznie: druga osoba dostaje z Postgresa kod błędu
+`23505` (naruszenie unikalności), więc kod dociąga wiersz, który przed
+chwilą zapisała pierwsza osoba, i serwuje go jako darmowe trafienie w
+cache zamiast błędu — to samo zachowanie co dawało `upsert`, tylko
+wyliczone ręcznie zamiast przez bazę. Nie wymaga ŻADNEJ zmiany SQL —
+wyłącznie poprawka w `analyze/index.ts`.
+
+Weryfikacja: `node --experimental-strip-types --check` (bez błędów),
+`tsc --noEmit --skipLibCheck` (te same znane błędy środowiskowe co
+zawsze, zero nowych). Właściciel: przetestować ponownie analizę obrazu
+po wdrożeniu tej poprawki w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

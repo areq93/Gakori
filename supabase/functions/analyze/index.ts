@@ -4057,13 +4057,42 @@ ${compactExisting}`
     // `record-view`), a pierwsze wyświetlenie (przekierowanie od razu po
     // analizie) samo doliczy się jako pierwsze "1" — start od 1 tutaj
     // policzyłby to podwójnie.
+    // POPRAWKA 2026-08-28(zc) — PILNA NAPRAWA: od POPRAWKI (za) ograniczenie
+    // unikalności (content_hash, language) obejmuje TYLKO publiczne wiersze
+    // (częściowy indeks — `WHERE is_private = false`, patrz
+    // GAKORI_CONTEXT.md). Zwykły `.upsert(..., {onConflict:'content_hash,
+    // language'})` generuje w Postgresie `ON CONFLICT (content_hash,
+    // language) DO UPDATE` BEZ warunku WHERE — a Postgres wymaga
+    // IDENTYCZNEGO warunku WHERE w samej klauzuli ON CONFLICT, żeby dopasować
+    // częściowy indeks (klient supabase-js nie ma jak tego wygenerować).
+    // Efekt: KAŻDY zapis nowej analizy (nie tylko tekstu — wszystkich typów,
+    // łącznie z obrazem) kończył się błędem "no unique or exclusion
+    // constraint matching the ON CONFLICT specification" → "Nie udało się
+    // zapisać wyniku analizy" — zgłoszone przez właściciela (3 nieudane
+    // próby analizy obrazu z rzędu). Naprawa: zwykły `.insert()` zamiast
+    // `.upsert()` (nie potrzebuje żadnej klauzuli ON CONFLICT). Jedyny
+    // scenariusz, który wcześniej łapał `upsert` a `insert` by nie złapał:
+    // dwie osoby publikujące DOKŁADNIE tę samą, NOWĄ treść w tej samej
+    // chwili (prawdziwy wyścig) — obsłużone niżej ręcznie: druga osoba
+    // dostaje z Postgresa kod błędu 23505 (naruszenie unikalności), więc
+    // dociągamy wiersz, który przed chwilą zapisała pierwsza, i serwujemy go
+    // jako darmowe trafienie w cache zamiast błędu.
     const { data: newScan, error: insertError } = refreshScanId
       ? await supabase.from('scans').update(scanRow).eq('id', refreshScanId).select().single()
-      : await supabase
-          .from('scans')
-          .upsert({ ...scanRow, view_count: 0 }, { onConflict: 'content_hash,language' })
-          .select()
-          .single()
+      : await (async () => {
+          const inserted = await supabase.from('scans').insert({ ...scanRow, view_count: 0 }).select().single()
+          if (inserted.error?.code === '23505') {
+            const { data: raceWinner } = await supabase
+              .from('scans')
+              .select('*')
+              .eq('content_hash', effectiveContentHash)
+              .eq('language', outputLanguage)
+              .eq('is_private', false)
+              .maybeSingle()
+            if (raceWinner) return { data: raceWinner, error: null }
+          }
+          return inserted
+        })()
 
     // Jeśli zapis się nie uda, NIE kontynuujemy w ciemno (poprzednio kod
     // próbował dalej użyć newScan.id, co przy null-u wywalało się
