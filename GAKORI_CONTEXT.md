@@ -6083,6 +6083,79 @@ licznik poza inicjalnym `view_count: 0` przy tworzeniu nowego wiersza.
 `node --experimental-strip-types --check` i `tsc --noEmit
 --skipLibCheck` bez nowych błędów (te same 19 znanych linii co zawsze).
 
+**POPRAWKA 2026-08-28(ze) — "Twoje prywatne analizy" → "Twoje analizy":
+użytkownik widzi teraz WSZYSTKIE swoje analizy (też publiczne/z cache'u),
+z filtrem prywatne/publiczne/wszystkie; dopisek "zawsze prywatne" przy
+Obrazie i PDF.** Właściciel poprosił wprost: konto ma pokazywać
+KOMPLETNĄ historię działań użytkownika — każdą analizę, jaką kiedykolwiek
+wywołał lub odebrał (także trafienie w cudzy cache, gdzie nie było
+żadnego nowego wywołania Gemini), nie tylko te ściśle prywatne jak
+dotychczas. System prywatny/publiczny (kto może zobaczyć wynik) ma
+zostać BEZ ZMIAN — to wyłącznie dodanie WIDOKU/OZNACZENIA dla właściciela
+konta, nie zmiana uprawnień dostępu.
+
+Nowa tabela `scan_history` (SQL niżej) — celowo ODDZIELNA od `scan_access`:
+- `scan_access` nadal jedynym mechanizmem KONTROLI DOSTĘPU (RLS) — kto
+  faktycznie ma prawo zobaczyć prywatny PDF/obraz/tekst. Bez zmian.
+- `scan_history` to czysto WIDOKOWA lista "co ten użytkownik kiedykolwiek
+  uruchomił/odebrał", jeden wiersz na parę (scan_id, user_id), zapisywana
+  przy KAŻDEJ udanej odpowiedzi z wynikiem w `analyze/index.ts` — cache
+  własny, cache cudzy (publiczny), świeża analiza — wszystkie 5 miejsc w
+  kodzie, gdzie funkcja zwraca `result`, wywołują teraz
+  `recordScanHistory(supabase, scanId, user_id, sourceFilename)`. Zapis
+  jest "cichy" (nie blokuje odpowiedzi użytkownikowi, jeśli się nie uda) —
+  to tylko wygoda widoku, nie księgowość ani bezpieczeństwo.
+
+`historia.html` (strona pod przyciskiem "Twoje analizy", dawniej "Twoje
+prywatne analizy PDF"): teraz pobiera dane z `scan_history` (nie
+`scan_access`), pokazuje 4 sekcje (🔗 Linki / 📝 Teksty / 🖼️ Obrazy /
+📄 PDF-y) i nowy pasek filtra "Wszystkie / Publiczne / Prywatne" (te same
+klasy CSS `.tabs`/`.tab-btn` co zakładki trybu analizy, dla spójności
+wyglądu). Każdy wiersz oznaczony badge'em "🔒 Prywatna" TYLKO gdy
+faktycznie jest teraz prywatny — liczone na żywo z bieżącego stanu
+(`scans.is_private`/`input_type`), więc gdy tekst zostanie upubliczniony
+(patrz POPRAWKA (za), scenariusz 4 — scalanie duplikatów), badge sam
+zniknie następnym razem, gdy strona się odświeży — bez żadnej dodatkowej
+logiki śledzenia zmiany stanu. Ten sam badge (`.scan-row-privacy-badge`,
+dawniej `.scan-row-public-badge` z innym znaczeniem, przemianowany) dodany
+też na `scan.html` przy samym wyniku analizy.
+
+`index.html`: pod zakładkami Obraz i PDF dodano stały dopisek "🔒 Ta
+analiza zawsze zostaje prywatna — widoczna tylko dla Ciebie." (właściciel
+poprosił dodatkowo, żeby było to widoczne w miejscu wyboru trybu analizy,
+nie tylko po fakcie) — jeden wspólny klucz i18n
+`label_image_pdf_always_private`, użyty w obu miejscach.
+
+`account.html`: nowy przycisk "Twoje analizy →" nad przyciskiem
+"Wyloguj", prowadzący na `historia.html`.
+
+Wymagana NOWA migracja SQL (`scan_history` + RLS) — właściciel musi ją
+uruchomić w Supabase SQL Editor PRZED wdrożeniem nowego `analyze/index.ts`
+(inaczej zapis do `scan_history` będzie się cicho nie udawał, a "Twoje
+analizy" nie pokaże nowych pozycji, dopóki tabela nie powstanie):
+```sql
+CREATE TABLE IF NOT EXISTS public.scan_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scan_id uuid NOT NULL REFERENCES public.scans(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  source_filename text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (scan_id, user_id)
+);
+ALTER TABLE public.scan_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "scan_history_select_own" ON public.scan_history;
+CREATE POLICY "scan_history_select_own" ON public.scan_history
+  FOR SELECT USING (auth.uid() = user_id);
+```
+
+Weryfikacja: `node --experimental-strip-types --check` i `tsc --noEmit
+--skipLibCheck` na `analyze/index.ts` bez nowych błędów (te same 19
+znanych linii). Składnia wszystkich zmienionych plików HTML (inline
+`<script>`) sprawdzona `node --check`, `i18n.js` sprawdzone `node
+--check` + policzone klucze (10/10 języków), `style.css` sprawdzone pod
+kątem zbalansowania klamer. `sw.js` `CACHE_NAME` podbite, żeby przeglądarki
+pobrały nowe pliki.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

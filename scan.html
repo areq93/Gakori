@@ -34,7 +34,7 @@
         <div id="creditBalance" class="credit-balance" style="display:none;" data-i18n-aria-label="credit_balance_label" aria-label="Stan kredytów">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span id="creditBalanceValue" aria-live="polite">0</span>
         </div>
-        <a id="historyBtn" class="icon-btn" href="historia.html" data-i18n-aria-label="history_title" aria-label="Twoje prywatne analizy"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></a>
+        <a id="historyBtn" class="icon-btn" href="historia.html" data-i18n-aria-label="history_title" aria-label="Twoje analizy"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></a>
         <a id="userMenuBtn" class="icon-btn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
     </div>
 
@@ -83,6 +83,10 @@
                 </div>
             </div>
             <div id="scanBadge" class="result-badge"></div>
+            <!-- POPRAWKA 2026-08-28(ze) — ten sam znacznik prywatności co na
+                 "Twoje analizy" (historia.html), teraz też przy samym wyniku
+                 — właściciel poprosił wprost: "i tak samo w samej analizie". -->
+            <span id="scanPrivacyBadge" class="scan-row-privacy-badge" style="display:none; margin-left:8px; vertical-align:middle;"></span>
             <div id="scanPatterns"></div>
             <div class="summary-block">
                 <p class="summary-label" data-i18n="summary_label">Podsumowanie</p>
@@ -352,7 +356,7 @@
                 showNotFound();
             } else {
                 sessionReady.then(() => sb.from('scans')
-                    .select('input_type, source_url, text_content, result, is_manual_source, retracted, view_count')
+                    .select('input_type, source_url, text_content, result, is_manual_source, retracted, view_count, is_private')
                     .eq('id', scanId)
                     .maybeSingle())
                     .then(({ data, error }) => {
@@ -776,6 +780,16 @@
                         const badge = document.getElementById('scanBadge');
                         badge.className = 'result-badge ' + badgeClass;
                         badge.innerText = label;
+
+                        // POPRAWKA 2026-08-28(ze) — ten sam znacznik prywatności co
+                        // na "Twoje analizy" (historia.html): PDF/obraz zawsze
+                        // prywatne, tekst zależy od `is_private` (może się zmienić
+                        // "po fakcie" — scenariusz 4/POPRAWKA za — stąd liczone na
+                        // żywo z danymi tej strony, nie zapamiętane raz na zawsze).
+                        const isPrivateScan = data.input_type === 'pdf' || data.input_type === 'image' || (data.input_type === 'text' && !!data.is_private);
+                        const privacyBadge = document.getElementById('scanPrivacyBadge');
+                        privacyBadge.style.display = isPrivateScan ? 'inline-block' : 'none';
+                        privacyBadge.innerText = t('history_private_badge');
 
                         // Nowa struktura wyniku ma r.patterns (lista wielu wzorców), stara
                         // (już zcache'owane analizy sprzed tej zmiany) ma pojedynczy

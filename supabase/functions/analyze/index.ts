@@ -149,6 +149,36 @@ async function logQuietConfirmation(supabase: ReturnType<typeof createClient>, s
   )
 }
 
+// POPRAWKA 2026-08-28(ze) — "Twoje analizy" (dawniej "Twoje prywatne
+// analizy", patrz GAKORI_CONTEXT.md): dotąd `scan_access` śledził TYLKO
+// PDF/obraz/prywatny tekst (bo tylko one potrzebowały tego wpisu do
+// samego DZIAŁANIA — RLS). Publiczne analizy (link, publiczny tekst) nie
+// zostawiały ŻADNEGO śladu tego, KTO je zrobił/oglądał — właściciel
+// zgłosił wprost: "użytkownik w swojej bazie musi mieć wszystkie
+// analizy jakie robił, nawet te wywołane z cache". `scan_history` to
+// wyłącznie WYŚWIETLANIE (nie ma nic wspólnego z RLS/dostępem —
+// publiczne analizy są i tak czytelne dla każdego) — jeden wiersz na
+// (scan, użytkownik), niezależnie od tego, ile razy ta sama osoba do
+// tego samego wyniku wraca. Wywoływane przy KAŻDYM z pięciu miejsc w
+// tym pliku, gdzie zalogowany użytkownik dostaje gotowy wynik (zwykły
+// cache, oba warianty ratunku po source_url, dopasowanie po
+// podobieństwie w forceRefresh, świeża analiza) — namierzone przez pełne
+// przeszukanie pliku pod kątem `return new Response(...)` zawierających
+// pole `result`, nie samą pamięć/domysł, zgodnie z zasadą zapisaną po
+// POPRAWCE (zc)/(zd) wyżej.
+async function recordScanHistory(
+  supabase: ReturnType<typeof createClient>,
+  scanId: string,
+  userId: string | null,
+  sourceFilename: string | null
+): Promise<void> {
+  if (!userId) return
+  await supabase.from('scan_history').upsert(
+    { scan_id: scanId, user_id: userId, source_filename: sourceFilename },
+    { onConflict: 'scan_id,user_id', ignoreDuplicates: true }
+  )
+}
+
 // POPRAWKA 2026-08-28(za) — scenariusz 4 z prywatnością tekstu (patrz
 // GAKORI_CONTEXT.md po pełny opis 5 scenariuszy ustalonych z właścicielem):
 // ktoś publikuje treść, która wcześniej istniała WYŁĄCZNIE jako prywatna
@@ -2337,6 +2367,16 @@ Deno.serve(async (req: Request) => {
         })
       }
 
+      // POPRAWKA 2026-08-28(ze) — "Twoje analizy" ma pokazywać WSZYSTKO, co
+      // zalogowany użytkownik kiedykolwiek zrobił, także trafienia w cache
+      // (patrz recordScanHistory() wyżej).
+      await recordScanHistory(
+        supabase,
+        existing.id,
+        user_id,
+        existing.input_type === 'pdf' ? pdfFilename : existing.input_type === 'image' ? imageFilenameLabel : null
+      )
+
       return new Response(
         // "id" pozwala frontendowi otworzyć pełny wynik jako osobną stronę
         // (scan.html?id=...) zamiast pokazywać go na tej samej stronie.
@@ -2874,6 +2914,8 @@ Deno.serve(async (req: Request) => {
             text_content: string | null
             link_last_checked_at: string | null
           })
+          // POPRAWKA 2026-08-28(ze) — patrz recordScanHistory() wyżej.
+          await recordScanHistory(supabase, rescueExact.id as string, user_id, null)
           return new Response(
             JSON.stringify({ cached: true, cost: 0, id: rescueExact.id, result: rescueExact.result, is_manual_source: true, source_url: rescueExact.source_url }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -2895,6 +2937,8 @@ Deno.serve(async (req: Request) => {
             costTracker
           )
           if (translated) {
+            // POPRAWKA 2026-08-28(ze) — patrz recordScanHistory() wyżej.
+            await recordScanHistory(supabase, rescueOriginal.id as string, user_id, null)
             return new Response(
               JSON.stringify({ cached: true, cost: 0, id: rescueOriginal.id, result: translated, is_manual_source: true, source_url: rescueOriginal.source_url }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -2969,6 +3013,8 @@ Deno.serve(async (req: Request) => {
             // wyżej (patrz komentarz tam) — licznik liczy odtąd wyłącznie
             // faktyczne otwarcia strony wyniku, nie ponowne zapytania do
             // `analyze` (w tym "Sprawdź, czy coś się zmieniło").
+            // POPRAWKA 2026-08-28(ze) — patrz recordScanHistory() wyżej.
+            await recordScanHistory(supabase, refreshScanId as string, user_id, null)
             return new Response(
               JSON.stringify({ cached: true, cost: 0, id: refreshScanId, result: existingForRefresh.result, source_url }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -4137,6 +4183,16 @@ ${compactExisting}`
     // bezpieczeństwa).
     const chargeFailure = await chargeCredits(finalCost, 'spend', newScan.id)
     if (chargeFailure) return outageResponse(chargeFailure)
+
+    // POPRAWKA 2026-08-28(ze) — patrz recordScanHistory() wyżej. Ostatni z
+    // pięciu miejsc w tym pliku, gdzie zalogowany użytkownik dostaje gotowy
+    // wynik — tu akurat świeżo policzony i opłacony, nie z cache'u.
+    await recordScanHistory(
+      supabase,
+      newScan.id,
+      user_id,
+      input_type === 'pdf' ? pdfFilename : input_type === 'image' ? imageFilenameLabel : null
+    )
 
     return new Response(
       JSON.stringify({

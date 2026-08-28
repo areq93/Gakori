@@ -4,7 +4,7 @@
     <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('gakori_theme') || 'light');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gakori - Twoje prywatne analizy</title>
+    <title>Gakori - Twoje analizy</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="shortcut icon" href="icon-192.png">
@@ -34,26 +34,40 @@
         <div id="creditBalance" class="credit-balance" style="display:flex;" data-i18n-aria-label="credit_balance_label" aria-label="Stan kredytów">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span id="creditBalanceValue" aria-live="polite">0</span>
         </div>
-        <a id="historyBtn" class="icon-btn" href="historia.html" style="display:flex;" data-i18n-aria-label="history_title" aria-label="Twoje prywatne analizy"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></a>
+        <a id="historyBtn" class="icon-btn" href="historia.html" style="display:flex;" data-i18n-aria-label="history_title" aria-label="Twoje analizy"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></a>
         <a id="userMenuBtn" class="icon-btn" href="account.html" style="display:flex;" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
     </div>
 
     <div class="card-stack">
 
         <div class="card">
-            <h2 data-i18n="history_title">Twoje prywatne analizy</h2>
-            <p style="color:var(--ink-soft); font-size:13.5px; margin:0 0 14px 0; text-align:center;" data-i18n="history_intro">Tylko Ty widzisz tę listę — te analizy nie są publiczne.</p>
+            <h2 data-i18n="history_title">Twoje analizy</h2>
+            <p style="color:var(--ink-soft); font-size:13.5px; margin:0 0 14px 0; text-align:center;" data-i18n="history_intro">Wszystkie analizy, które kiedykolwiek zrobiłeś. Prywatne są oznaczone znaczkiem 🔒.</p>
             <input type="search" id="historySearch" data-i18n-placeholder="history_search_placeholder" placeholder="Szukaj we wszystkich swoich analizach..." style="display:none;">
+            <!-- POPRAWKA 2026-08-28(ze) — filtr publiczne/prywatne/wszystkie,
+                 ten sam wzorzec CSS co zakładki trybu na stronie głównej
+                 (.tabs/.tab-btn), dla spójności stylu. -->
+            <div class="tabs" id="historyPrivacyFilter" style="display:none;">
+                <button class="tab-btn active" data-filter="all" type="button" data-i18n="history_filter_all">Wszystkie</button>
+                <button class="tab-btn" data-filter="public" type="button" data-i18n="history_filter_public">Publiczne</button>
+                <button class="tab-btn" data-filter="private" type="button" data-i18n="history_filter_private">Prywatne</button>
+            </div>
         </div>
 
         <div id="historyLoading" class="card">
             <p style="color:var(--ink-soft); margin:0; text-align:center;" data-i18n="loading">Ładowanie...</p>
         </div>
 
-        <div id="historyCardPdf" class="card" style="display:none;">
-            <h3 class="history-section-title"><span data-i18n="history_section_pdf">PDF-y</span> <span id="historyCountPdf" class="history-count"></span></h3>
-            <div id="historyListPdf" class="scan-list-scroll"></div>
-            <p id="historyNoMatchPdf" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
+        <div id="historyCardUrl" class="card" style="display:none;">
+            <h3 class="history-section-title"><span data-i18n="history_section_url">Linki</span> <span id="historyCountUrl" class="history-count"></span></h3>
+            <div id="historyListUrl" class="scan-list-scroll"></div>
+            <p id="historyNoMatchUrl" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
+        </div>
+
+        <div id="historyCardText" class="card" style="display:none;">
+            <h3 class="history-section-title"><span data-i18n="history_section_text">Teksty</span> <span id="historyCountText" class="history-count"></span></h3>
+            <div id="historyListText" class="scan-list-scroll"></div>
+            <p id="historyNoMatchText" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
         </div>
 
         <div id="historyCardImage" class="card" style="display:none;">
@@ -62,13 +76,13 @@
             <p id="historyNoMatchImage" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
         </div>
 
-        <div id="historyCardText" class="card" style="display:none;">
-            <h3 class="history-section-title"><span data-i18n="history_section_text">Prywatne teksty</span> <span id="historyCountText" class="history-count"></span></h3>
-            <div id="historyListText" class="scan-list-scroll"></div>
-            <p id="historyNoMatchText" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
+        <div id="historyCardPdf" class="card" style="display:none;">
+            <h3 class="history-section-title"><span data-i18n="history_section_pdf">PDF-y</span> <span id="historyCountPdf" class="history-count"></span></h3>
+            <div id="historyListPdf" class="scan-list-scroll"></div>
+            <p id="historyNoMatchPdf" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
         </div>
 
-        <p id="historyEmpty" class="card" style="display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych prywatnych analiz.</p>
+        <p id="historyEmpty" class="card" style="display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych analiz.</p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -111,22 +125,28 @@
                 }
                 refreshCreditBalance(sb, session.user.id);
 
-                // `scan_access` (widoczne tylko dla właściciela, patrz RLS w
-                // GAKORI_CONTEXT.md) trzyma nazwę pliku i moment ostatniego
-                // dostępu; dociągamy powiązany wynik (`scans`) przez wbudowane
-                // złączenie PostgREST — RLS na `scans` i tak pozwoli tu tylko
-                // na wiersze, do których ten użytkownik ma wpis w scan_access,
-                // więc to złączenie nie ujawnia nic więcej niż zapytanie samo
-                // w sobie już pozwala. POPRAWKA 2026-08-28(g) — `scan_access`
-                // trzyma teraz też obrazy (zawsze prywatne) i teksty oznaczone
-                // jako prywatne (`is_private`, patrz analyze/index.ts).
+                // POPRAWKA 2026-08-28(ze) — "Twoje analizy" (dawniej "Twoje
+                // prywatne analizy"): dotąd ta strona czytała `scan_access`,
+                // czyli WYŁĄCZNIE PDF/obraz/prywatny tekst. Właściciel zgłosił
+                // wprost: "użytkownik w swojej bazie musi mieć wszystkie
+                // analizy jakie robił, nawet te wywołane z cache" — czyli też
+                // linki i publiczny tekst, które `scan_access` nigdy nie
+                // śledził (nie były do tego potrzebne — RLS i tak pozwala
+                // każdemu je czytać). Nowa tabela `scan_history` (patrz
+                // GAKORI_CONTEXT.md i `recordScanHistory()` w
+                // `analyze/index.ts`) śledzi TERAZ każdą analizę zalogowanego
+                // użytkownika, niezależnie od typu i prywatności — WYŁĄCZNIE
+                // do wyświetlania tutaj, nie ma nic wspólnego z RLS/dostępem.
+                // RLS na `scan_history` i tak pozwala tu tylko na wiersze
+                // tego użytkownika, więc złączenie ze `scans` nie ujawnia nic
+                // więcej niż zapytanie samo w sobie już pozwala.
                 // POPRAWKA 2026-08-28(h) — limit podniesiony z 100 do 300:
                 // wspólna wyszukiwarka niżej filtruje WYŁĄCZNIE to, co już
                 // jest pobrane (bez kolejnego zapytania do bazy przy każdym
                 // wpisanym znaku), więc trzeba mieć zapas większy niż limit
                 // wyświetlania (20/typ), żeby wyszukiwanie miało w czym szukać.
                 const { data, error } = await sb
-                    .from('scan_access')
+                    .from('scan_history')
                     .select('scan_id, source_filename, created_at, scans(result, input_type, text_content, is_private)')
                     .eq('user_id', session.user.id)
                     .order('created_at', { ascending: false })
@@ -142,10 +162,10 @@
                 const dateFmt = new Intl.DateTimeFormat(getCurrentLanguage(), { dateStyle: 'medium', timeStyle: 'short' });
 
                 // Etykieta danego wiersza — dla PDF/obrazu to nazwa pliku
-                // (`source_filename`), dla tekstu to tytuł wygenerowany przez
-                // AI (`result.title`, patrz analyze/index.ts) — z fallbackiem
-                // na fragment treści dla starszych analiz sprzed tej zmiany
-                // (nie mają jeszcze pola "title").
+                // (`source_filename`), dla linku/tekstu to tytuł wygenerowany
+                // przez AI (`result.title`, patrz analyze/index.ts) — z
+                // fallbackiem na fragment treści dla starszych analiz sprzed
+                // tej zmiany (nie mają jeszcze pola "title").
                 function labelFor(type, row) {
                     if (type === 'pdf') return row.source_filename || t('history_unnamed_file');
                     if (type === 'image') return row.source_filename || t('history_unnamed_image');
@@ -153,10 +173,21 @@
                     if (typeof r.title === 'string' && r.title.trim()) return r.title.trim();
                     const raw = (row.scans && row.scans.text_content) || '';
                     const snippet = raw.length > 60 ? raw.slice(0, 60).trim() + '…' : raw;
-                    return snippet || t('history_unnamed_text');
+                    return snippet || (type === 'url' ? t('history_unnamed_url') : t('history_unnamed_text'));
                 }
 
-                function buildRow(row, icon, labelText) {
+                // PDF/obraz są ZAWSZE prywatne (patrz GAKORI_CONTEXT.md — nie
+                // ma dla nich opcji "upublicznij"); link jest ZAWSZE publiczny;
+                // tekst zależy od `scans.is_private` (mogła się zmienić po
+                // fakcie — patrz scenariusz 4/POPRAWKA za — dlatego liczone na
+                // żywo z bazy, nie zapamiętane raz na zawsze przy tworzeniu).
+                function isPrivateRow(type, row) {
+                    if (type === 'pdf' || type === 'image') return true;
+                    if (type === 'text') return !!(row.scans && row.scans.is_private);
+                    return false;
+                }
+
+                function buildRow(row, icon, labelText, isPrivate) {
                     const r = (row.scans && row.scans.result) || {};
                     const score = r.q_score;
                     let badgeClass = 'badge-red', label = (typeof score === 'number' ? score : '?') + '/100';
@@ -187,16 +218,18 @@
                     dateEl.className = 'scan-row-date';
                     dateEl.innerText = dateFmt.format(new Date(row.created_at));
                     snippet.appendChild(dateEl);
-                    // POPRAWKA 2026-08-28(za) — prywatna analiza tekstu mogła zostać
-                    // upubliczniona przez kogoś innego, kto wkleił dokładnie tę samą
-                    // treść bez zaznaczania prywatności (patrz GAKORI_CONTEXT.md,
-                    // scenariusz 4). Pozycja ZOSTAJE na tej liście, ale musi być jasno
-                    // oznaczona, że faktycznie już nie jest prywatna.
-                    if (row.scans && row.scans.input_type === 'text' && row.scans.is_private === false) {
-                        const publicBadge = document.createElement('span');
-                        publicBadge.className = 'scan-row-public-badge';
-                        publicBadge.innerText = t('history_now_public');
-                        snippet.appendChild(publicBadge);
+                    // POPRAWKA 2026-08-28(ze) — jeden, ogólny znacznik prywatności
+                    // zamiast dawnego, jednorazowego "Teraz publiczna" (POPRAWKA
+                    // za): pojawia się WYŁĄCZNIE, gdy pozycja jest prywatna —
+                    // jeśli ktoś inny wklei tę samą treść i ją upubliczni
+                    // (scenariusz 4), `is_private` w bazie samo się zmieni na
+                    // `false`, a znaczek po prostu przestanie się pojawiać przy
+                    // następnym odświeżeniu tej strony — bez osobnej logiki.
+                    if (isPrivate) {
+                        const privBadge = document.createElement('span');
+                        privBadge.className = 'scan-row-privacy-badge';
+                        privBadge.innerText = t('history_private_badge');
+                        snippet.appendChild(privBadge);
                     }
                     link.appendChild(snippet);
 
@@ -208,31 +241,39 @@
                     return link;
                 }
 
-                const byType = { pdf: [], image: [], text: [] };
+                const byType = { url: [], text: [], image: [], pdf: [] };
                 data.forEach((row) => {
                     const type = row.scans && row.scans.input_type;
                     if (byType[type]) byType[type].push(row);
                 });
 
                 const TYPE_CONFIG = [
-                    { type: 'pdf', icon: '📄', card: 'historyCardPdf', list: 'historyListPdf', count: 'historyCountPdf', noMatch: 'historyNoMatchPdf' },
-                    { type: 'image', icon: '🖼️', card: 'historyCardImage', list: 'historyListImage', count: 'historyCountImage', noMatch: 'historyNoMatchImage' },
+                    { type: 'url', icon: '🔗', card: 'historyCardUrl', list: 'historyListUrl', count: 'historyCountUrl', noMatch: 'historyNoMatchUrl' },
                     { type: 'text', icon: '📝', card: 'historyCardText', list: 'historyListText', count: 'historyCountText', noMatch: 'historyNoMatchText' },
+                    { type: 'image', icon: '🖼️', card: 'historyCardImage', list: 'historyListImage', count: 'historyCountImage', noMatch: 'historyNoMatchImage' },
+                    { type: 'pdf', icon: '📄', card: 'historyCardPdf', list: 'historyListPdf', count: 'historyCountPdf', noMatch: 'historyNoMatchPdf' },
                 ];
 
-                // Przelicza etykietę RAZ na wiersz (nie przy każdym wpisanym
-                // znaku wyszukiwania) — reszta renderowania (filtrowanie,
-                // limit 20) działa już tylko na tej gotowej liście.
+                // Przelicza etykietę i prywatność RAZ na wiersz (nie przy
+                // każdym wpisanym znaku wyszukiwania ani kliknięciu filtra) —
+                // reszta renderowania (filtrowanie, limit 20) działa już
+                // tylko na tej gotowej liście.
                 TYPE_CONFIG.forEach((cfg) => {
                     byType[cfg.type] = byType[cfg.type].map((row) => ({
                         row,
                         label: labelFor(cfg.type, row),
+                        isPrivate: isPrivateRow(cfg.type, row),
                     }));
                 });
 
-                // Renderuje (albo odświeża po wyszukiwaniu) wszystkie trzy
-                // karty naraz — wspólne query przefiltrowuje KAŻDY typ
-                // niezależnie, każdy dostaje własny limit 20.
+                // POPRAWKA 2026-08-28(ze) — filtr Wszystkie/Publiczne/Prywatne,
+                // obok wyszukiwarki — działa na tych samych, już pobranych
+                // danych (bez kolejnego zapytania do bazy).
+                let privacyFilter = 'all';
+
+                // Renderuje (albo odświeża po wyszukiwaniu/zmianie filtra)
+                // wszystkie cztery karty naraz — wspólne query przefiltrowuje
+                // KAŻDY typ niezależnie, każdy dostaje własny limit 20.
                 function render(query) {
                     const q = query.trim().toLowerCase();
                     let anyTypeHasItems = false;
@@ -244,7 +285,10 @@
                         const countEl = document.getElementById(cfg.count);
                         listEl.innerHTML = '';
 
-                        const items = byType[cfg.type];
+                        const allItems = byType[cfg.type];
+                        const items = privacyFilter === 'all'
+                            ? allItems
+                            : allItems.filter((it) => (privacyFilter === 'private') === it.isPrivate);
                         if (items.length === 0) {
                             cardEl.style.display = 'none';
                             return;
@@ -264,8 +308,8 @@
                             return;
                         }
                         noMatchEl.style.display = 'none';
-                        matches.forEach(({ row, label }) => {
-                            listEl.appendChild(buildRow(row, cfg.icon, label));
+                        matches.forEach(({ row, label, isPrivate }) => {
+                            listEl.appendChild(buildRow(row, cfg.icon, label, isPrivate));
                         });
                     });
 
@@ -275,16 +319,27 @@
                 // POPRAWKA 2026-08-28(p) — pasek wyszukiwania widoczny ZAWSZE
                 // (tak jak wyszukiwarka publicznych analiz na stronie głównej,
                 // która też nigdy się nie chowa), nie tylko gdy jest już
-                // przynajmniej jedna prywatna analiza — właściciel zgłosił, że
-                // przy pustej liście w ogóle nie widział okienka wyszukiwania,
-                // co wyglądało jak brak tej funkcji, nie jak jej celowe
-                // ukrycie.
+                // przynajmniej jedna analiza — właściciel zgłosił, że przy
+                // pustej liście w ogóle nie widział okienka wyszukiwania, co
+                // wyglądało jak brak tej funkcji, nie jak jej celowe ukrycie.
+                // Filtr prywatności obok niego — ten sam powód, ten sam
+                // moment pokazania.
                 const searchEl = document.getElementById('historySearch');
                 searchEl.style.display = 'block';
+                document.getElementById('historyPrivacyFilter').style.display = 'flex';
                 let debounceHandle = null;
                 searchEl.addEventListener('input', () => {
                     clearTimeout(debounceHandle);
                     debounceHandle = setTimeout(() => render(searchEl.value), 150);
+                });
+                document.querySelectorAll('#historyPrivacyFilter [data-filter]').forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        privacyFilter = btn.dataset.filter;
+                        document.querySelectorAll('#historyPrivacyFilter [data-filter]').forEach((b) => {
+                            b.classList.toggle('active', b === btn);
+                        });
+                        render(searchEl.value);
+                    });
                 });
 
                 const hasAnything = render('');
