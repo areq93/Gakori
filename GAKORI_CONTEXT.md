@@ -4869,6 +4869,40 @@ Weryfikacja: `tsc --noEmit --skipLibCheck` (te same znane błędy
 środowiskowe) oraz `node --experimental-strip-types --check` — brak
 błędów.
 
+**POPRAWKA 2026-08-28(c) — `daily-report`: przebudowa sekcji "Najpopularniejsze
+analizy" na wyraźną prośbę właściciela.** Dawniej: top 5 WSZECH CZASÓW,
+jeden wspólny ranking (link+tekst razem), tytuły w oryginalnym języku
+analizy. Właściciel poprosił o cztery zmiany naraz: (1) tylko wczorajsza
+doba (te same `yr.start`/`yr.end` co reszta raportu) — "nie chcę żeby
+wisiały mi stare analizy"; (2) osobne rankingi na język: top 5 linków +
+top 3 analiz tekstu (rozdzielone `input_type`); (3) język bez ŻADNEJ
+analizy wczoraj znika z raportu całkowicie, nie pokazuje pustej sekcji;
+(4) tytuły przetłumaczone na polski (raport czyta wyłącznie po polsku).
+
+**Punkt (4) to PIERWSZY realny koszt AI w tej funkcji** — dotąd
+`daily-report` kosztował $0 (tylko wysyłka maila przez Brevo). Nowa
+funkcja `translateTitlesToPolish()` — JEDNO, zbiorcze zapytanie do Gemini
+(`gemini-3.5-flash-lite`, ten sam model co `analyze/index.ts`) na CAŁĄ
+listę tytułów naraz (nie osobne zapytanie na każdy tytuł, wyraźnie
+zaznaczone właścicielowi PRZED wdrożeniem i zaakceptowane) —
+`responseSchema` typu tablica stringów, długość musi się zgadzać z
+wejściem. Świadomie NIE podłączona do współdzielonej infrastruktury
+kill-switcha z `analyze/index.ts` (`costTracker`/`system_daily_spend`) —
+uzasadnienie: to stały, z góry ograniczony koszt raz dziennie (maks.
+kilkadziesiąt krótkich tytułów), nie coś wywoływanego bezpośrednio przez
+użytkowników, więc nie ma tego samego ryzyka "spirali kosztu", przed
+którym chroni główny wyłącznik. Nowy wymagany sekret `GEMINI_API_KEY`
+(dopisany do listy na górze pliku). Fail-open na każdym etapie
+(błąd sieci, zły JSON, niezgodna długość odpowiedzi, pojedynczy pusty
+element) — zawsze zostają oryginalne tytuły zamiast wywalać raport;
+przetestowane osobno w Node (scratchpad) na pięciu przypadkach (poprawna
+odpowiedź, zła długość, zepsuty JSON, pusty string, pojedynczy pusty
+element w tablicy).
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` (te same znane błędy
+środowiskowe) oraz `node --experimental-strip-types --check` — brak
+błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

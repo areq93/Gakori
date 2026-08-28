@@ -21,6 +21,10 @@
 // - CRON_REPORT_SECRET, REPORT_RECIPIENT_EMAIL,
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 //   BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME
+//   GEMINI_API_KEY (POPRAWKA 2026-08-28 — tłumaczenie tytułów najpopularniejszych
+//   analiz na polski, patrz translateTitlesToPolish() niżej; PIERWSZY realny
+//   koszt AI w tej funkcji, dotąd $0 — fail-open: brak klucza po prostu
+//   zostawia tytuły nieprzetłumaczone, nie wywala raportu)
 //
 // Świadomie NIE ma tu (na razie): statystyk cashflow/kupionych pakietów
 // (system płatności jeszcze nie istnieje) ani liczby zgłoszonych błędów
@@ -82,6 +86,57 @@ function warsawYesterdayRange(): { start: string; end: string; dateStr: string }
 function avg(nums: number[]): number | null {
   if (nums.length === 0) return null
   return nums.reduce((a, b) => a + b, 0) / nums.length
+}
+
+// POPRAWKA 2026-08-28 — tłumaczy CAŁĄ listę krótkich tytułów/podsumowań na
+// polski w JEDNYM zapytaniu do Gemini (ten sam model co `analyze/index.ts`
+// — `gemini-3.5-flash-lite` — dla spójności, ale ta funkcja jest celowo
+// samodzielna/minimalna, bez współdzielonej infrastruktury kill-switcha z
+// tamtego pliku: to stały, ograniczony z góry koszt raz dziennie
+// (maks. kilkadziesiąt krótkich tytułów), nie coś, co mogłoby "spiralować"
+// tak jak analizy wywoływane bezpośrednio przez użytkowników — dlatego nie
+// wymaga tego samego mechanizmu ochronnego). Fail-open na każdym etapie:
+// błąd sieci/parsowania/niezgodna długość odpowiedzi zwraca ORYGINALNE
+// (nieprzetłumaczone) teksty, nigdy nie wywala reszty raportu.
+async function translateTitlesToPolish(items: string[], geminiKey: string): Promise<string[]> {
+  if (items.length === 0) return []
+  try {
+    const prompt = `Przetłumacz KAŻDY z poniższych tytułów/podsumowań na język polski — prosto i zwięźle, zachowując sens. Jeśli tekst już jest po polsku, zwróć go bez zmian. Zwróć WYŁĄCZNIE tablicę tłumaczeń w DOKŁADNIE tej samej kolejności i tej samej długości co wejście (jedno tłumaczenie na jeden wpis wejściowy).
+
+Wejście (JSON):
+${JSON.stringify(items)}`
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15000)
+    let res: Response
+    try {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0,
+              responseMimeType: 'application/json',
+              responseSchema: { type: 'array', items: { type: 'string' } },
+            },
+          }),
+          signal: controller.signal,
+        }
+      )
+    } finally {
+      clearTimeout(timer)
+    }
+    const data = await res.json()
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+    if (typeof text !== 'string' || !text) return items
+    const translated = JSON.parse(text)
+    if (!Array.isArray(translated) || translated.length !== items.length) return items
+    return translated.map((t: unknown, i: number) => (typeof t === 'string' && t.trim() ? t.trim() : items[i]))
+  } catch (_err) {
+    return items
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -163,25 +218,70 @@ Deno.serve(async (req: Request) => {
     // metryki wczorajszych analiz niedostępne — reszta raportu leci dalej
   }
 
-  // --- Najpopularniejsze analizy (top 5 wg wyświetleń) w każdym języku, w którym coś jest ---
+  // --- POPRAWKA 2026-08-28 — "Najpopularniejsze analizy": przebudowane na
+  // wyraźną prośbę właściciela. Dawniej: top 5 WSZECH CZASÓW, jeden wspólny
+  // ranking (link+tekst razem), tytuły w oryginalnym języku analizy — stare
+  // popularne analizy wisiałyby w raporcie bez końca, a nie-polskie tytuły
+  // były nieczytelne dla właściciela. Teraz: TYLKO wczorajsza doba (te same
+  // `yr.start`/`yr.end` co reszta raportu — "nie chcę żeby wisiały mi stare
+  // analizy"), OSOBNE rankingi na język: top 5 linków + top 3 analiz tekstu
+  // (rozdzielone, bo to inny rodzaj treści), język bez ŻADNEJ analizy
+  // wczoraj w ogóle znika z raportu (nie pokazujemy pustej sekcji).
   const SITE_URL = 'https://gakori.app'
-  const topByLanguage: { langName: string; items: { label: string; views: number; url: string }[] }[] = []
+  type PopularItem = { label: string; views: number; url: string }
+  type LanguagePopular = { langName: string; linkItems: PopularItem[]; textItems: PopularItem[] }
+  const topByLanguage: LanguagePopular[] = []
   try {
+    const toItem = (r: { id: string; view_count: number | null; result: { summary?: string } | null; source_url: string | null }): PopularItem => ({
+      label: String(r.result?.summary || r.source_url || 'analiza bez podsumowania').slice(0, 110),
+      views: r.view_count ?? 0,
+      url: `${SITE_URL}/scan.html?id=${encodeURIComponent(r.id)}`,
+    })
     for (const lang of LANGUAGES) {
-      const { data, error } = await supabase
+      const { data: linkData, error: linkErr } = await supabase
         .from('scans')
         .select('id, view_count, result, source_url')
         .eq('language', lang.code)
+        .eq('input_type', 'url')
+        .gte('created_at', yr.start)
+        .lt('created_at', yr.end)
         .order('view_count', { ascending: false })
         .limit(5)
-      if (error) throw error
-      if (!data || data.length === 0) continue
-      const items = (data as any[]).map((r) => ({
-        label: String(r.result?.summary || r.source_url || 'analiza bez podsumowania').slice(0, 110),
-        views: r.view_count ?? 0,
-        url: `${SITE_URL}/scan.html?id=${encodeURIComponent(r.id)}`,
-      }))
-      topByLanguage.push({ langName: lang.name, items })
+      if (linkErr) throw linkErr
+      const { data: textData, error: textErr } = await supabase
+        .from('scans')
+        .select('id, view_count, result, source_url')
+        .eq('language', lang.code)
+        .eq('input_type', 'text')
+        .gte('created_at', yr.start)
+        .lt('created_at', yr.end)
+        .order('view_count', { ascending: false })
+        .limit(3)
+      if (textErr) throw textErr
+      const linkItems = ((linkData || []) as any[]).map(toItem)
+      const textItems = ((textData || []) as any[]).map(toItem)
+      if (linkItems.length === 0 && textItems.length === 0) continue
+      topByLanguage.push({ langName: lang.name, linkItems, textItems })
+    }
+
+    // POPRAWKA 2026-08-28 — tłumaczenie WSZYSTKICH tytułów na polski,
+    // właściciel wprost poprosił ("proszę przetłumaczaj mi tytuły na język
+    // polski") — czyta raport wyłącznie po polsku, a tytuły nie-polskich
+    // analiz były dotąd w oryginalnym języku analizy. JEDNO, zbiorcze
+    // zapytanie do Gemini na CAŁĄ listę naraz (nie osobne zapytanie na
+    // każdy tytuł) — pierwszy realny koszt AI w tej funkcji (dotąd $0,
+    // tylko wysyłka maila przez Brevo), ale bardzo mały: krótkie teksty,
+    // maks. kilkadziesiąt tytułów dziennie. Fail-open: błąd/brak klucza
+    // zostawia oryginalne (nieprzetłumaczone) tytuły, nie wywala raportu.
+    const geminiKey = Deno.env.get('GEMINI_API_KEY')
+    if (geminiKey) {
+      const allItems = topByLanguage.flatMap((g) => [...g.linkItems, ...g.textItems])
+      if (allItems.length > 0) {
+        const translated = await translateTitlesToPolish(allItems.map((it) => it.label), geminiKey)
+        allItems.forEach((it, i) => {
+          if (translated[i]) it.label = translated[i]
+        })
+      }
     }
   } catch (_err) {
     // ranking popularności niedostępny — reszta raportu leci dalej
@@ -535,22 +635,30 @@ Deno.serve(async (req: Request) => {
 <div style="font-size:14px;color:#374151;margin-top:6px;">łącznie w tym miesiącu: ${fmt(emailsSentThisMonth)}</div>${emailFailuresHtml}`
   )
 
+  const renderPopularItems = (items: PopularItem[]) =>
+    items.length === 0
+      ? '<p style="color:#9ca3af;font-size:13px;margin:0 0 6px;">Brak.</p>'
+      : `<ol style="margin:0 0 6px;padding-left:20px;color:#374151;font-size:14px;">
+${items.map((it) => `<li style="margin-bottom:2px;"><a href="${it.url}" style="color:#2563eb;text-decoration:none;">${it.label}</a> — <strong>${it.views}</strong> wyświetleń</li>`).join('')}
+</ol>`
+
   const topHtml =
     topByLanguage.length === 0
-      ? '<p style="color:#6b7280;">Brak danych o popularności analiz.</p>'
+      ? '<p style="color:#6b7280;">Brak danych o popularności analiz z ostatnich 24h.</p>'
       : topByLanguage
           .map(
             (group) => `
-<div style="margin-bottom:10px;">
+<div style="margin-bottom:12px;">
   <div style="font-weight:600;color:#111827;margin-bottom:4px;">${group.langName}</div>
-  <ol style="margin:0;padding-left:20px;color:#374151;font-size:14px;">
-    ${group.items.map((it) => `<li style="margin-bottom:2px;"><a href="${it.url}" style="color:#2563eb;text-decoration:none;">${it.label}</a> — <strong>${it.views}</strong> wyświetleń</li>`).join('')}
-  </ol>
+  <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Linki</div>
+  ${renderPopularItems(group.linkItems)}
+  <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Tekst</div>
+  ${renderPopularItems(group.textItems)}
 </div>`
           )
           .join('')
 
-  const topCard = card('Najpopularniejsze analizy (top 5 na język)', topHtml)
+  const topCard = card('Najpopularniejsze analizy z ostatnich 24h (top 5 linki / top 3 tekst, na język)', topHtml)
 
   const trustCard = card(
     'Zaufanie do linków (punkt B)',
