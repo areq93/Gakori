@@ -165,7 +165,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 16px;
+    display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 18px;
     background-color: var(--paper);
     background-image: radial-gradient(ellipse 900px 500px at 50% -12%, var(--card-2) 0%, var(--paper) 60%);
     color: var(--ink);
@@ -246,7 +246,7 @@ h2 {
 
 .card {
     background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 45%, var(--card) 100%);
-    padding: 26px; border-radius: var(--radius);
+    padding: 30px; border-radius: var(--radius);
     border: var(--border-w) solid var(--card-border);
     box-shadow: var(--sculpt-shadow);
     width: 100%; max-width: 400px; box-sizing: border-box;
@@ -264,7 +264,7 @@ h2 {
    stylu inline przy każdym nowym `<select>`, eliminuje całą tę klasę
    błędu na przyszłość. */
 input:not([type="checkbox"]):not([type="radio"]), textarea, select {
-    width: 100%; padding: 13px 14px; margin: 10px 0;
+    width: 100%; padding: 15px 16px; margin: 12px 0;
     border: var(--border-w) solid var(--card-border); border-radius: var(--radius-sm); box-sizing: border-box;
     font-size: 16px; font-family: inherit; color: var(--ink); background: var(--input-bg);
     transition: border-color .15s ease, box-shadow .15s ease;
@@ -313,7 +313,7 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
    etykiece). */
 .field-label {
     display: block; font-weight: 700; font-size: 12.5px; color: var(--ink-soft);
-    text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 6px 0;
+    text-transform: uppercase; letter-spacing: 0.04em; margin: 16px 0 8px 0;
 }
 .field-label:first-child { margin-top: 0; }
 /* Etykieta obok checkboxa (np. "Zachowaj tę analizę jako prywatną") —
@@ -324,7 +324,7 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
 .checkbox-label {
     display: flex; align-items: flex-start; gap: 8px;
     font-family: inherit; font-size: 13px; color: var(--ink-soft);
-    margin: 10px 0 18px 0; cursor: pointer;
+    margin: 12px 0 20px 0; cursor: pointer;
 }
 /* Każdy przycisk w aplikacji (główny, drugoplanowy, aktywna zakładka,
    ikona konta) — JEDEN spójny, matowo-"perłowy" styl, bez wyjątków
@@ -342,7 +342,7 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
    wszędzie: głównym przycisku, aktywnej zakładce i ikonie konta. Tekst
    zawsze przez var(--btn-text)/var(--ink), nigdy na sztywno. */
 button {
-    width: 100%; padding: 13px;
+    width: 100%; padding: 15px;
     background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 50%, var(--primary-dark) 100%);
     color: var(--btn-text); border: none;
     border-radius: var(--radius-sm); font-weight: 700; letter-spacing: 0.01em; cursor: pointer; font-size: 16px;
@@ -383,7 +383,7 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
 }
 :root[data-theme="dark"] button:not(.tab-btn):not(.image-preview-remove):disabled { background: #4a463a; color: #a39a86; border-color: #4a463a; }
 
-.tabs { display: flex; gap: 6px; margin: 10px 0 18px 0; }
+.tabs { display: flex; gap: 6px; margin: 12px 0 20px 0; }
 .tab-btn {
     flex: 1; padding: 11px 4px; font-size: 13.5px; font-weight: 700;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -412,7 +412,7 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
    łatania marginesu na dole każdego możliwego ostatniego elementu z
    osobna (styl `margin: 0 auto` w @media wyżej celowo zeruje boczne
    przyciski — ID ma wyższą specyficzność, więc wygrywa tu mimo tego). */
-#analyzeBtn { margin-top: 18px; }
+#analyzeBtn { margin-top: 20px; }
 
 #imageSelectionInfo { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
 /* Nazwy plików (zwłaszcza PDF z systemów typu ESPI/EBI) bywają jednym
@@ -462,7 +462,7 @@ a { color: var(--accent); }
 /* Karta wyniku */
 .result-card {
     background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 45%, var(--card) 100%);
-    padding: 26px; border-radius: var(--radius);
+    padding: 30px; border-radius: var(--radius);
     border: var(--border-w) solid var(--card-border);
     box-shadow: var(--sculpt-shadow);
     width: 100%; max-width: 400px; box-sizing: border-box; display: none;
@@ -471,7 +471,7 @@ a { color: var(--accent); }
 /* Pionowy stos kilku kart pod sobą (patrz historia.html) — ta sama
    szerokość co pojedyncza `.card`, żeby wszystko na stronie było
    wyrównane do tej samej kolumny. */
-.card-stack { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 16px; }
+.card-stack { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 18px; }
 
 /* POPRAWKA 2026-08-28(i) — na dużym ekranie (PC/laptop) panel zostawał
    wąski (400px, zaprojektowany pod telefon) z mnóstwem pustego miejsca po
@@ -757,8 +757,16 @@ a { color: var(--accent); }
 
 /* Panel debugowania — tylko dla developera, patrz sekcja 1 w skrypcie (?debug=1) */
 #debug { display: none; margin-top: 20px; padding: 10px; background: var(--debug-bg); border-radius: 10px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed var(--debug-border); box-sizing: border-box; color: var(--ink-soft); }
-.status-ok { color: var(--ok-text); font-weight: bold; }
-.status-err { color: var(--danger-text); font-weight: bold; }
+/* POPRAWKA 2026-08-28(v) — właściciel zgłosił, że komunikat "Konto z tym
+   adresem e-mail już istnieje..." (i podobne) nie był wyśrodkowany, mimo
+   że reszta aplikacji jest. `.status-ok`/`.status-err` to zawsze CAŁA
+   zawartość swojego kontenera (nigdy nie mieszają się w jednej linijce z
+   innym tekstem — sprawdzone we wszystkich miejscach użycia), więc
+   `display: block` + `text-align: center` tutaj, w JEDNYM miejscu, centruje
+   każdy komunikat w całej aplikacji naraz, bez ręcznego dopisywania
+   `text-align: center` do dziesiątek osobnych kontenerów na 4 stronach. */
+.status-ok { display: block; text-align: center; color: var(--ok-text); font-weight: bold; }
+.status-err { display: block; text-align: center; color: var(--danger-text); font-weight: bold; }
 
 /* POPRAWKA 2026-08-28(j) — dawniej `#userMenuBtn`/`.credit-balance` były
    KAŻDE osobno `position: fixed` z ręcznie wyliczonym `right` (16px/68px),

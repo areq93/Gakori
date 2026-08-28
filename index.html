@@ -41,6 +41,8 @@
             <select id="authLanguageSelect" style="margin-bottom:10px;"></select>
             <input type="email" id="authEmail" data-i18n-placeholder="placeholder_email" placeholder="e-mail" autocomplete="email">
             <input type="password" id="authPassword" data-i18n-placeholder="placeholder_password" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
+            <div id="authStatus" style="text-align:center; margin-top:10px; font-size:13px;"></div>
+            <button id="resendEmailBtn" type="button" style="display:none; margin-top:8px; font-size:13px;" data-i18n="btn_resend_email">Wyślij mail ponownie</button>
             <div id="turnstileWidget" style="margin-top:10px; margin-bottom:10px;"></div>
             <button id="authSubmitBtn" type="button" data-i18n="btn_login">Zaloguj się</button>
             <div style="text-align:center; margin-top:8px;">
@@ -53,15 +55,13 @@
             <div style="text-align:center; margin-top:8px; display:none;" id="backToLoginWrap">
                 <a href="#" id="backToLoginLink" style="font-size:13px; color:var(--accent);" data-i18n="link_back_to_login">Masz już konto? Zaloguj się</a>
             </div>
-            <div id="authStatus" style="margin-top:10px; font-size:13px;"></div>
-            <button id="resendEmailBtn" type="button" style="display:none; margin-top:8px; font-size:13px;" data-i18n="btn_resend_email">Wyślij mail ponownie</button>
         </div>
 
         <div id="authRecovery" style="display:none;">
             <p style="margin:0 0 10px 0;" data-i18n="recovery_title">Ustaw nowe hasło do konta:</p>
             <input type="password" id="recoveryPassword" data-i18n-placeholder="placeholder_new_password" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
             <button id="recoverySubmitBtn" type="button" data-i18n="btn_set_new_password">Ustaw nowe hasło</button>
-            <div id="recoveryStatus" style="margin-top:10px; font-size:13px;"></div>
+            <div id="recoveryStatus" style="text-align:center; margin-top:10px; font-size:13px;"></div>
         </div>
     </div>
 
@@ -110,7 +110,7 @@
         </div>
 
         <button id="analyzeBtn" data-i18n="btn_analyze">Analizuj</button>
-        <div id="status" style="margin-top:10px"></div>
+        <div id="status" style="text-align:center; margin-top:10px"></div>
     </div>
 
     <!-- Ekran zgody na koszt analizy — pokazywany TYLKO wtedy, gdy backend
@@ -149,7 +149,7 @@
             <p id="resultManualSourceNotice" style="color:var(--ink-soft);"></p>
             <button id="reportMismatchBtn" type="button" style="margin-right:8px;" data-i18n="btn_report_mismatch">Zgłoś niezgodność z treścią źródła</button>
             <button id="forceRefreshBtn" type="button" data-i18n="btn_force_refresh">Sprawdź, czy coś się zmieniło</button>
-            <p id="resultManualSourceStatus" style="margin-top:6px;"></p>
+            <p id="resultManualSourceStatus" style="text-align:center; margin-top:6px;"></p>
         </div>
     </div>
 
@@ -533,10 +533,11 @@
         };
 
         // 0c. Tryb logowanie / rejestracja. Od POPRAWKI 2026-08-28(t) nie ma już
-        // widocznych zakładek "Zaloguj"/"Zarejestruj" — rejestracja otwiera się w
-        // NOWEJ karcie przeglądarki (przycisk "Załóż konto"), pod adresem z
-        // ?mode=signup, rozpoznawanym niżej. "Zaloguj się" zostaje jedynym
-        // widocznym trybem na tej, oryginalnej karcie.
+        // widocznych zakładek "Zaloguj"/"Zarejestruj" — przycisk "Załóż konto"
+        // PRZENOSI na tę samą stronę pod adresem z ?mode=signup (POPRAWKA (v) —
+        // pierwotnie otwierało nową kartę, właściciel doprecyzował, że
+        // chodziło o zwykłe przejście w tej samej karcie), rozpoznawanym niżej.
+        // "Zaloguj się" zostaje domyślnym trybem na starcie.
         let authFormMode = 'login';
         function setAuthMode(mode) {
             authFormMode = mode;
@@ -550,7 +551,7 @@
             document.getElementById('resendEmailBtn').style.display = 'none';
         }
         document.getElementById('createAccountBtn').addEventListener('click', () => {
-            window.open(window.location.origin + window.location.pathname + '?mode=signup', '_blank');
+            window.location.href = window.location.pathname + '?mode=signup';
         });
         document.getElementById('backToLoginLink').addEventListener('click', (e) => {
             e.preventDefault();

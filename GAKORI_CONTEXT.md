@@ -5680,6 +5680,73 @@ Weryfikacja: składnia wbudowanych skryptów `index.html` sprawdzona
 (`node --check`), `i18n.js` sprawdzony jako poprawny JS — bez błędów.
 Czysta zmiana CSS/HTML/i18n, bez backendu — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(w) — pakiet naprawek zgłoszonych bezpośrednio po (u):
+"Załóż konto" ma PRZENOSIĆ zamiast otwierać nową kartę (doprecyzowanie
+właściciela — pierwotne "nowa karta" z (t) było jego pomyłką w
+komunikacji), wszystkie komunikaty statusu wyśrodkowane w całej appce,
+komunikat "Konto już istnieje" przeniesiony wyżej (między hasło a baner
+Cloudflare), oraz ogólne zwiększenie odstępów w całej aplikacji (~10-15%,
+"ciasne, zgniecione" — zgłoszenie właściciela z dwoma zrzutami ekranu:
+pola e-mail/hasło i wyszukiwarka).**
+
+1. **"Załóż konto" nawiguje zamiast otwierać nową kartę.** Zmiana z
+   POPRAWKI (t) (`window.open(...,'_blank')`) na zwykłe przekierowanie w
+   tej samej karcie: `window.location.href = window.location.pathname +
+   '?mode=signup'`. Reszta mechanizmu (wykrycie `?mode=signup` przy
+   starcie strony, `setAuthMode('signup')`) działa bez zmian — to wciąż
+   ten sam adres, tylko odwiedzany przez pełne przejście zamiast nowej
+   karty.
+2. **Komunikat statusu logowania/rejestracji przeniesiony.** Właściciel
+   pokazał zrzut ekranu z komunikatem "Konto z tym adresem e-mail już
+   istnieje..." wyświetlonym na samym dole karty logowania (pod "Masz już
+   konto? Zaloguj się") i poprosił, żeby pojawiał się między polem hasła
+   a banerem Cloudflare. `#authStatus` (razem z `#resendEmailBtn`, który
+   zawsze pojawiał się razem z nim) przeniesiony w `index.html` z końca
+   `#authLoggedOut` na miejsce zaraz po `#authPassword`, przed
+   `#turnstileWidget` — więc komunikat (błąd logowania, "trwa
+   rejestracja...", "sprawdź e-mail" itd.) jest teraz widoczny od razu
+   pod polami, zanim jeszcze scrolluje się do przycisków.
+3. **Wszystkie komunikaty wyśrodkowane, w JEDNYM miejscu w CSS.**
+   `.status-ok`/`.status-err` (dotąd zwykłe `<span>`, które ZAWSZE
+   stanowią całą zawartość swojego kontenera — sprawdzone we wszystkich
+   miejscach użycia w `index.html`/`account.html`/`scan.html`) dostały
+   `display: block; text-align: center;` — to jedna zmiana w `style.css`,
+   centrująca każdy komunikat statusu w całej aplikacji naraz, zamiast
+   ręcznego dopisywania `text-align: center` do dziesiątek osobnych
+   kontenerów. Dodatkowo wyśrodkowane wprost trzy kontenery, które czasem
+   pokazują goły tekst BEZ `.status-ok`/`.status-err` (np. "Trwa
+   logowanie..."): `#authStatus`, `#recoveryStatus`, `#status` (główny
+   pasek postępu analizy w `index.html`), oraz `#scanManualSourceStatus`/
+   `#resultManualSourceStatus` (na wszelki wypadek, mimo że w praktyce
+   zawsze używają klas statusu).
+4. **Zwiększone odstępy w całej aplikacji.** Bazowe reguły współdzielone
+   przez wszystkie 4 strony (bo wszystkie korzystają z tego samego
+   `style.css`):
+   - `.card`/`.result-card` padding: `26px` → `30px`
+   - pola (`input`/`textarea`/`select`) padding: `13px 14px` → `15px
+     16px`, margines: `10px 0` → `12px 0`
+   - `button` padding: `13px` → `15px` (zakładki trybu — `.tab-btn` —
+     mają WŁASNY, mniejszy padding, celowo nieruszony, bo to kompaktowe
+     przełączniki, nie pole formularza)
+   - `.field-label` margines: `14px 0 6px 0` → `16px 0 8px 0`
+   - `.checkbox-label` margines: `10px 0 18px 0` → `12px 0 20px 0`
+   - `.tabs` (przełącznik Link/Tekst/Obraz/PDF) margines: `10px 0 18px
+     0` → `12px 0 20px 0`
+   - `#analyzeBtn` margines górny: `18px` → `20px`
+   - odstęp między kartami: `body { gap: 16px }` → `18px`, `.card-stack
+     gap: 16px` → `18px` (ta sama wartość w obu miejscach, jak
+     dotychczas — patrz POPRAWKA (l), dlaczego mają być identyczne)
+
+   Świadomie NIE ruszone: wewnętrzne odstępy wewnątrz wyników analizy
+   (`.pattern-item`, `.result-quote`, `.chapter-heading` itd.) —
+   zgłoszenie dotyczyło konkretnie pól formularzy/przycisków (dwa
+   pokazane zrzuty: e-mail/hasło i wyszukiwarka), nie treści wyniku.
+
+Weryfikacja: nawiasy klamrowe w `style.css` sparowane (133/133), składnia
+wbudowanych skryptów `index.html`/`scan.html` sprawdzona (`node --check`)
+— bez błędów. Czysta zmiana CSS/HTML, bez backendu — nic do wklejenia w
+Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
