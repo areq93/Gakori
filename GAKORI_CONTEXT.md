@@ -5442,6 +5442,33 @@ wszystkich 4 stron oraz `i18n.js` wprost — bez błędów. Sprawdzone parami
 nawiasy klamrowe w `style.css`. Czysto wizualna zmiana CSS/HTML/i18n, bez
 zmian w backendzie — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(o) — checkbox prywatności przestylowany od zera,
+bez natywnej bieli przeglądarki.** `accent-color` (dotychczasowe
+podejście) barwi WYŁĄCZNIE stan zaznaczony — pusty checkbox nadal
+renderował się natywnym, zwykle białym kwadracikiem systemu/przeglądarki,
+rażąco odstającym od ciemnej, ciepłej palety aplikacji ("ta biel mnie
+irytuje i jest niespójna"). Właściciel zaproponował dwie opcje: kuleczkę w
+kolorach appki albo kwadracik z ptaszkiem — wybrany kwadracik z ptaszkiem,
+bo to jednoznaczny, powszechnie rozpoznawalny wzorzec dla pojedynczego
+prawda/fałsz przełącznika (kółko sugerowałoby raczej "jedna opcja z wielu",
+jak radio button — a to nie jest ta sytuacja).
+
+**Naprawa** (`style.css`): `appearance: none` + własny wygląd od zera —
+obramowanie i tło w zmiennych karty (`--card-border`/`--input-bg`, te
+same co pola tekstowe), zaznaczony stan wypełnia się kolorem `--primary`
+(spójne z resztą przycisków/akcentów appki), ptaszek dorysowany przez
+`::after` (obrócony fragment obramowania, klasyczna technika CSS) w
+kolorze `--btn-text`. Fokus klawiaturowy dostał ten sam pierścień
+(`box-shadow` z `--primary-soft`) co pola tekstowe — spójność również dla
+nawigacji klawiaturą. Reguła bazowa dalej współdzielona z `input[type=
+"radio"]` (na wypadek przyszłego użycia — obecnie w całej aplikacji nie
+ma ani jednego radio buttona), ale ptaszek `::after` jest zawężony
+wyłącznie do `checkbox`.
+
+Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css`
+(128/128) — czysta zmiana CSS, bez zmian HTML/JS/backendu — nic do
+wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
