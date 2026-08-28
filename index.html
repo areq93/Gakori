@@ -41,13 +41,14 @@
             <select id="authLanguageSelect" style="margin-bottom:10px;"></select>
             <input type="email" id="authEmail" data-i18n-placeholder="placeholder_email" placeholder="e-mail" autocomplete="email">
             <input type="password" id="authPassword" data-i18n-placeholder="placeholder_password" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
-            <div id="turnstileWidget" style="margin:10px 0;"></div>
+            <div id="turnstileWidget" style="margin-top:10px; margin-bottom:10px;"></div>
             <button id="authSubmitBtn" type="button" data-i18n="btn_login">Zaloguj się</button>
             <div style="text-align:center; margin-top:8px;">
                 <a href="#" id="forgotPasswordLink" style="font-size:13px; color:var(--accent);" data-i18n="link_forgot_password">Zapomniałeś hasła?</a>
             </div>
             <div style="text-align:center; color:var(--ink-soft); font-size:12px; margin:12px 0;" data-i18n="divider_or">— lub —</div>
             <button id="googleLoginBtn" type="button" data-i18n="btn_google_login">Zaloguj przez Google</button>
+            <p id="noAccountHint" style="text-align:center; color:var(--ink-soft); font-size:12px; margin:14px 0 8px 0;" data-i18n="text_no_account">Nie masz konta? Kliknij przycisk poniżej.</p>
             <button id="createAccountBtn" type="button" data-i18n="btn_create_account">Załóż konto</button>
             <div style="text-align:center; margin-top:8px; display:none;" id="backToLoginWrap">
                 <a href="#" id="backToLoginLink" style="font-size:13px; color:var(--accent);" data-i18n="link_back_to_login">Masz już konto? Zaloguj się</a>
@@ -543,6 +544,7 @@
             document.getElementById('googleLoginBtn').innerText = mode === 'login' ? t('btn_google_login') : t('btn_google_signup');
             document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
             document.getElementById('createAccountBtn').style.display = mode === 'login' ? '' : 'none';
+            document.getElementById('noAccountHint').style.display = mode === 'login' ? '' : 'none';
             document.getElementById('backToLoginWrap').style.display = mode === 'signup' ? 'block' : 'none';
             document.getElementById('authStatus').innerText = '';
             document.getElementById('resendEmailBtn').style.display = 'none';

@@ -5643,6 +5643,43 @@ wbudowanych skryptów `index.html` sprawdzona (`node --check`) — bez
 błędów, `i18n.js` sprawdzony jako poprawny JS. Czysta zmiana
 CSS/HTML/i18n, bez backendu — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(u) — trzy drobne poprawki od razu po wdrożeniu (t):
+baner Cloudflare NADAL nie był wyśrodkowany, brak odstępu między
+przyciskami "Zaloguj przez Google"/"Załóż konto", brakująca podpowiedź
+przed przyciskiem rejestracji.**
+
+1. **Baner Cloudflare wciąż nie wyśrodkowany mimo POPRAWKI (t).** To ten
+   sam, dobrze już w tej sesji udokumentowany błąd co przy
+   `#usernameInput` (POPRAWKA r) — `#turnstileWidget` miał w `index.html`
+   styl wpisany wprost w znaczniku, `style="margin:10px 0;"`. Skrócony
+   zapis `10px 0` ustawia WSZYSTKIE cztery boki (`margin-left`/
+   `margin-right` na `0`), a styl wpisany w HTML zawsze wygrywa z regułą
+   w arkuszu CSS, niezależnie od `@media`/specyficzności — więc reguła z
+   POPRAWKI (t) (`margin-left: auto; margin-right: auto`) nigdy nie miała
+   szansy zadziałać. Naprawa: zmieniono na osobne właściwości
+   `margin-top: 10px; margin-bottom: 10px;` (bez `margin-left`/
+   `margin-right`) — teraz zewnętrzna reguła CSS może swobodnie ustawić
+   boczne marginesy na `auto`.
+2. **Brak odstępu między przyciskami "Zaloguj przez Google" i "Załóż
+   konto".** `<button>` nie ma domyślnie żadnego marginesu w tym
+   arkuszu (odstępy dotąd zawsze pochodziły od sąsiednich elementów typu
+   dzielnik "— lub —") — dwa przyciski obok siebie po prostu się stykały.
+3. **Nowa podpowiedź przed przyciskiem rejestracji** — właściciel
+   poprosił o coś w stylu "Nie masz konta? Kliknij przycisk poniżej."
+   nad przyciskiem "Załóż konto", żeby jego przeznaczenie było od razu
+   jasne. Dodano `<p id="noAccountHint">` z tym tekstem (styl jak inne
+   drobne podpisy w karcie logowania — `--ink-soft`, 12px), który
+   jednocześnie rozwiązuje punkt 2 (margines `14px 0 8px 0` daje odstęp
+   od przycisku Google nad nim i od przycisku "Załóż konto" pod nim).
+   `noAccountHint` chowa się razem z `createAccountBtn` w trybie
+   rejestracji (`setAuthMode('signup')`) — inaczej podpowiedź "Nie masz
+   konta?" zostałaby osierocona na karcie, która akurat JEST rejestracją.
+   Nowy klucz i18n `text_no_account` (10 języków).
+
+Weryfikacja: składnia wbudowanych skryptów `index.html` sprawdzona
+(`node --check`), `i18n.js` sprawdzony jako poprawny JS — bez błędów.
+Czysta zmiana CSS/HTML/i18n, bez backendu — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

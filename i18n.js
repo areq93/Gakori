@@ -27,6 +27,7 @@ const RTL_LANGUAGES = ['ar'];
 const TRANSLATIONS = {
     pl: {
         btn_create_account: "Załóż konto", link_back_to_login: "Masz już konto? Zaloguj się",
+        text_no_account: "Nie masz konta? Kliknij przycisk poniżej.",
         placeholder_email: "e-mail", placeholder_password: "hasło (min. 6 znaków)",
         btn_login: "Zaloguj się", btn_signup: "Zarejestruj się",
         link_forgot_password: "Zapomniałeś hasła?", divider_or: "— lub —",
@@ -116,6 +117,7 @@ const TRANSLATIONS = {
     },
     en: {
         btn_create_account: "Create account", link_back_to_login: "Already have an account? Log in",
+        text_no_account: "Don't have an account? Click the button below.",
         placeholder_email: "email", placeholder_password: "password (min. 6 characters)",
         btn_login: "Log in", btn_signup: "Sign up",
         link_forgot_password: "Forgot your password?", divider_or: "— or —",
@@ -205,6 +207,7 @@ const TRANSLATIONS = {
     },
     es: {
         btn_create_account: "Crear cuenta", link_back_to_login: "¿Ya tienes una cuenta? Inicia sesión",
+        text_no_account: "¿No tienes cuenta? Haz clic en el botón de abajo.",
         placeholder_email: "correo electrónico", placeholder_password: "contraseña (mín. 6 caracteres)",
         btn_login: "Iniciar sesión", btn_signup: "Registrarse",
         link_forgot_password: "¿Olvidaste tu contraseña?", divider_or: "— o —",
@@ -294,6 +297,7 @@ const TRANSLATIONS = {
     },
     de: {
         btn_create_account: "Konto erstellen", link_back_to_login: "Schon ein Konto? Anmelden",
+        text_no_account: "Noch kein Konto? Klicke auf den Button unten.",
         placeholder_email: "E-Mail", placeholder_password: "Passwort (mind. 6 Zeichen)",
         btn_login: "Anmelden", btn_signup: "Registrieren",
         link_forgot_password: "Passwort vergessen?", divider_or: "— oder —",
@@ -383,6 +387,7 @@ const TRANSLATIONS = {
     },
     fr: {
         btn_create_account: "Créer un compte", link_back_to_login: "Déjà un compte ? Se connecter",
+        text_no_account: "Pas encore de compte ? Cliquez sur le bouton ci-dessous.",
         placeholder_email: "e-mail", placeholder_password: "mot de passe (min. 6 caractères)",
         btn_login: "Se connecter", btn_signup: "S'inscrire",
         link_forgot_password: "Mot de passe oublié ?", divider_or: "— ou —",
@@ -472,6 +477,7 @@ const TRANSLATIONS = {
     },
     ru: {
         btn_create_account: "Создать аккаунт", link_back_to_login: "Уже есть аккаунт? Войти",
+        text_no_account: "Нет аккаунта? Нажмите кнопку ниже.",
         placeholder_email: "эл. почта", placeholder_password: "пароль (мин. 6 символов)",
         btn_login: "Войти", btn_signup: "Зарегистрироваться",
         link_forgot_password: "Забыли пароль?", divider_or: "— или —",
@@ -561,6 +567,7 @@ const TRANSLATIONS = {
     },
     zh: {
         btn_create_account: "创建账户", link_back_to_login: "已有账户？登录",
+        text_no_account: "还没有账户？点击下方按钮。",
         placeholder_email: "电子邮箱", placeholder_password: "密码（至少6个字符）",
         btn_login: "登录", btn_signup: "注册",
         link_forgot_password: "忘记密码？", divider_or: "— 或 —",
@@ -650,6 +657,7 @@ const TRANSLATIONS = {
     },
     ja: {
         btn_create_account: "アカウントを作成", link_back_to_login: "すでにアカウントをお持ちですか？ログイン",
+        text_no_account: "アカウントをお持ちでないですか？下のボタンをクリックしてください。",
         placeholder_email: "メールアドレス", placeholder_password: "パスワード（6文字以上）",
         btn_login: "ログイン", btn_signup: "登録する",
         link_forgot_password: "パスワードをお忘れですか？", divider_or: "— または —",
@@ -739,6 +747,7 @@ const TRANSLATIONS = {
     },
     hi: {
         btn_create_account: "खाता बनाएं", link_back_to_login: "पहले से खाता है? लॉग इन करें",
+        text_no_account: "खाता नहीं है? नीचे दिए गए बटन पर क्लिक करें।",
         placeholder_email: "ईमेल", placeholder_password: "पासवर्ड (कम से कम 6 अक्षर)",
         btn_login: "लॉग इन करें", btn_signup: "साइन अप करें",
         link_forgot_password: "पासवर्ड भूल गए?", divider_or: "— या —",
@@ -828,6 +837,7 @@ const TRANSLATIONS = {
     },
     ar: {
         btn_create_account: "إنشاء حساب", link_back_to_login: "لديك حساب بالفعل؟ تسجيل الدخول",
+        text_no_account: "ليس لديك حساب؟ انقر على الزر أدناه.",
         placeholder_email: "البريد الإلكتروني", placeholder_password: "كلمة المرور (6 أحرف على الأقل)",
         btn_login: "تسجيل الدخول", btn_signup: "إنشاء حساب",
         link_forgot_password: "هل نسيت كلمة المرور؟", divider_or: "— أو —",
