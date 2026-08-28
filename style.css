@@ -506,13 +506,27 @@ a { color: var(--accent); }
        `style="width:100%"` wprost w HTML (nie `max-width`) — to nie
        koliduje: `max-width` zawsze ogranicza policzoną szerokość,
        niezależnie od specyficzności/kolejności. */
-    input:not([type="checkbox"]):not([type="radio"]), textarea, select {
-        max-width: 480px; display: block; margin-left: auto; margin-right: auto;
+    input:not([type="checkbox"]):not([type="radio"]), textarea, select, .paste-zone {
+        max-width: 400px; display: block; margin-left: auto; margin-right: auto;
+    }
+    /* POPRAWKA 2026-08-28(s) — właściciel na żywo sprawdził wynik POPRAWKI
+       (r): sama treść wpisana/wybrana w polu (np. "Polski", nazwa
+       użytkownika) wciąż była przyklejona do lewej krawędzi wewnątrz już
+       wyśrodkowanego pola — teraz i tekst w środku pola jest wyśrodkowany.
+       `textarea` świadomie pominięta (długi wklejony tekst wyśrodkowany
+       liniami wyglądałby źle). Właściciel ocenił też, że 480px (POPRAWKA r)
+       to wciąż "ciut za szeroko" — zwężone o ok. 1/6 do 400px (wyżej), tak
+       samo zwężono panel wklejania obrazu (.paste-zone), żeby wszystkie
+       pola miały jedną, spójną szerokość na PC. */
+    input:not([type="checkbox"]):not([type="radio"]), select {
+        text-align: center;
     }
     /* Etykieta była wyrównana do lewej, dokładnie nad polem, które teraz
        jest wyśrodkowane (wyżej) — bez tego etykieta "wskazywałaby" na
-       pustą przestrzeń zamiast na pole pod spodem. */
-    .field-label { text-align: center; }
+       pustą przestrzeń zamiast na pole pod spodem. #pdfPageLimitNote to
+       ten sam przypadek — dopisek "(maksymalnie 36 stron)" pod etykietą
+       PDF, osobny <p>, nieobjęty klasą .field-label. */
+    .field-label, #pdfPageLimitNote { text-align: center; }
     /* Ten sam powód co przy etykietach wyżej — wiersz checkboxa
        prywatności był przyklejony do lewej krawędzi, teraz wyśrodkowany
        jako całość (sam checkbox + tekst obok niego zostają jeden przy

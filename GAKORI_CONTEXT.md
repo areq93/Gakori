@@ -5549,6 +5549,47 @@ Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css`
 (132/132) — czysta zmiana CSS, bez zmian HTML/JS/backendu — nic do
 wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(s) — dopracowanie centrowania z (r): treść w polach
+wyśrodkowana, panel wklejania obrazu i dopisek o limicie stron PDF też
+objęte, szerokość zmniejszona o ok. 1/6.** Właściciel sprawdził (r) na
+żywo na PC i zgłosił trzy kolejne, drobne niedociągnięcia tego samego
+mechanizmu:
+
+1. Samo pole (obwódka) było już wyśrodkowane, ale TREŚĆ w środku (np.
+   wybrana wartość "Polski"/"Ciemny" w selectach konta, wpisana nazwa
+   użytkownika) nadal była przyklejona do lewej krawędzi wewnątrz pola.
+2. Panel do wklejania zrzutu ekranu ("Wklej obraz tutaj") to osobny
+   element (`.paste-zone`, `<div>`, nie `<input>`) — nie był objęty
+   regułą centrowania/zwężania z (p)/(r) i został na pełnej szerokości
+   karty, znacznie szerszy niż pole wyszukiwania, które właściciel
+   podał jako wzór docelowej szerokości.
+3. Dopisek "(maksymalnie 36 stron)" pod tytułem panelu PDF to zwykły
+   `<p>` bez klasy `.field-label` — reguła centrowania etykiet go nie
+   obejmowała, więc został sam jeden przy lewej krawędzi pod
+   wyśrodkowanym tytułem nad nim.
+4. Sama szerokość pól (480px z POPRAWKI r) oceniona jako wciąż "ciut za
+   szeroka" — zwężona orientacyjnie o 1/6, do 400px.
+
+**Naprawa** (`style.css`, `@media (min-width: 700px)`; `index.html`):
+- `max-width` pól zmniejszony z 480px na 400px, i rozszerzony na
+  `.paste-zone` (ten sam wiersz reguły) — panel wklejania obrazu ma
+  teraz dokładnie tę samą szerokość co pole wyszukiwania.
+- Nowa reguła `input:not([type="checkbox"]):not([type="radio"]), select
+  { text-align: center; }` — celowo BEZ `textarea` (długi wklejony
+  tekst wyśrodkowany liniami wyglądałby źle, to pole zostaje wyrównane
+  do lewej jak dotychczas).
+- `<p>` z dopiskiem o limicie stron PDF dostał `id="pdfPageLimitNote"`
+  w `index.html`, a w CSS dopisany do tej samej reguły co
+  `.field-label { text-align: center }`.
+
+Telefon (poniżej progu 700px) bez zmian, jak przy każdej poprzedniej
+poprawce z tej serii.
+
+Weryfikacja: nawiasy klamrowe w `style.css` sparowane (133/133),
+składnia wbudowanych skryptów `index.html`/`account.html` sprawdzona
+(`node --check`) — bez błędów. Czysta zmiana CSS/HTML, bez
+backendu — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

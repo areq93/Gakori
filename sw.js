@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gakori-v24';
+const CACHE_NAME = 'gakori-v25';
 // Osobny, tymczasowy "schowek" na obraz udostępniony z innej aplikacji
 // (patrz handleShareTarget niżej) — celowo NIE ten sam co CACHE_NAME, żeby
 // czyszczenie starych wersji aplikacji (patrz "activate" niżej) nigdy
