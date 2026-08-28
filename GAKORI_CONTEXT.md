@@ -5309,6 +5309,57 @@ Weryfikacja: `node --check` dla wyciągniętych skryptów inline z
 Czysto wizualna zmiana CSS/HTML, bez zmian w backendzie — nic do
 wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(k) — spójne "wstecz" wszędzie, historia.html
+prowadzi na stronę główną (nie na konto), wyśrodkowane teksty
+informacyjne, odstępy między elementami ("interlinia").** Kolejna runda
+drobnych, ale licznych uwag estetycznych właściciela, tym razem o
+spójności nawigacji i rytmie odstępów:
+
+1. **Link powrotny ujednolicony wszędzie** — dawniej `account.html`/
+   `scan.html` miały "← Wróć do Gakori" (klucz `account_back`), a
+   `historia.html` osobne "← Wróć do konta" (klucz `history_back`) — dwa
+   różne teksty dla tej samej funkcji. Oba klucze zmienione na jedno,
+   krótkie "← Wstecz" (i odpowiedniki w 10 językach — np. "← Back", "←
+   Zurück", "← 戻る"). Przy okazji: `historia.html` prowadzi teraz z
+   powrotem na stronę główną (`index.html`), NIE na `account.html` —
+   właściciel zauważył, że skoro ikona "Twoje prywatne analizy"
+   (POPRAWKA (j)) jest teraz dostępna z KAŻDEJ strony przez górny pasek,
+   a nie tylko z panelu konta, to "wstecz" prowadzące z powrotem do konta
+   przestało mieć sens kontekstowy — powinno wracać tam, skąd
+   realistycznie się przyszło (główny ekran aplikacji).
+2. **Wyśrodkowane teksty informacyjne** — "Tylko Ty widzisz tę listę..."
+   (`historia.html`), "Zalogowano jako: [e-mail]" i komunikaty statusu
+   (`usernameStatus`/`accountStatus`, np. "Kolejną zmianą będzie można
+   zrobić od...") w `account.html`, oraz napisy "Ładowanie..." na
+   wszystkich podstronach — dotąd wyrównane do lewej, niespójne z
+   wyśrodkowanymi nagłówkami (`h2`) i resztą tego typu komunikatów w
+   appce (np. już wyśrodkowany komunikat "Ładowanie..." na `index.html`).
+   Etykieta "Zalogowano jako:" dostała też `class="field-label"` (ta sama
+   stonowana, drukowana etykieta co reszta pól) zamiast zwykłego tekstu.
+3. **Odstępy między elementami ("interlinia")** — właściciel zauważył
+   (żywym zrzutem ekranu trybu "Tekst"), że niektóre elementy stykają się
+   ze sobą niemal bez odstępu: `.tabs` (rząd zakładek Link/Tekst/Obraz/
+   PDF) miał tylko 10px odstępu od etykiety pola pod spodem, a nowy
+   checkbox prywatności (POPRAWKA (g)) nie miał ŻADNEGO marginesu na
+   dole, więc przycisk "Analizuj" dosłownie się do niego stykał (to samo
+   dotyczyło trybu obrazu — siatka miniaturek też nie miała marginesu na
+   dole). Naprawa: `.tabs` dostał większy odstęp pod spodem (10px→18px na
+   dole), `.checkbox-label` dostał margines na dole (18px), a
+   NAJWAŻNIEJSZE — `#analyzeBtn` (współdzielony przycisk "Analizuj" pod
+   wszystkimi 4 trybami) dostał WŁASNY, stały margines górny (18px),
+   niezależny od tego, jaki element akurat jest nad nim w danym trybie —
+   jedno, solidne miejsce naprawy zamiast łatania marginesu na dole
+   każdego możliwego "ostatniego elementu" osobno w każdym z 4 trybów.
+   Margines na `#analyzeBtn` (selektor po ID) celowo wygrywa z regułą
+   `margin: 0 auto` z `@media` (POPRAWKA (j)) dzięki wyższej
+   specyficzności selektora ID — nie trzeba było nic zmieniać w tamtej
+   regule.
+
+Weryfikacja: `node --check` dla wyciągniętych skryptów inline z
+`index.html`/`historia.html`/`account.html`/`scan.html` oraz `i18n.js`
+wprost — bez błędów. Czysto wizualna zmiana CSS/HTML/i18n, bez zmian w
+backendzie — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

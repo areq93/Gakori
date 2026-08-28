@@ -42,11 +42,11 @@
         <h2 data-i18n="account_title">Twoje konto</h2>
 
         <div id="accountLoading">
-            <p style="color:var(--ink-soft); margin:0;" data-i18n="loading">Ładowanie...</p>
+            <p style="color:var(--ink-soft); margin:0; text-align:center;" data-i18n="loading">Ładowanie...</p>
         </div>
 
         <div id="accountContent" style="display:none;">
-            <p style="margin:0 0 10px 0;"><span data-i18n="account_logged_in_as">Zalogowano jako:</span><br><strong id="accountEmail"></strong></p>
+            <p style="margin:0 0 14px 0; text-align:center;"><span class="field-label" style="display:inline; margin:0;" data-i18n="account_logged_in_as">Zalogowano jako:</span><br><strong id="accountEmail"></strong></p>
             <button id="logoutBtn" type="button" data-i18n="btn_logout">Wyloguj</button>
 
             <div id="blockStatusBox" style="display:none; margin-top:16px; padding:12px; border-radius:var(--radius-sm); background:#fff3cd; color:#664d03; font-size:13px;">
@@ -71,7 +71,7 @@
                 <label for="usernameInput" class="field-label" data-i18n="username_label">Nazwa użytkownika</label>
                 <input type="text" id="usernameInput" maxlength="24" style="margin:0;">
                 <button id="saveUsernameBtn" type="button" data-i18n="btn_save_username" style="margin-top:8px;">Zapisz nazwę</button>
-                <div id="usernameStatus" style="font-size:13px; margin-top:4px;"></div>
+                <div id="usernameStatus" style="font-size:13px; margin-top:4px; text-align:center; color:var(--ink-soft);"></div>
             </div>
 
             <div style="margin-top:16px;">
@@ -81,7 +81,7 @@
                 <input type="password" id="newPassword" data-i18n-placeholder="placeholder_new_password" placeholder="nowe hasło (min. 6 znaków)" autocomplete="new-password">
                 <button id="changePasswordBtn" type="button" data-i18n="btn_save_password">Zapisz nowe hasło</button>
             </div>
-            <div id="accountStatus" style="margin-top:10px; font-size:13px;"></div>
+            <div id="accountStatus" style="margin-top:10px; font-size:13px; text-align:center; color:var(--ink-soft);"></div>
         </div>
     </div>
 
