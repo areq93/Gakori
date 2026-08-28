@@ -5360,6 +5360,33 @@ Weryfikacja: `node --check` dla wyciągniętych skryptów inline z
 wprost — bez błędów. Czysto wizualna zmiana CSS/HTML/i18n, bez zmian w
 backendzie — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(l) — "Wyloguj" przeniesiony na sam dół panelu konta
++ podbity `CACHE_NAME` service workera.** Dwie drobne, niepowiązane
+poprawki zgłoszone tej samej okazji:
+1. Przycisk "Wyloguj" (dotąd zaraz pod "Zalogowano jako:", na samej
+   górze) przeniesiony na sam dół `#accountContent`, pod "Zmień hasło" —
+   właściciel ocenił, że destrukcyjna-w-skutkach akcja (wylogowanie) nie
+   powinna być pierwszą rzeczą widoczną po wejściu w ustawienia. Czysto
+   kosmetyczna zmiana kolejności w HTML — logika JS (`getElementById`) nie
+   zależy od pozycji elementu, więc nic więcej nie trzeba było ruszać.
+2. Właściciel zgłosił, że jeden z linków wciąż pokazywał starą treść
+   ("Wróć do Gakori" zamiast "Wstecz") mimo wdrożonej POPRAWKI (k) —
+   sprawdzone: `i18n.js` miał już poprawną wartość, `sw.js` jest
+   NETWORK-FIRST dla `.html`/`.css`/`.js` (z `cache: 'reload'`, patrz
+   komentarz w pliku), więc `CACHE_NAME` sam w sobie nie powinien
+   powodować takiej rozbieżności — najbardziej prawdopodobne wytłumaczenie
+   to migawka przeglądarki (np. przycisk "wstecz" pokazujący starą stronę
+   z pamięci, z pominięciem service workera). Mimo to `CACHE_NAME`
+   podbity `gakori-v23` → `gakori-v24` jako dodatkowe zabezpieczenie —
+   zauważono przy tej okazji, że przez CAŁĄ dzisiejszą serię poprawek
+   frontendu (POPRAWKI (g) do (k), kilkanaście commitów) `CACHE_NAME` ani
+   razu nie został podbity, wbrew ustalonej wcześniej praktyce projektu
+   (patrz historyczne poprawki `sw.js`) — nadrobione teraz zbiorczo.
+
+Weryfikacja: `node --check` dla wyciągniętego skryptu inline z
+`account.html` — bez błędów. Czysto wizualna zmiana HTML +
+podbicie wersji cache PWA — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
