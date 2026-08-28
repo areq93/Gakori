@@ -2857,10 +2857,14 @@ Deno.serve(async (req: Request) => {
             Array.isArray((row.result as { patterns?: unknown })?.patterns)
         )
         if (rescueExact) {
-          await supabase
-            .from('scans')
-            .update({ view_count: (rescueExact.view_count as number) + 1 })
-            .eq('id', rescueExact.id)
+          // POPRAWKA 2026-08-28(zd) — `view_count` NIE jest już zwiększane
+          // przy trafieniu w ratunek (ten sam powód co przy zwykłym cache'u,
+          // patrz POPRAWKA (za) niżej) — licznik wyświetleń liczy odtąd
+          // wyłącznie faktyczne otwarcia strony wyniku (`record-view`), nie
+          // ponowne zapytania do `analyze`. To był drugi z dwóch miejsc
+          // przeoczonych przy POPRAWCE (za) — znaleziony dopiero przy
+          // pełnym przeszukaniu repo pod kątem `view_count` po zgłoszeniu
+          // właściciela, że wcześniejsza weryfikacja była zbyt pobieżna.
           // Punkt 5 audytu bezpieczeństwa — patrz GAKORI_CONTEXT.md,
           // "Zaufanie do ręcznie wklejonych linków".
           await logQuietConfirmation(supabase, rescueExact.id as string, req)
@@ -2937,7 +2941,7 @@ Deno.serve(async (req: Request) => {
         if (forceRefresh && refreshScanId) {
           const { data: existingForRefresh } = await supabase
             .from('scans')
-            .select('text_content, result, view_count')
+            .select('text_content, result')
             .eq('id', refreshScanId)
             .maybeSingle()
           // POPRAWKA 2026-08-28(c) — DIAGNOSTYKA TYMCZASOWA, patrz
@@ -2960,10 +2964,11 @@ Deno.serve(async (req: Request) => {
             typeof existingForRefresh.text_content === 'string' &&
             shingleSimilarity(existingForRefresh.text_content, preFetchedText) >= SHINGLE_SIMILARITY_THRESHOLD
           ) {
-            await supabase
-              .from('scans')
-              .update({ view_count: (existingForRefresh.view_count as number) + 1 })
-              .eq('id', refreshScanId)
+            // POPRAWKA 2026-08-28(zd) — `view_count` NIE jest już zwiększane
+            // tutaj, ten sam powód i to samo przeoczenie co przy `rescueExact`
+            // wyżej (patrz komentarz tam) — licznik liczy odtąd wyłącznie
+            // faktyczne otwarcia strony wyniku, nie ponowne zapytania do
+            // `analyze` (w tym "Sprawdź, czy coś się zmieniło").
             return new Response(
               JSON.stringify({ cached: true, cost: 0, id: refreshScanId, result: existingForRefresh.result, source_url }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -4000,14 +4005,14 @@ ${compactExisting}`
     // 6. ZAPIS WYNIKU DO CACHE'U (dzielony przez wszystkich użytkowników).
     // POPRAWKA 2026-08-23(a) — gdy to odświeżenie konkretnego, znanego
     // wiersza (`refreshScanId`, patrz wyżej), NADPISUJEMY DOKŁADNIE TEN
-    // WIERSZ (po `id`), zamiast `upsert` po `content_hash` — bo przy
-    // przejściu z ręcznie wklejonej treści na świeże pobranie linku nowy
-    // `content_hash` nigdy nie zgadza się ze starym (z treści), więc zwykły
-    // upsert tworzyłby DRUGI, zduplikowany wiersz zamiast nadpisać oryginał.
-    // Aktualizujemy tu też sam `content_hash` na nowy, żeby od teraz
-    // normalny cache po hashu też trafiał w ten sam wiersz. Dla zwykłego,
-    // nowego zapytania (bez odświeżenia) zachowuje się jak dawniej —
-    // `upsert` po `content_hash,language`.
+    // WIERSZ (po `id`) — bo przy przejściu z ręcznie wklejonej treści na
+    // świeże pobranie linku nowy `content_hash` nigdy nie zgadza się ze
+    // starym (z treści), więc zwykły insert po samym hashu utworzyłby
+    // DRUGI, zduplikowany wiersz zamiast nadpisać oryginał. Aktualizujemy
+    // tu też sam `content_hash` na nowy, żeby od teraz normalny cache po
+    // hashu też trafiał w ten sam wiersz. Dla zwykłego, nowego zapytania
+    // (bez odświeżenia) — zwykły `.insert()` (patrz POPRAWKA (zc) niżej,
+    // dlaczego już NIE `upsert` po `content_hash,language`).
     // POPRAWKA 2026-08-26 — zapisujemy `effectiveContentHash` (prawdziwy
     // odcisk analizowanej treści, patrz sha256Hex() wyżej), NIE surowego
     // `content_hash` od klienta — patrz uzasadnienie tam.

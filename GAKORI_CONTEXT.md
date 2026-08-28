@@ -6057,6 +6057,32 @@ Weryfikacja: `node --experimental-strip-types --check` (bez błędów),
 zawsze, zero nowych). Właściciel: przetestować ponownie analizę obrazu
 po wdrożeniu tej poprawki w Supabase.
 
+**POPRAWKA 2026-08-28(zd) — właściciel słusznie zwrócił uwagę, że
+weryfikacja POPRAWKI (zc) była zbyt pobieżna: przeszukano od razu cały
+plik pod kątem `view_count`, tak jak każe nowa zasada z tego samego dnia
+(patrz "Pułapki, w które już raz wpadliśmy"), i znaleziono DWA kolejne
+miejsca przeoczone przy POPRAWCE (za).** Oba to inne, starsze mechanizmy
+"darmowego trafienia w cache" (nie ten sam kod co zwykły cache z sekcji
+2, ale ten sam SKUTEK — `cached: true, cost: 0`), które też ręcznie
+zwiększały `view_count`:
+- `rescueExact` (ratunek po `source_url` — patrz "Zaufanie do ręcznie
+  wklejonych linków")
+- dopasowanie po podobieństwie treści w ścieżce `forceRefresh`
+  ("Sprawdź, czy coś się zmieniło" — `shingleSimilarity`)
+
+Oba usunięte z tego samego powodu co główny cache w POPRAWCE (za):
+`view_count` ma teraz liczyć WYŁĄCZNIE faktyczne otwarcia strony wyniku
+(`record-view`), nie żadne z zapytań do `analyze`, niezależnie od tego,
+którym z kilku mechanizmów w tym pliku trafiły "za darmo". Przy okazji
+usunięte nieużywane już pobieranie kolumny `view_count` z zapytania dla
+`existingForRefresh` (był tylko po to, żeby ją tu zwiększyć).
+
+Weryfikacja: pełne przeszukanie pliku (`grep -n "view_count"`)
+potwierdza, że nie zostało już żadne inne miejsce zwiększające ten
+licznik poza inicjalnym `view_count: 0` przy tworzeniu nowego wiersza.
+`node --experimental-strip-types --check` i `tsc --noEmit
+--skipLibCheck` bez nowych błędów (te same 19 znanych linii co zawsze).
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
