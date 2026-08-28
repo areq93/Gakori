@@ -6244,6 +6244,12 @@ wprost ("pomożesz też innym, którzy wkleją ten sam link"), we wszystkich
 `?debug=1`) NIE dostał tej drugiej części (nigdy nie miał porady
 "skopiuj tekst" — to czysto techniczny komunikat debugowania).
 
+Kolejna korekta (ten sam dzień): usunięte zdanie "Sprawdź, czy link jest
+poprawny i publicznie dostępny." — właściciel zauważył, że to nierealna
+prośba (użytkownicy i tak tego nie zrobią, a zdanie nic nie wnosi, skoro
+i tak podajemy jedyne sensowne wyjście — tryb Tekst). Usunięte z obu
+miejsc: `err_url_fetch_failed` (10 języków) i backendowego `message`.
+
 Weryfikacja: `node --check i18n.js` bez błędów, policzone wystąpienia
 klucza (10/10 języków). `node --experimental-strip-types --check` na
 `analyze/index.ts` bez nowych błędów.
