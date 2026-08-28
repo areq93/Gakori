@@ -369,7 +369,18 @@
                         // ewentualny błąd sieci, nie zgłasza go dalej.
                         fetch(RECORD_VIEW_FUNCTION_URL, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                // POPRAWKA 2026-08-28(zb) — funkcja ma włączone "Verify JWT"
+                                // (tak samo jak inne funkcje w projekcie) — bez nagłówka
+                                // Authorization Supabase odrzuciłby zapytanie, ZANIM w ogóle
+                                // dotarłoby do kodu funkcji. Ten sam wzorzec co przy `analyze`
+                                // (linia niżej, `authToken`): zalogowany dostaje prawdziwy token
+                                // sesji, niezalogowany — publiczny klucz anon (serwer i tak
+                                // liczy wyświetlenia niezależnie od tego, kto ogląda).
+                                'Authorization': 'Bearer ' + (currentSession ? currentSession.access_token : SUPABASE_ANON_KEY),
+                                'apikey': SUPABASE_ANON_KEY
+                            },
                             body: JSON.stringify({ scan_id: scanId })
                         }).catch(() => {});
                         // Jeśli to WŁAŚNIE ta osoba przed chwilą przesłała te obrazy do

@@ -5995,6 +5995,30 @@ niezwiązane z tą zmianą). Nawiasy klamrowe w `style.css` sparowane
 (135/135). Składnia wbudowanych skryptów `index.html`/`scan.html`/
 `historia.html` sprawdzona (`node --check`) — bez błędów.
 
+**POPRAWKA 2026-08-28(zb) — `record-view` nie miała nagłówka
+`Authorization`, więc Supabase odrzucałby KAŻDE wywołanie, zanim
+dotarłoby do kodu funkcji.** Właściciel wdrożył nową funkcję i pokazał
+zrzut ekranu jej zakładki "Settings": "Verify JWT with legacy secret"
+włączone (poprawnie — tak samo jak wszystkie inne funkcje w tym
+projekcie). Ale wywołanie z `scan.html` (POPRAWKA za) wysyłało tylko
+nagłówek `apikey`, bez `Authorization` — bramka Supabase wymaga ważnego
+JWT w `Authorization` NIEZALEŻNIE od tego, co robi kod samej funkcji
+(sprawdzane wcześniej, na poziomie bramki), więc każde wywołanie
+kończyłoby się cichym 401, a licznik wyświetleń nigdy by nie rósł.
+Naprawa: ten sam wzorzec co przy `analyze` (`SUPABASE_FUNCTION_URL`,
+zmienna `authToken` w `index.html`) — zalogowany dostaje `Authorization:
+Bearer <token sesji>`, niezalogowany `Authorization: Bearer
+<SUPABASE_ANON_KEY>` (anon key jest ważnym JWT, więc bramka go
+przepuszcza — funkcja i tak liczy wyświetlenia niezależnie od tego, kto
+ogląda). Kod samej funkcji `record-view` bez zmian — nie sprawdzał i
+nadal nie sprawdza tożsamości, to wyłącznie sprawa nagłówka na poziomie
+wywołania z frontendu.
+
+Weryfikacja: składnia wbudowanych skryptów `scan.html` sprawdzona
+(`node --check`) — bez błędów. Czysta zmiana frontendu (`scan.html`) —
+funkcja `record-view` w Supabase NIE wymaga ponownego wdrożenia, zmienił
+się tylko kod wołający ją z przeglądarki.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
