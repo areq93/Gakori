@@ -39,10 +39,6 @@
     <div class="card" id="authCard" style="display:none;">
         <div id="authLoggedOut">
             <select id="authLanguageSelect" style="margin-bottom:10px;"></select>
-            <div class="tabs">
-                <button class="tab-btn active" data-authmode="login" type="button" data-i18n="tab_login">Zaloguj</button>
-                <button class="tab-btn" data-authmode="signup" type="button" data-i18n="tab_signup">Zarejestruj</button>
-            </div>
             <input type="email" id="authEmail" data-i18n-placeholder="placeholder_email" placeholder="e-mail" autocomplete="email">
             <input type="password" id="authPassword" data-i18n-placeholder="placeholder_password" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
             <div id="turnstileWidget" style="margin:10px 0;"></div>
@@ -52,6 +48,10 @@
             </div>
             <div style="text-align:center; color:var(--ink-soft); font-size:12px; margin:12px 0;" data-i18n="divider_or">— lub —</div>
             <button id="googleLoginBtn" type="button" data-i18n="btn_google_login">Zaloguj przez Google</button>
+            <button id="createAccountBtn" type="button" data-i18n="btn_create_account">Załóż konto</button>
+            <div style="text-align:center; margin-top:8px; display:none;" id="backToLoginWrap">
+                <a href="#" id="backToLoginLink" style="font-size:13px; color:var(--accent);" data-i18n="link_back_to_login">Masz już konto? Zaloguj się</a>
+            </div>
             <div id="authStatus" style="margin-top:10px; font-size:13px;"></div>
             <button id="resendEmailBtn" type="button" style="display:none; margin-top:8px; font-size:13px;" data-i18n="btn_resend_email">Wyślij mail ponownie</button>
         </div>
@@ -531,22 +531,35 @@
             });
         };
 
-        // 0c. Przełączanie Zaloguj / Zarejestruj
+        // 0c. Tryb logowanie / rejestracja. Od POPRAWKI 2026-08-28(t) nie ma już
+        // widocznych zakładek "Zaloguj"/"Zarejestruj" — rejestracja otwiera się w
+        // NOWEJ karcie przeglądarki (przycisk "Załóż konto"), pod adresem z
+        // ?mode=signup, rozpoznawanym niżej. "Zaloguj się" zostaje jedynym
+        // widocznym trybem na tej, oryginalnej karcie.
         let authFormMode = 'login';
         function setAuthMode(mode) {
             authFormMode = mode;
-            document.querySelectorAll('[data-authmode]').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.authmode === mode);
-            });
             document.getElementById('authSubmitBtn').innerText = mode === 'login' ? t('btn_login') : t('btn_signup');
             document.getElementById('googleLoginBtn').innerText = mode === 'login' ? t('btn_google_login') : t('btn_google_signup');
             document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+            document.getElementById('createAccountBtn').style.display = mode === 'login' ? '' : 'none';
+            document.getElementById('backToLoginWrap').style.display = mode === 'signup' ? 'block' : 'none';
             document.getElementById('authStatus').innerText = '';
             document.getElementById('resendEmailBtn').style.display = 'none';
         }
-        document.querySelectorAll('[data-authmode]').forEach(btn => {
-            btn.addEventListener('click', () => setAuthMode(btn.dataset.authmode));
+        document.getElementById('createAccountBtn').addEventListener('click', () => {
+            window.open(window.location.origin + window.location.pathname + '?mode=signup', '_blank');
         });
+        document.getElementById('backToLoginLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            // Sprząta ?mode=signup z adresu — inaczej odświeżenie strony po
+            // kliknięciu "Zaloguj się" wróciłoby z powrotem do rejestracji.
+            window.history.replaceState({}, '', window.location.pathname);
+            setAuthMode('login');
+        });
+        if (new URLSearchParams(window.location.search).get('mode') === 'signup') {
+            setAuthMode('signup');
+        }
 
         // Ochrona przed limitem maili Brevo (300/dzień) — POPRAWKA
         // 2026-08-21(u). `email_daily_count` jest publicznie czytelna

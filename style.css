@@ -506,7 +506,7 @@ a { color: var(--accent); }
        `style="width:100%"` wprost w HTML (nie `max-width`) — to nie
        koliduje: `max-width` zawsze ogranicza policzoną szerokość,
        niezależnie od specyficzności/kolejności. */
-    input:not([type="checkbox"]):not([type="radio"]), textarea, select, .paste-zone {
+    input:not([type="checkbox"]):not([type="radio"]), textarea, select, .paste-zone, #turnstileWidget {
         max-width: 400px; display: block; margin-left: auto; margin-right: auto;
     }
     /* POPRAWKA 2026-08-28(s) — właściciel na żywo sprawdził wynik POPRAWKI

@@ -5590,6 +5590,59 @@ składnia wbudowanych skryptów `index.html`/`account.html` sprawdzona
 (`node --check`) — bez błędów. Czysta zmiana CSS/HTML, bez
 backendu — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(t) — baner Cloudflare wyrównany do szerokości pól;
+ekran logowania: zakładki "Zaloguj"/"Zarejestruj" zamienione na osobną
+kartę rejestracji w nowej karcie przeglądarki.**
+
+1. **Baner Cloudflare (Turnstile) węższy.** Ten sam problem co przy
+   `.paste-zone` w POPRAWCE (s) — `#turnstileWidget` to zwykły `<div>`
+   (Cloudflare wypełnia go swoim widżetem w trybie `size: 'flexible'`,
+   czyli "na 100% szerokości kontenera"), nieobjęty regułą centrowania
+   pól, więc na PC zostawał na pełnej szerokości karty (640px), wyraźnie
+   szerszy niż pole "hasło" nad nim (400px). Naprawa: dopisany do tej
+   samej reguły co `.paste-zone` w `@media (min-width: 700px)` —
+   `max-width: 400px` + wyśrodkowanie, dokładnie ta sama szerokość co
+   pola.
+
+2. **Nowy przebieg logowania/rejestracji.** Właściciel ocenił zakładki
+   "Zaloguj"/"Zarejestruj" nad formularzem jako zbędne i mylące.
+   Zamieniono na:
+   - Zakładki (`<div class="tabs">` z `data-authmode`) USUNIĘTE z
+     `index.html` — formularz e-mail/hasło jest teraz domyślnie i
+     zawsze w trybie logowania na tej samej karcie.
+   - Nowy przycisk **"Załóż konto"** pod "Zaloguj przez Google" — po
+     kliknięciu otwiera **nową kartę przeglądarki** pod tym samym
+     adresem z doklejonym `?mode=signup` (`window.open(...,'_blank')`).
+   - Na starcie skryptu sprawdzany jest `URLSearchParams` — jeśli w
+     adresie jest `?mode=signup`, formularz od razu przełącza się w
+     tryb rejestracji (`setAuthMode('signup')`): przycisk
+     "Zarejestruj się", "Zarejestruj przez Google", a "Załóż konto"
+     się chowa (nie ma sensu w karcie, która już JEST rejestracją).
+   - W trybie rejestracji pokazuje się nowy link **"Masz już konto?
+     Zaloguj się"** (`#backToLoginLink`, właściciel wybrał tę opcję
+     wprost, żeby uniknąć ślepego zaułka dla kogoś, kto trafił tu przez
+     pomyłkę) — klik czyści `?mode=signup` z adresu
+     (`history.replaceState`, żeby odświeżenie strony nie wróciło do
+     rejestracji) i wraca do trybu logowania na TEJ SAMEJ karcie (bez
+     otwierania kolejnej).
+   - Cała reszta logiki (submit e-mail/hasło, Google OAuth,
+     `authFormMode`, blokada rejestracji przez Google na już istniejące
+     konto) działa bez zmian — to wciąż ten sam, jeden formularz i jedna
+     zmienna trybu, zmieniło się tylko to, JAK się do trybu rejestracji
+     trafia (link z `?mode=signup` zamiast zakładki).
+   - `i18n.js`: usunięte martwe klucze `tab_login`/`tab_signup` (nigdzie
+     już nieużywane po usunięciu zakładek), dodane `btn_create_account`
+     i `link_back_to_login` (10 języków).
+
+Telefon: bez odrębnych zmian — ten sam mechanizm (nowa karta z
+`?mode=signup`) działa identycznie na telefonie, przeglądarki mobilne
+też otwierają `window.open(...,'_blank')` jako nową kartę/okno.
+
+Weryfikacja: nawiasy klamrowe w `style.css` sparowane, składnia
+wbudowanych skryptów `index.html` sprawdzona (`node --check`) — bez
+błędów, `i18n.js` sprawdzony jako poprawny JS. Czysta zmiana
+CSS/HTML/i18n, bez backendu — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

@@ -26,7 +26,7 @@ const RTL_LANGUAGES = ['ar'];
 
 const TRANSLATIONS = {
     pl: {
-        tab_login: "Zaloguj", tab_signup: "Zarejestruj",
+        btn_create_account: "Załóż konto", link_back_to_login: "Masz już konto? Zaloguj się",
         placeholder_email: "e-mail", placeholder_password: "hasło (min. 6 znaków)",
         btn_login: "Zaloguj się", btn_signup: "Zarejestruj się",
         link_forgot_password: "Zapomniałeś hasła?", divider_or: "— lub —",
@@ -115,7 +115,7 @@ const TRANSLATIONS = {
         scan_load_error: "Nie udało się wczytać analizy (sprawdź połączenie z internetem i odśwież stronę).",
     },
     en: {
-        tab_login: "Log in", tab_signup: "Sign up",
+        btn_create_account: "Create account", link_back_to_login: "Already have an account? Log in",
         placeholder_email: "email", placeholder_password: "password (min. 6 characters)",
         btn_login: "Log in", btn_signup: "Sign up",
         link_forgot_password: "Forgot your password?", divider_or: "— or —",
@@ -204,7 +204,7 @@ const TRANSLATIONS = {
         scan_load_error: "Couldn't load the analysis (check your connection and reload the page).",
     },
     es: {
-        tab_login: "Iniciar sesión", tab_signup: "Registrarse",
+        btn_create_account: "Crear cuenta", link_back_to_login: "¿Ya tienes una cuenta? Inicia sesión",
         placeholder_email: "correo electrónico", placeholder_password: "contraseña (mín. 6 caracteres)",
         btn_login: "Iniciar sesión", btn_signup: "Registrarse",
         link_forgot_password: "¿Olvidaste tu contraseña?", divider_or: "— o —",
@@ -293,7 +293,7 @@ const TRANSLATIONS = {
         scan_load_error: "No se pudo cargar el análisis (revisa tu conexión y recarga la página).",
     },
     de: {
-        tab_login: "Anmelden", tab_signup: "Registrieren",
+        btn_create_account: "Konto erstellen", link_back_to_login: "Schon ein Konto? Anmelden",
         placeholder_email: "E-Mail", placeholder_password: "Passwort (mind. 6 Zeichen)",
         btn_login: "Anmelden", btn_signup: "Registrieren",
         link_forgot_password: "Passwort vergessen?", divider_or: "— oder —",
@@ -382,7 +382,7 @@ const TRANSLATIONS = {
         scan_load_error: "Analyse konnte nicht geladen werden (Verbindung prüfen und Seite neu laden).",
     },
     fr: {
-        tab_login: "Connexion", tab_signup: "Inscription",
+        btn_create_account: "Créer un compte", link_back_to_login: "Déjà un compte ? Se connecter",
         placeholder_email: "e-mail", placeholder_password: "mot de passe (min. 6 caractères)",
         btn_login: "Se connecter", btn_signup: "S'inscrire",
         link_forgot_password: "Mot de passe oublié ?", divider_or: "— ou —",
@@ -471,7 +471,7 @@ const TRANSLATIONS = {
         scan_load_error: "Impossible de charger l'analyse (vérifiez votre connexion et rechargez la page).",
     },
     ru: {
-        tab_login: "Войти", tab_signup: "Регистрация",
+        btn_create_account: "Создать аккаунт", link_back_to_login: "Уже есть аккаунт? Войти",
         placeholder_email: "эл. почта", placeholder_password: "пароль (мин. 6 символов)",
         btn_login: "Войти", btn_signup: "Зарегистрироваться",
         link_forgot_password: "Забыли пароль?", divider_or: "— или —",
@@ -560,7 +560,7 @@ const TRANSLATIONS = {
         scan_load_error: "Не удалось загрузить анализ (проверьте подключение и обновите страницу).",
     },
     zh: {
-        tab_login: "登录", tab_signup: "注册",
+        btn_create_account: "创建账户", link_back_to_login: "已有账户？登录",
         placeholder_email: "电子邮箱", placeholder_password: "密码（至少6个字符）",
         btn_login: "登录", btn_signup: "注册",
         link_forgot_password: "忘记密码？", divider_or: "— 或 —",
@@ -649,7 +649,7 @@ const TRANSLATIONS = {
         scan_load_error: "无法加载分析结果（请检查网络连接并刷新页面）。",
     },
     ja: {
-        tab_login: "ログイン", tab_signup: "新規登録",
+        btn_create_account: "アカウントを作成", link_back_to_login: "すでにアカウントをお持ちですか？ログイン",
         placeholder_email: "メールアドレス", placeholder_password: "パスワード（6文字以上）",
         btn_login: "ログイン", btn_signup: "登録する",
         link_forgot_password: "パスワードをお忘れですか？", divider_or: "— または —",
@@ -738,7 +738,7 @@ const TRANSLATIONS = {
         scan_load_error: "分析結果を読み込めませんでした（接続を確認してページを再読み込みしてください）。",
     },
     hi: {
-        tab_login: "लॉग इन करें", tab_signup: "साइन अप करें",
+        btn_create_account: "खाता बनाएं", link_back_to_login: "पहले से खाता है? लॉग इन करें",
         placeholder_email: "ईमेल", placeholder_password: "पासवर्ड (कम से कम 6 अक्षर)",
         btn_login: "लॉग इन करें", btn_signup: "साइन अप करें",
         link_forgot_password: "पासवर्ड भूल गए?", divider_or: "— या —",
@@ -827,7 +827,7 @@ const TRANSLATIONS = {
         scan_load_error: "विश्लेषण लोड नहीं हो सका (कनेक्शन जांचें और पेज रीलोड करें)।",
     },
     ar: {
-        tab_login: "تسجيل الدخول", tab_signup: "إنشاء حساب",
+        btn_create_account: "إنشاء حساب", link_back_to_login: "لديك حساب بالفعل؟ تسجيل الدخول",
         placeholder_email: "البريد الإلكتروني", placeholder_password: "كلمة المرور (6 أحرف على الأقل)",
         btn_login: "تسجيل الدخول", btn_signup: "إنشاء حساب",
         link_forgot_password: "هل نسيت كلمة المرور؟", divider_or: "— أو —",
