@@ -180,18 +180,33 @@ Deno.serve(async (req: Request) => {
   // okazji już istniejącego pobrania WSZYSTKICH kont (poniżej), żeby nie
   // robić drugiego, identycznego zapytania do Supabase Auth.
   let totalUsersCount: number | null = null
+  // POPRAWKA 2026-08-28(zl) — właściciel testuje aplikację własnym kontem —
+  // jego analizy nie są prawdziwym ruchem klienckim i zniekształcają
+  // marżę/koszty w karcie księgowej niżej. `ownerUserId` (jeśli uda się
+  // dociągnąć) wyklucza WŁAŚNIE to jedno konto z liczb księgowych — reszta
+  // raportu (rejestracje, popularność, itd.) zostaje bez zmian, celowo
+  // pokazuje WSZYSTKO. Adres bierzemy z `REPORT_RECIPIENT_EMAIL` (już
+  // istniejący sekret, adres właściciela) zamiast wpisywać go na sztywno
+  // drugi raz w kodzie.
+  let ownerUserId: string | null = null
   try {
-    const allUsers: { created_at: string }[] = []
+    const allUsers: { id: string; email?: string; created_at: string }[] = []
     let page = 1
     const perPage = 1000
     while (page <= 20) {
       const { data, error } = await supabase.auth.admin.listUsers({ page, perPage })
       if (error) throw error
-      allUsers.push(...data.users.map((u: { created_at: string }) => ({ created_at: u.created_at })))
+      allUsers.push(...data.users.map((u: { id: string; email?: string; created_at: string }) => ({ id: u.id, email: u.email, created_at: u.created_at })))
       if (data.users.length < perPage) break
       page++
     }
     totalUsersCount = allUsers.length
+
+    const ownerEmail = Deno.env.get('REPORT_RECIPIENT_EMAIL')
+    if (ownerEmail) {
+      const owner = allUsers.find((u) => u.email?.toLowerCase() === ownerEmail.toLowerCase())
+      if (owner) ownerUserId = owner.id
+    }
 
     newYesterday = allUsers.filter((u) => u.created_at >= yr.start && u.created_at < yr.end).length
 
@@ -364,14 +379,22 @@ Deno.serve(async (req: Request) => {
   try {
     const { data, error } = await supabase
       .from('scans')
-      .select('input_type, credits_charged, gemini_cost_usd')
+      .select('input_type, credits_charged, gemini_cost_usd, discovered_by')
       .gte('created_at', yr.start)
       .lt('created_at', yr.end)
       .not('gemini_cost_usd', 'is', null)
     if (error) throw error
-    const rows = data as { input_type: string; credits_charged: number | null; gemini_cost_usd: number | null }[]
+    const rows = data as { input_type: string; credits_charged: number | null; gemini_cost_usd: number | null; discovered_by: string | null }[]
     const byType: Record<string, MarginRow> = {}
     for (const r of rows) {
+      // POPRAWKA 2026-08-28(zl) — pomijamy własne, testowe analizy
+      // właściciela (patrz `ownerUserId` wyżej) — nie liczą się do marży/
+      // kosztów, bo to nie prawdziwy ruch kliencki. Porównanie w JS (nie w
+      // zapytaniu Supabase) celowo — `.neq('discovered_by', ownerUserId)`
+      // w Postgresie wykluczyłby PRZY OKAZJI też anonimowe wiersze
+      // (discovered_by = NULL), bo `NULL != wartość` w SQL nie jest
+      // prawdą — a te mają zostać policzone normalnie.
+      if (ownerUserId && r.discovered_by === ownerUserId) continue
       const key = r.input_type
       if (!byType[key]) byType[key] = { inputType: key, creditsCharged: 0, realCostUsd: 0, count: 0 }
       byType[key].creditsCharged += r.credits_charged ?? 0
@@ -703,11 +726,15 @@ ${marginByType.map((r) => `<li style="margin-bottom:2px;">${fmtMargin(r)}</li>`)
     marginTotal && marginTotal.count > 0
       ? `<div style="font-size:14px;color:#111827;font-weight:600;margin-top:6px;">Razem: ${fmtMargin(marginTotal)}</div>`
       : ''
-  const freeCreditsLiabilityUsd = totalUsersCount !== null ? totalUsersCount * INITIAL_WALLET_BONUS * CREDIT_VALUE_USD : null
+  // POPRAWKA 2026-08-28(zl) — to samo wykluczenie właściciela co w
+  // `marginByType` wyżej: jego własne konto nie jest prawdziwym
+  // zobowiązaniem wobec klienta.
+  const liabilityUsersCount = totalUsersCount !== null ? totalUsersCount - (ownerUserId ? 1 : 0) : null
+  const freeCreditsLiabilityUsd = liabilityUsersCount !== null ? liabilityUsersCount * INITIAL_WALLET_BONUS * CREDIT_VALUE_USD : null
   const marginCard = card(
-    'Marża wg typu treści (baza księgowa, projekcja wg docelowego cennika: 1 kredyt = $0,01)',
+    'Marża wg typu treści (baza księgowa, projekcja wg docelowego cennika: 1 kredyt = $0,01, bez konta właściciela)',
     `${marginRowsHtml}${marginTotalHtml}
-<div style="font-size:13px;color:#6b7280;margin-top:10px;">Zobowiązanie z darmowych kredytów rejestracyjnych (${fmt(totalUsersCount)} kont × ${INITIAL_WALLET_BONUS} kr.): ${fmtUsd(freeCreditsLiabilityUsd)} wg docelowego cennika — to NIE jest prawdziwy przychód, system sprzedaży kredytów jeszcze nie istnieje.</div>`
+<div style="font-size:13px;color:#6b7280;margin-top:10px;">Zobowiązanie z darmowych kredytów rejestracyjnych (${fmt(liabilityUsersCount)} kont × ${INITIAL_WALLET_BONUS} kr.): ${fmtUsd(freeCreditsLiabilityUsd)} wg docelowego cennika — to NIE jest prawdziwy przychód, system sprzedaży kredytów jeszcze nie istnieje.</div>`
   )
 
   const retriesHtml =

@@ -6409,6 +6409,33 @@ Weryfikacja: `node --experimental-strip-types --check` na
 `analyze/index.ts` i `daily-report/index.ts` bez nowych błędów (te same
 znane linie co zawsze — moduły/`Deno`/implicit-any).
 
+**POPRAWKA 2026-08-28(zl) — karta "Marża wg typu treści" wyklucza własne,
+testowe konto właściciela.** Zaraz po wdrożeniu (zk) właściciel słusznie
+zauważył: sam testuje aplikację swoim kontem, więc jego analizy nie są
+prawdziwym ruchem klienckim — wliczanie ich zniekształcałoby marżę/koszty.
+`ownerUserId` dociągane PRZY OKAZJI już istniejącego pobrania wszystkich
+kont Supabase Auth (ta sama pętla co liczba rejestracji) — dopasowanie po
+adresie e-mail z `REPORT_RECIPIENT_EMAIL` (istniejący sekret, adres
+właściciela; świadomie NIE wpisany na sztywno drugi raz w kodzie).
+Wykluczenie zastosowane w DWÓCH miejscach tej samej karty:
+- Suma marży wg typu (`marginByType`) — wiersze `scans.discovered_by ===
+  ownerUserId` pomijane PRZED zsumowaniem. Porównanie zrobione w JS (po
+  pobraniu wierszy), nie jako `.neq()` w zapytaniu Supabase — w Postgresie
+  `kolumna != wartość` jest nieprawdą (NULL), gdy kolumna jest `NULL`, więc
+  `.neq('discovered_by', ownerUserId)` po cichu wykluczyłby PRZY OKAZJI
+  też WSZYSTKIE anonimowe analizy (`discovered_by IS NULL`) — a te mają
+  zostać policzone normalnie, to prawdziwy ruch.
+- Zobowiązanie z darmowych kredytów — liczba kont pomniejszona o 1
+  (właściciela), jeśli udało się go dociągnąć.
+
+Świadomie WYŁĄCZNIE ta jedna karta — reszta raportu (rejestracje,
+popularność analiz, kredyty/koszt AI ogółem) zostaje bez zmian, pokazuje
+WSZYSTKO, łącznie z kontem właściciela — nie było o to proszone, a te
+metryki mają inny cel (śledzenie ogólnego ruchu, nie księgowość).
+
+Weryfikacja: `node --experimental-strip-types --check` na
+`daily-report/index.ts` bez nowych błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
