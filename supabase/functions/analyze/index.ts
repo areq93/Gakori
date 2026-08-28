@@ -8,6 +8,18 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 // (patrz sekcja PDF w Deno.serve niżej). Czysty JS, działa w Deno bez
 // natywnych zależności.
 import { PDFDocument } from 'npm:pdf-lib@1.17.1'
+// POPRAWKA 2026-08-28(e) — prawdziwy parser HTML→DOM (linkedom) + algorytm
+// wyciągania głównej treści strony (Readability, ten sam kod co tryb
+// czytania Firefoksa) — patrz `fetchUrlAsText()` niżej po pełne
+// uzasadnienie i historię błędów własnego, regexowego mechanizmu, który to
+// zastępuje (zagnieżdżone `<article>`, linki rozciągnięte na kilka
+// akapitów — patrz GAKORI_CONTEXT.md, POPRAWKA 2026-08-28(b)/(d)/(e)).
+// Licencje sprawdzone WPROST w rejestrze npm przed wdrożeniem (nie z
+// pamięci): linkedom = ISC, @mozilla/readability = Apache-2.0 — obie
+// liberalne, pozwalają na użycie komercyjne bez obowiązku udostępniania
+// kodu Gakori.
+import { parseHTML } from 'npm:linkedom@0.18.13'
+import { Readability } from 'npm:@mozilla/readability@0.6.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1520,157 +1532,52 @@ ${compactList}`
 // zwykłym wejściu na stronę, żeby przejść przez tę węższą kategorię
 // zabezpieczeń. Nie pomoże to stronom wymagającym JS (patrz wyżej) — to
 // świadomie ograniczona, ale zero-kosztowa i zero-zależnościowa poprawka.
-// --- Oczyszczanie pobranej strony z szumu (POPRAWKA 2026-08-25) ---
-// Żywy przykład, który to wymusił: artykuł polityczny dostał aż 90/100 i
-// ZERO wykrytych wzorców, mimo że ten sam tekst wklejony ręcznie w trybie
-// "Tekst" dał 75/100 i 4 prawdziwe wzorce — bo automatyczne pobranie
-// zaciągnęło do treści niepowiązany fragment z panelu bocznego strony
-// ("WIDEO: Fatalne skutki pożaru..."). Ten sam szum zawyżał też cenę
-// (płacimy za KAŻDY znak, patrz cennik w GAKORI_CONTEXT.md). Poniższe
-// funkcje czyszczą stronę PRZED policzeniem znaków/wysłaniem do analizy —
-// patrz GAKORI_CONTEXT.md po pełne uzasadnienie i przykład realnej strony
-// (polsatnews.pl), na podstawie którego to zaprojektowano.
-
-// Pojedyncze, całe "słowa" (tokeny) klasy/id, które niemal zawsze oznaczają
-// szum, nie treść artykułu. ŚWIADOMIE dopasowanie CAŁEGO tokenu (nie
-// podciągu) — inaczej np. polskie "adres" zostałoby błędnie potraktowane
-// jako reklama ("ad"). Nie jest to lista wyczerpująca (każda strona nazywa
-// to nieco inaczej) — pokrywa zdecydowaną większość typowych przypadków.
-// POPRAWKA 2026-08-25(f) — rozszerzone o "tag"/"tags"/"keywords"/"teaser"
-// po żywym przykładzie: lista tagów/tematów pod artykułem ("JURATA KAROL
-// NAWROCKI MARTA NAWROCKA MŁODZIEŻ POLSKA...") i fragment "Czytaj więcej"
-// przetrwały wcześniejsze czyszczenie i myliły model (tekst uznany za
-// "czysty", bo szum rozcieńczył prawdziwą treść) — patrz GAKORI_CONTEXT.md.
-// Świadomie NIE dodajemy tu ogólnych słów jak "more"/"więcej" — zbyt duże
-// ryzyko przypadkowego dopasowania do niewinnej klasy zawierającej to
-// słowo jako część nazwy (np. "more-content"), skupiamy się na precyzyjnych,
-// mało prawdopodobnych do pomylenia tokenach.
-const NOISE_CLASS_TOKENS = new Set([
-  'ad', 'ads', 'advert', 'advertisement', 'banner', 'cookie', 'cookies',
-  'consent', 'gdpr', 'newsletter', 'subscribe', 'subscription', 'comment',
-  'comments', 'related', 'recommended', 'sponsor', 'sponsored', 'promo',
-  'promotion', 'popup', 'share', 'social', 'tag', 'tags', 'keyword',
-  'keywords', 'teaser',
-])
+// --- Pobieranie i oczyszczanie strony (POPRAWKA 2026-08-28(e)) ---
+// Historia: pierwsza wersja (POPRAWKA 2026-08-25) to był własny,
+// regexowy pipeline (wycinanie tagów po nazwie/klasie, ręczne liczenie
+// zagnieżdżenia). Kolejne żywe przypadki pokazały jego fundamentalną
+// słabość — nie CO robił był problemem, tylko SPOSÓB: (POPRAWKA
+// 2026-08-28(d)) zagnieżdżony `<article>` (boks "Zobacz również" sam
+// oznaczony jako `<article>`) mylił proste dopasowanie "od pierwszego do
+// pierwszego zamknięcia"; (POPRAWKA 2026-08-28(b)) link rozciągnięty na
+// kilka akapitów (jedna karta z kategorią/tytułem/autorem w osobnych
+// `<div>`, całość owinięta JEDNYM `<a>`) mylił filtr liczący gęstość
+// linków per akapit. Każda naprawa łatała JEDEN konkretny przypadek —
+// właściciel zapytał wprost: "nie damy rady zrobić tak, żeby jakość
+// zawsze była na każdej stronie?" — i to pytanie doprowadziło do decyzji
+// o zmianie CAŁEGO podejścia (patrz rozmowa 2026-08-28, "pójście drogą
+// parsera"). Zamiast dalej łatać własne regexy, używamy prawdziwego
+// parsera HTML→DOM (`linkedom`) + sprawdzonego, bardzo dojrzałego
+// algorytmu wyciągania głównej treści (`@mozilla/readability`, ten sam
+// kod co tryb czytania Firefoksa) — patrz importy na górze pliku po
+// uzasadnienie wyboru bibliotek i sprawdzone licencje.
+//
+// UCZCIWE ZASTRZEŻENIE: Readability samo w sobie NIE usuwa 100% szumu w
+// każdym przypadku (sprawdzone w testach przed wdrożeniem — krótkie,
+// gęsto polinkowane boksy "zobacz również" czasem przetrwają jego
+// algorytm, zwłaszcza gdy artykuł jest krótszy i Readability ma mniej
+// materiału porównawczego do oceny, co jest podstawą jego algorytmu).
+// Dlatego ZATRZYMUJEMY nasz już sprawdzony filtr gęstości linków (patrz
+// niżej) jako DRUGĄ warstwę, uruchamianą na TYM CO ZWRÓCIŁ Readability —
+// teraz działa niezawodnie, bo pracuje na już oczyszczonym materiale
+// (mniej okazji do pomyłki), a poprawiony wcześniej problem "link na
+// kilka akapitów" (znaczniki-sentinel niewidocznych znaków U+0001/U+0002) obsługuje też
+// przypadek, gdy Readability samo nie rozbije takiej karty na osobne
+// elementy.
 
 // Zamienia jedno dopasowanie numerycznej encji HTML (`&#321;` albo
 // `&#x141;`) na prawdziwy znak — fail-open: jeśli punkt kodowy jest
 // nieprawidłowy (np. samotna surogatowa połówka), zostawia oryginalny,
-// niezmieniony tekst zamiast wywalać całe pobranie strony.
+// niezmieniony tekst. Rzadko już potrzebne (DOM dekoduje encje PRZY
+// PARSOWANIU, więc `article.content` z Readability prawie zawsze ma już
+// prawdziwe znaki Unicode, nie encje) — zostaje jako tania siatka
+// bezpieczeństwa na wszelki wypadek.
 function decodeNumericEntity(original: string, digits: string, radix: number): string {
   try {
     return String.fromCodePoint(parseInt(digits, radix))
   } catch {
     return original
   }
-}
-
-// POPRAWKA 2026-08-25(f) — żywy przykład: JEDNA strona miesza NAZWANE
-// encje HTML (`&oacute;` = "ó" — standardowy zestaw HTML4/Latin-1) z
-// NUMERYCZNYMI (`&#322;` = "ł" — bo "ł" nie ma własnej nazwanej encji,
-// nie należy do Latin-1). Bez tej tabeli "niekt&oacute;rym" wychodziło
-// jako dosłowne "niektoacuterym" zamiast "niektórym". Nie jest to
-// kompletny zestaw wszystkich encji HTML (tych jest kilkaset) — tylko
-// najczęstsze akcentowane litery europejskie i typograficzne znaki
-// (myślniki, cudzysłowy), które realnie widzieliśmy na żywo.
-const HTML_NAMED_ENTITIES: Record<string, string> = {
-  aacute: 'á', Aacute: 'Á', eacute: 'é', Eacute: 'É', iacute: 'í', Iacute: 'Í',
-  oacute: 'ó', Oacute: 'Ó', uacute: 'ú', Uacute: 'Ú', ntilde: 'ñ', Ntilde: 'Ñ',
-  ccedil: 'ç', Ccedil: 'Ç', agrave: 'à', Agrave: 'À', egrave: 'è', Egrave: 'È',
-  igrave: 'ì', Igrave: 'Ì', ograve: 'ò', Ograve: 'Ò', ugrave: 'ù', Ugrave: 'Ù',
-  acirc: 'â', Acirc: 'Â', ecirc: 'ê', Ecirc: 'Ê', ocirc: 'ô', Ocirc: 'Ô',
-  ucirc: 'û', Ucirc: 'Û', auml: 'ä', Auml: 'Ä', euml: 'ë', Euml: 'Ë',
-  iuml: 'ï', Iuml: 'Ï', ouml: 'ö', Ouml: 'Ö', uuml: 'ü', Uuml: 'Ü',
-  yacute: 'ý', Yacute: 'Ý', aring: 'å', Aring: 'Å', aelig: 'æ', AElig: 'Æ',
-  oslash: 'ø', Oslash: 'Ø', szlig: 'ß',
-  mdash: '—', ndash: '–', hellip: '…',
-  ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’',
-  laquo: '«', raquo: '»', middot: '·', deg: '°', sect: '§', para: '¶',
-  copy: '©', reg: '®', trade: '™',
-}
-function hasNoiseClass(openTagHtml: string): boolean {
-  const tokens: string[] = []
-  for (const m of openTagHtml.matchAll(/(?:class|id)="([^"]*)"/gi)) {
-    tokens.push(...m[1].toLowerCase().split(/[\s_-]+/))
-  }
-  return tokens.some((tok) => NOISE_CLASS_TOKENS.has(tok))
-}
-
-// Usuwa z fragmentu HTML wszystkie elementy o podanych nazwach tagów (np.
-// "nav" albo "div|section|aside|ul|figure") RAZEM z całą ich zawartością —
-// poprawnie licząc zagnieżdżenie tego samego tagu (np. <div> w <div>), bo
-// prosty regex "od otwarcia do pierwszego napotkanego zamknięcia" ucinałby
-// zawartość w połowie przy takim zagnieżdżeniu. `shouldRemove(openTag)`
-// decyduje per KONKRETNY tag (po jego atrybutach), czy go usunąć — inne
-// wystąpienia tego samego typu tagu, które nie pasują, zostają nietknięte.
-function stripElementsByTag(html: string, tagNames: string, shouldRemove: (openTag: string) => boolean): string {
-  const tagRe = new RegExp(`<(${tagNames})\\b[^>]*>|<\\/(${tagNames})>`, 'gi')
-  let result = ''
-  let cursor = 0
-  let depth = 0
-  let removeTagName = ''
-  let match: RegExpExecArray | null
-  while ((match = tagRe.exec(html))) {
-    const isClosing = !!match[2]
-    const tagName = (match[1] || match[2]).toLowerCase()
-    if (depth === 0) {
-      if (!isClosing && shouldRemove(match[0])) {
-        result += html.slice(cursor, match.index)
-        depth = 1
-        removeTagName = tagName
-        cursor = tagRe.lastIndex
-      }
-    } else if (tagName === removeTagName) {
-      if (!isClosing) depth++
-      else {
-        depth--
-        if (depth === 0) cursor = tagRe.lastIndex
-      }
-    }
-  }
-  result += html.slice(cursor)
-  return result
-}
-
-// POPRAWKA 2026-08-28(d) — żywy przypadek: `articleMatch` niżej używał
-// prostego dopasowania "od PIERWSZEGO <article> do PIERWSZEGO </article>"
-// (`[\s\S]*?` — niechciwe, ale BEZ liczenia zagnieżdżenia) — jeśli strona
-// ma ZAGNIEŻDŻONE znaczniki `<article>` (np. każdy boks "Zobacz również"
-// sam w sobie oznaczony jako `<article>`, częste w nowoczesnym,
-// semantycznym HTML-u), dopasowanie kończyło się na zamknięciu tego
-// WEWNĘTRZNEGO boksu, a nie prawdziwego, głównego artykułu — reszta
-// treści (często większość!) w ogóle nie trafiała do dalszego
-// przetwarzania, niezależnie jak dobry był filtr szumu PO tym kroku
-// (patrz `linkTextDensity()` wyżej — nie miała już czego filtrować,
-// bo treść zniknęła wcześniej). Naprawa: ten sam mechanizm liczenia
-// zagnieżdżenia co `stripElementsByTag()` wyżej, tylko zwraca zawartość
-// PIERWSZEGO elementu (poprawnie dopasowaną do jego WŁASNEGO zamknięcia)
-// zamiast usuwać dopasowane elementy.
-function extractFirstElementContent(html: string, tagName: string): string | null {
-  const tagRe = new RegExp(`<(${tagName})\\b[^>]*>|<\\/(${tagName})>`, 'gi')
-  let match: RegExpExecArray | null
-  let startIndex = -1
-  let depth = 0
-  while ((match = tagRe.exec(html))) {
-    const isClosing = !!match[2]
-    if (startIndex === -1) {
-      if (!isClosing) {
-        depth = 1
-        startIndex = tagRe.lastIndex
-      }
-      continue
-    }
-    if (!isClosing) {
-      depth++
-    } else {
-      depth--
-      if (depth === 0) return html.slice(startIndex, match.index)
-    }
-  }
-  // Brak poprawnie zamkniętego elementu (np. niepoprawny HTML) —
-  // fail-open: wywołujący zostaje przy oryginalnym `html`, tak jak
-  // dotychczas gdy `articleMatch` był `null`.
-  return null
 }
 
 async function fetchUrlAsText(url: string): Promise<string | null> {
@@ -1698,202 +1605,128 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     )
     if (!res.ok) return null
     let html = await res.text()
-    // POPRAWKA 2026-08-26(f) — żywy problem znaleziony po długim śledztwie
-    // niespójności link/tekst: strony czasem zapisują tekst ze znakami
-    // końca linii w stylu Windows (CRLF, "\r\n" — DWA znaki na jedno
-    // przejście do nowej linii), a my nigdy tego nie ujednolicaliśmy.
-    // Przeglądarka, gdy taki tekst trafia do zwykłego pola `<textarea>`
-    // (czy to przez wklejenie, czy przez jakikolwiek inny mechanizm), SAMA,
-    // zgodnie ze standardem HTML, zamienia "\r\n" na pojedyncze "\n" —
-    // czyli liczba znaków w polu tekstowym wychodzi MNIEJSZA niż to, co
-    // faktycznie zapisaliśmy i pokazaliśmy jako "liczbę znaków" gdzie
-    // indziej w aplikacji. To tłumaczyło żywy przypadek: właściciel
-    // porównywał tę samą treść (link vs wklejony tekst) i za każdym razem
-    // brakowało innej liczby znaków (42, 51, 61 — zależnie od artykułu),
-    // co wykluczało zarówno błąd kopiowania (już wykluczony wcześniej
-    // przyciskiem "Kopiuj"/mechanizmem bez schowka), jak i stały,
-    // przewidywalny błąd. Naprawa: ujednolicamy WSZYSTKIE znaki końca
-    // linii do pojedynczego "\n" od razu po pobraniu, ZANIM cokolwiek
-    // innego zacznie przetwarzać ten tekst — więc nie ma już czego
-    // "zgubić" po stronie przeglądarki.
+    // POPRAWKA 2026-08-26(f) — CRLF → LF od razu po pobraniu, patrz
+    // GAKORI_CONTEXT.md po pełne uzasadnienie (niespójna liczba znaków
+    // link vs wklejony tekst w przeglądarce).
     html = html.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
     // POPRAWKA 2026-08-25 — ochrona limitu czasu procesora Supabase Edge
-    // Function (patrz PDF_HARD_MAX_PAGES wyżej — to samo ograniczenie
-    // platformy: tylko kilka sekund REALNEJ pracy procesora na całe
-    // zapytanie). Kilka kolejnych przebiegów regex niżej (wycinanie
-    // <article>, usuwanie szumu, zachowanie akapitów) kosztuje procesor
-    // proporcjonalnie do długości strony — dla bardzo dużych,
-    // nietypowych stron (setki KB-MB surowego HTML-a) ucinamy z góry,
-    // zanim zaczniemy czyścić. Finalny tekst i tak jest ograniczony do
+    // Function: budowanie drzewa DOM z bardzo dużej strony (setki KB-MB)
+    // kosztuje procesor proporcjonalnie do jej długości — ucinamy z góry,
+    // zanim zaczniemy parsować. Finalny tekst i tak jest ograniczony do
     // 20000 znaków niżej — treść artykułu prawie zawsze mieści się dużo
     // wcześniej niż ten limit surowego HTML-a.
     const MAX_RAW_HTML_CHARS = 800_000
     if (html.length > MAX_RAW_HTML_CHARS) html = html.slice(0, MAX_RAW_HTML_CHARS)
 
-    html = html
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<!--[\s\S]*?-->/g, ' ')
+    // Parsowanie do prawdziwego drzewa DOM + wyciągnięcie głównej treści
+    // (patrz komentarz nad tą funkcją po pełne uzasadnienie). Fail-open:
+    // błąd parsowania albo brak wyniku traktujemy tak samo jak dotychczas
+    // nieudane pobranie — `null` uruchamia istniejącą ścieżkę awaryjną
+    // (Gemini "URL context", patrz Deno.serve niżej), a nie twardy błąd.
+    let articleContentHtml: string
+    try {
+      const { document } = parseHTML(html)
+      const article = new Readability(document).parse()
+      if (!article || !article.content) return null
+      articleContentHtml = article.content
+    } catch {
+      return null
+    }
 
-    // Jeśli strona oznacza swoją główną treść znacznikiem <article>
-    // (bardzo częste na dużych portalach, m.in. ze względów SEO) — bierzemy
-    // TYLKO to, co jest w środku. Jednym ruchem wyrzuca to menu strony,
-    // stopkę i panel boczny, bo one z definicji żyją POZA <article>.
-    // POPRAWKA 2026-08-28(d) — patrz `extractFirstElementContent()` wyżej:
-    // poprawnie liczy zagnieżdżenie, żeby zagnieżdżony `<article>` (np.
-    // boks "Zobacz również" oznaczony jako osobny `<article>`) nie ucinał
-    // dopasowania przedwcześnie.
-    const articleContent = extractFirstElementContent(html, 'article')
-    if (articleContent !== null) html = articleContent
-    // POPRAWKA 2026-08-28(c) — DIAGNOSTYKA TYMCZASOWA, patrz GAKORI_CONTEXT.md:
-    // widoczność, ile tekstu zostaje zaraz PO wycięciu <article>, PRZED
-    // resztą czyszczenia (filtr gęstości linków itd.) — pozwala odróżnić
-    // "problem jest tu, na samym starcie" od "problem jest w dalszym
-    // czyszczeniu".
-    console.log(`[refresh-debug] url=${url} po_wycieciu_article znaleziono=${articleContent !== null} dlugosc=${html.length}`)
-
-    // Pasek "udostępnij"/nawigacja W OBRĘBIE treści — zawsze szum, nigdy
-    // sama treść artykułu, więc usuwamy KAŻDE wystąpienie <nav>, bez
-    // sprawdzania klasy.
-    html = stripElementsByTag(html, 'nav', () => true)
-    // POPRAWKA 2026-08-25(f) — żywy przykład: osadzony odtwarzacz wideo
-    // NIEPOWIĄZANEGO tematu w środku artykułu ("WIDEO: ...Miller o decyzji
-    // Tuska" w artykule o zupełnie innej sprawie) — jego "treść" to zawsze
-    // tylko techniczny komunikat zastępczy ("Twoja przeglądarka nie
-    // wspiera odtwarzacza wideo..."), nigdy prawdziwy tekst artykułu, więc
-    // bezpiecznie usuwamy całe <video>/<iframe> (osadzone tweety, mapy,
-    // odtwarzacze) i <noscript> (fallback dla wyłączonego JS) — bez
-    // sprawdzania klasy, tak jak <nav> wyżej.
-    html = stripElementsByTag(html, 'video|iframe|noscript', () => true)
-    // Reklamy, baner cookie, newsletter, komentarze, "czytaj też" itp. —
-    // rozpoznawane po typowych, powtarzalnych nazwach klas/id (patrz
-    // NOISE_CLASS_TOKENS wyżej). ŚWIADOMIE NIE usuwamy <header>/<footer>/
-    // <aside> "w ciemno" po samym typie tagu — żywy przykład: `<header
-    // class="news_header">` W OBRĘBIE <article> bywa właściwym
-    // nagłówkiem/leadem artykułu, nie szumem całej strony (ten drugi,
-    // "śmieciowy" wariant i tak już odpadł przy wycięciu <article> wyżej).
-    html = stripElementsByTag(html, 'div|section|aside|ul|figure', hasNoiseClass)
-
-    // Zachowujemy podział na akapity — koniec bloku (akapit, nagłówek,
-    // wiersz listy, złamanie linii, wiersz tabeli) zamieniamy na pustą
-    // linię w tekście, ZANIM usuniemy resztę znaczników. Bez tego cała
-    // treść zlewała się w jedną, nieczytelną "ścianę tekstu" (zgłoszone na
-    // żywo przez właściciela) — to WYŁĄCZNIE kwestia białych znaków,
-    // NIGDY nie zmienia ani jednego słowa treści (ważne dla dopasowania
-    // cytatów w `scan.html`, patrz `buildHighlightedText()`/
-    // `normalizeWithMap()` tam — one już i tak traktują dowolny ciąg
-    // białych znaków jako pojedynczą spację przy szukaniu cytatu).
-    html = html
+    // Znaczniki-sentinel (niewidoczne znaki prywatnego użytku Unicode,
+    // nigdy nie występują w prawdziwym tekście) w miejscu `<a>`/`</a>` —
+    // PRZETRWAJĄ późniejszy podział na akapity, więc link rozciągnięty na
+    // kilka akapitów (jedna karta z kategorią/tytułem/autorem w osobnych
+    // `<div>` wewnątrz JEDNEGO `<a>`) dalej poprawnie liczy się jako "w
+    // 100% link" w KAŻDYM z tych akapitów — patrz GAKORI_CONTEXT.md,
+    // POPRAWKA 2026-08-28(b), gdzie to dokładnie ten problem, którego
+    // pierwsza wersja tego filtra (licząca gęstość per akapit z osobna,
+    // bez pamięci stanu między nimi) nie łapała.
+    const SENTINEL_OPEN = ''
+    const SENTINEL_CLOSE = ''
+    const html2 = articleContentHtml
+      .replace(/<a\b[^>]*>/gi, SENTINEL_OPEN)
+      .replace(/<\/a>/gi, SENTINEL_CLOSE)
+      // Zachowujemy podział na akapity — koniec bloku (akapit, nagłówek,
+      // wiersz listy, złamanie linii, wiersz tabeli) zamieniamy na pustą
+      // linię w tekście, ZANIM usuniemy resztę znaczników. Bez tego cała
+      // treść zlewałaby się w jedną, nieczytelną "ścianę tekstu" (ważne
+      // też dla dopasowania cytatów w `scan.html`, patrz
+      // `buildHighlightedText()`/`normalizeWithMap()` tam).
       .replace(/<\/(p|div|li|h[1-6]|tr|blockquote)>/gi, '\n\n')
       .replace(/<br\s*\/?>/gi, '\n')
 
-    // Czyści JEDEN fragment surowego HTML-a (akapit) do zwykłego tekstu —
-    // te same kroki (encje, białe znaki), które dawniej robiliśmy raz na
-    // CAŁYM dokumencie naraz, tylko teraz per akapit, żeby dało się je
-    // połączyć z gęstością linków (patrz `linkTextDensity()` niżej) tego
-    // SAMEGO fragmentu, zanim jego tagi znikną.
+    // Czyści JEDEN fragment (akapit) do zwykłego tekstu — usuwa znaczniki
+    // (włącznie ze znacznikami-sentinel wyżej) i dekoduje podstawowe
+    // encje HTML.
     function cleanFragmentText(fragmentHtml: string): string {
       return fragmentHtml
         .replace(/<[^>]+>/g, ' ')
+        .replace(/[]/g, '')
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
         .replace(/&quot;/g, '"')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
-        // POPRAWKA 2026-08-25(f) — dekodowanie NUMERYCZNYCH encji HTML
-        // (`&#321;`/`&#x141;` → "Ł" itd.) — dawniej dekodowaliśmy tylko kilka
-        // nazwanych encji, więc polskie znaki specjalne zapisane w ten
-        // sposób (częste na starszych/nietypowych stronach) wychodziły jako
-        // zniekształcone "M#321;ODZIE#379;" zamiast "MŁODZIEŻ". Ten sam
-        // wzór obejmuje też `&#39;` (apostrof), więc osobna reguła dla niego
-        // nie jest już potrzebna. `decodeNumericEntity()` fail-open na
-        // pojedynczym błędnym dopasowaniu (nieprawidłowy punkt kodowy) —
-        // zostawia ten jeden fragment nietknięty zamiast wywalać całe
-        // pobranie strony.
         .replace(/&#x([0-9a-fA-F]+);/g, (m, hex) => decodeNumericEntity(m, hex, 16))
         .replace(/&#(\d+);/g, (m, dec) => decodeNumericEntity(m, dec, 10))
-        // Nazwane encje (patrz HTML_NAMED_ENTITIES wyżej) — fail-open: nazwa
-        // spoza tabeli zostaje nietknięta (np. rzadka encja, na którą nie
-        // trafiliśmy jeszcze na żywo).
-        .replace(/&([a-zA-Z]+);/g, (m, name) => HTML_NAMED_ENTITIES[name] ?? m)
         .replace(/[ \t]+/g, ' ')
         .replace(/ *\n */g, '\n')
         .trim()
     }
 
-    // POPRAWKA 2026-08-28(b) — patrz GAKORI_CONTEXT.md po pełne uzasadnienie
-    // i żywy przypadek (interia.pl, artykuł ucięty na pierwszym z trzech
-    // śródartykułowych boksów "Zobacz również"). Zastępuje dawny
-    // TRAILING_LIST_DATE_RE (rozpoznawanie PO WZORZE konkretnej daty,
-    // zakładające JEDNĄ taką listę, zawsze na samym końcu strony) —
-    // ogólniejszy, niezależny od języka/formatu daty sygnał: prawdziwy
-    // akapit artykułu to głównie zwykły tekst z rzadkimi linkami, a boks
-    // "zobacz również"/lista powiązanych to niemal WYŁĄCZNIE linki
-    // (nagłówek = link). Liczone na SUROWYM HTML-u fragmentu (przed
-    // usunięciem tagów w `cleanFragmentText()` wyżej), żeby widzieć
-    // dokładnie, ile tekstu leży wewnątrz `<a>...</a>`.
-    function linkTextDensity(rawFragmentHtml: string): number {
-      const totalText = rawFragmentHtml.replace(/<[^>]+>/g, '').trim()
-      if (!totalText) return 0
-      let linkText = ''
-      for (const m of rawFragmentHtml.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)) {
-        linkText += m[1].replace(/<[^>]+>/g, '')
-      }
-      return linkText.length / totalText.length
-    }
-    // Progi celowo ostrożne (krótki akapit ORAZ zdecydowana większość jego
-    // tekstu w linku, obie warunki naraz) — na razie najlepsze oszacowanie
-    // właściciela i asystenta, świadomie otwarte na dostrojenie po
-    // zobaczeniu więcej żywych przypadków (patrz GAKORI_CONTEXT.md).
+    // POPRAWKA 2026-08-28(b)/(e) — druga warstwa czyszczenia PO
+    // Readability: krótki akapit (≤220 znaków), którego zdecydowana
+    // większość (≥60%) tekstu leży wewnątrz linku — to niemal na pewno
+    // boks "zobacz również"/lista powiązanych, nie proza artykułu.
+    // `insideAnchor` to stan NIESIONY MIĘDZY kolejnymi akapitami (nie
+    // liczony od nowa dla każdego z osobna) — dzięki temu link
+    // rozciągnięty na kilka akapitów (patrz sentinel-e wyżej) dalej
+    // poprawnie liczy się jako link w każdym z nich. Progi to na razie
+    // najlepsze wspólne oszacowanie właściciela i asystenta — świadomie
+    // otwarte na dostrojenie po zobaczeniu więcej żywych przypadków.
     const LINK_DENSITY_NOISE_THRESHOLD = 0.6
     const LINK_DENSITY_MAX_NOISE_TEXT_LENGTH = 220
-
-    // POPRAWKA 2026-08-25(g) — żywy przykład, powtórzony na DWÓCH różnych
-    // artykułach: śródartykułowe zapowiedzi zupełnie INNEGO tekstu
-    // ("ZOBACZ: 25-letni Białorusin napadnięty..." w środku artykułu o
-    // czymś zupełnie innym) i samotne "Czytaj więcej" (etykieta
-    // przycisku, nie treść) — żaden z nich nie ma rozpoznawalnej klasy
-    // HTML (to zwykły akapit tekstu w środku artykułu), więc filtrujemy
-    // je PO TREŚCI, całymi akapitami. Świadome ograniczenie: to lista
-    // specyficzna dla języka polskiego, nie pomoże na stronach w innych
-    // językach.
-    const TEASER_LINE_PREFIXES = [
-      'zobacz:', 'zobacz też:', 'zobacz również:', 'czytaj także:', 'czytaj też:',
-      'przeczytaj także:', 'przeczytaj też:', 'polecamy:',
-    ]
-    // POPRAWKA 2026-08-26(i) — "WIDEO:" świadomie NIE było na liście wyżej
-    // (POPRAWKA 2026-08-25(g)) — obawa przed usunięciem prawdziwego,
-    // legalnego nagłówka artykułu O samym wideo. Ale mamy już DWA żywe
-    // przykłady (dwa różne artykuły, dwie różne strony), gdzie
-    // "WIDEO: ..." okazało się kompletnie NIEPOWIĄZANĄ zapowiedzią innego
-    // materiału, zawsze na SAMYM KOŃCU artykułu, tuż przed podpisem
-    // autora — nigdy prawdziwym tytułem. Konkretny dowód, że to naprawdę
-    // szkodzi: właściciel porównał ręczną kopię strony (bez tej linijki)
-    // z naszą analizą linku (z tą linijką) — ta sama treść dała RÓŻNE
-    // wyniki analizy, bo model potraktował niepowiązany "Ślub z
-    // krokodylem"/"Wpisał się w piątą kolumnę ukraińską" jako część
-    // ocenianego artykułu. Naprawa: filtrujemy "WIDEO:" tak jak resztę
-    // powyżej, ALE tylko gdy NIE jest pierwszym akapitem całego tekstu —
-    // zachowuje to ostrożność sprzed (g) na wypadek, gdyby to jednak był
-    // prawdziwy tytuł artykułu (ten zawsze ląduje na początku, nie na
-    // końcu tuż przed podpisem autora).
-    const TEASER_LINE_PREFIXES_UNLESS_FIRST_PARAGRAPH = ['wideo:']
-    const EXACT_NOISE_LINES = new Set(['czytaj więcej', 'czytaj dalej', 'zobacz więcej'])
-
-    // Dzielimy SUROWY (jeszcze z tagami w środku, np. <a>) html na akapity —
-    // ten sam podział co dawniej (dwa lub więcej znaków nowej linii,
-    // wstawionych przy zamykających tagach akapitowych wyżej), tylko TERAZ
-    // wykonywany PRZED usunięciem tagów, żeby `linkTextDensity()` miała co
-    // zmierzyć.
-    const rawBlocks = html.split(/\n{2,}/)
-    const paragraphs = rawBlocks
-      .map((raw) => ({ text: cleanFragmentText(raw), density: linkTextDensity(raw) }))
+    let insideAnchor = false
+    const rawBlocks = html2.split(/\n{2,}/)
+    let paragraphs = rawBlocks
+      .map((raw) => {
+        const withMarkersOnly = raw.replace(/<[^>]+>/g, '')
+        let linkChars = 0
+        let totalChars = 0
+        for (const ch of withMarkersOnly) {
+          if (ch === SENTINEL_OPEN) {
+            insideAnchor = true
+            continue
+          }
+          if (ch === SENTINEL_CLOSE) {
+            insideAnchor = false
+            continue
+          }
+          totalChars++
+          if (insideAnchor) linkChars++
+        }
+        const density = totalChars === 0 ? 0 : linkChars / totalChars
+        return { text: cleanFragmentText(raw), density }
+      })
       .filter(({ text, density }) => {
         if (!text) return false
         if (text.length <= LINK_DENSITY_MAX_NOISE_TEXT_LENGTH && density >= LINK_DENSITY_NOISE_THRESHOLD) return false
         return true
       })
       .map(({ text }) => text)
+
+    // POPRAWKA 2026-08-25(g)/2026-08-26(i) — tani, dodatkowy filtr PO
+    // TREŚCI dla polskich fraz-zapowiedzi, które same w sobie NIE są
+    // linkiem (więc filtr gęstości linków wyżej ich nie złapie), np. sama
+    // etykieta "Zobacz również:" bez linku obok. Świadome ograniczenie:
+    // lista specyficzna dla języka polskiego.
+    const TEASER_LINE_PREFIXES = [
+      'zobacz:', 'zobacz też:', 'zobacz również:', 'czytaj także:', 'czytaj też:',
+      'przeczytaj także:', 'przeczytaj też:', 'polecamy:',
+    ]
+    const TEASER_LINE_PREFIXES_UNLESS_FIRST_PARAGRAPH = ['wideo:']
+    const EXACT_NOISE_LINES = new Set(['czytaj więcej', 'czytaj dalej', 'zobacz więcej'])
 
     const text = paragraphs
       .filter((para, index) => {
@@ -1907,7 +1740,8 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
       .trim()
 
     // Zbyt krótki wynik to zwykle strona-zaślepka (np. "włącz obsługę
-    // JavaScript"), nie prawdziwa treść — traktujemy to jak porażkę.
+    // JavaScript") albo Readability, które nie znalazło sensownej głównej
+    // treści — traktujemy to jak porażkę (fallback niżej w Deno.serve).
     if (text.length < 200) return null
     return text.slice(0, 20000)
   } catch {

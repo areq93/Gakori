@@ -4651,6 +4651,100 @@ błędy typów, niezwiązane z tą zmianą) oraz `node --experimental-strip-type
 na żywo (ten sam link interia.pl) po ręcznym wdrożeniu w Supabase
 Dashboard.
 
+**POPRAWKA 2026-08-28(e) — zmiana fundamentalna: `fetchUrlAsText()` przepisane
+na prawdziwy parser HTML→DOM (`linkedom`) + algorytm wyciągania głównej
+treści (`@mozilla/readability`), zamiast własnych regexów.** Po dwóch
+kolejnych, punktowych łatkach w tej samej sesji (POPRAWKA (b) — gęstość
+linków, POPRAWKA (d) — zagnieżdżony `<article>`) właściciel zadał pytanie
+wprost: **"czy nie damy rady zrobić tak, żeby jakość zawsze była na
+każdej stronie?"** — uczciwa odpowiedź brzmiała: nie w 100%, żaden własny
+regexowy parser HTML nigdy nie obsłuży wszystkich wariantów budowy stron
+w internecie, bo zawsze może się pojawić nowy wzorzec. Ale da się
+DRAMATYCZNIE zmniejszyć ryzyko, przechodząc na prawdziwy, sprawdzony
+parser DOM zamiast własnych regexów — to samo podejście, którego
+przeglądarki używają w "trybie czytania" (Mozilla Readability to
+dosłownie ten kod, którego używa tryb czytania Firefoksa). Właściciel
+zgodził się na większą, ale trwalszą zmianę: "myślę że pójdziemy w ten
+parser, jeżeli ma to zwiększyć jakość" / "najwyżej wrócimy do obecnego
+stanu" (świadomość odwracalności przez git).
+
+**Sprawdzone licencje PRZED wdrożeniem** (właściciel wprost poprosił o
+ocenę warunków, zanim zaakceptujemy) — sprawdzone WPROST w rejestrze npm
+(`registry.npmjs.org`, dostępny z tego środowiska bez blokady sieciowej),
+nie z pamięci:
+- `linkedom` — licencja **ISC** (bardzo liberalna, jak MIT), aktywnie
+  rozwijana (218 wydanych wersji od 2020, ostatnia lipiec 2026).
+- `@mozilla/readability` — licencja **Apache-2.0** (liberalna, z grantem
+  patentowym), oficjalny projekt Mozilli, rozwijany od 2020, ostatnia
+  wersja marzec 2025.
+
+Obie pozwalają na użycie komercyjne, BEZ obowiązku udostępniania kodu
+Gakori, bez opłat — jedyny warunek to techniczna formalność (zachowanie
+notki licencyjnej w plikach samej biblioteki, dzieje się automatycznie
+przy imporcie `npm:`).
+
+**Nowa architektura `fetchUrlAsText()`**:
+1. Pobranie strony — bez zmian (te same nagłówki/timeout).
+2. `parseHTML(html)` (linkedom) buduje prawdziwe drzewo DOM.
+3. `new Readability(document).parse()` wyciąga główną treść — zastępuje
+   CAŁY dawny mechanizm: `NOISE_CLASS_TOKENS`/`hasNoiseClass`/
+   `stripElementsByTag`/`extractFirstElementContent`/`HTML_NAMED_ENTITIES`
+   (usunięte jako martwy kod — sprawdzone przez `grep`, że nic innego w
+   pliku ich nie używało). Fail-open: `null`/pusty wynik → `fetchUrlAsText()`
+   zwraca `null`, jak dotychczas, uruchamiając istniejącą ścieżkę
+   awaryjną (Gemini "URL context").
+4. **UCZCIWE ZASTRZEŻENIE, sprawdzone w testach przed wdrożeniem**:
+   Readability samo w sobie NIE usuwa 100% szumu w każdym przypadku —
+   krótkie, gęsto polinkowane boksy "zobacz również" czasem przetrwają
+   jego algorytm (zwłaszcza na krótszych artykułach, gdzie ma mniej
+   materiału porównawczego — jego ocena jest z natury statystyczna/
+   porównawcza). Dlatego ZATRZYMANY (nie usunięty) już sprawdzony filtr
+   gęstości linków z POPRAWKI (b) jako DRUGA warstwa, uruchamiana na
+   wyniku Readability — teraz działa niezawodnie, bo pracuje na już
+   oczyszczonym materiale. Dodatkowo POPRAWIONY względem wersji z (b):
+   `<a>`/`</a>` zamieniane na niewidoczne znaki-sentinel (U+0001/U+0002)
+   PRZED podziałem na akapity, a stan "czy jestem w środku linku"
+   NIESIONY MIĘDZY kolejnymi akapitami (nie liczony od nowa dla każdego z
+   osobna) — to naprawia problem, który POPRAWKA (b) miała: link
+   rozciągnięty na kilka akapitów (jedna karta z kategorią/tytułem/
+   autorem w osobnych `<div>`, całość w JEDNYM `<a>`) teraz poprawnie
+   liczy się jako "w 100% link" w KAŻDYM z tych akapitów.
+5. Tania, dodatkowa warstwa PO TREŚCI (`TEASER_LINE_PREFIXES`/
+   `EXACT_NOISE_LINES`, bez zmian z poprzednich poprawek) — łapie polskie
+   frazy-zapowiedzi, które same nie są linkiem (więc filtr gęstości ich
+   nie złapie).
+
+**Testy przed wdrożeniem** (Node, scratchpad, `npm install linkedom
+@mozilla/readability` — te same wersje co w `npm:` importach): (1)
+sprawdzone realne API `linkedom.parseHTML()` (zwraca `Window`, `.document`
+działa jak oczekiwano) przez rozpakowanie prawdziwej paczki z rejestru,
+nie z dokumentacji/pamięci; (2) syntetyczny test na krótkim HTML-u z
+zagnieżdżonym `<article>` — Readability poprawnie usuwa `<nav>`/`<footer>`,
+ale SAMO zostawia część boksu "zobacz również" (potwierdzone zastrzeżenie
+z punktu 4 wyżej); (3) dłuższy, bardziej realistyczny test (struktura
+zbliżona do interia.pl — dwa boksy "zobacz również" w środku wywiadu) —
+Readability + filtr gęstości linków RAZEM usuwają OBA boksy w całości,
+cała prawdziwa treść (włącznie z ostatnim zdaniem "Rozmawiał Łukasz
+Szpyrka") zachowana; (4) **test na DOKŁADNEJ kopii funkcji wyciągniętej z
+prawdziwego pliku** (nie przepisanej ręcznie w teście — realne ryzyko
+błędu przy kopiowaniu wykluczone) z podmienionym tylko `fetchWithTimeout`
+— potwierdzone identycznie jak w punkcie 3.
+
+Usunięty tymczasowy log diagnostyczny "po_wycięciu_article" (kod, którego
+dotyczył, już nie istnieje) — pozostałe dwa tymczasowe logi
+`[refresh-debug]` (wczesny cache po `content_hash`, porównanie
+podobieństwa shingle) ZOSTAJĄ na razie, do usunięcia po ostatecznym
+potwierdzeniu na żywo, że temat linku interia.pl jest zamknięty.
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` (te same dwa przedawnione
+błędy typów + dwa NOWE, oczekiwane błędy "Cannot find module" dla
+`npm:linkedom@0.18.13`/`npm:@mozilla/readability@0.6.0` — ten sam,
+znany, nieszkodliwy efekt uboczny środowiska bez Deno, jak przy
+`jsr:@supabase/supabase-js@2`/`npm:pdf-lib@1.17.1` od zawsze) oraz `node
+--experimental-strip-types --check` — brak błędów. Ostateczne
+potwierdzenie na żywo wymaga ręcznego wdrożenia w Supabase Dashboard i
+ponownego testu na tym samym linku interia.pl.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
