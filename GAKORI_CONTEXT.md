@@ -6187,6 +6187,26 @@ widoku. Naprawa dwuczęściowa:
 Weryfikacja: `node --check` na wyekstrahowanym `<script>` z `account.html`
 bez błędów.
 
+**POPRAWKA 2026-08-28(zg) — przycisk "Analizuj" wyszarzony/nieklikalny,
+dopóki brakuje wymaganej treści, dla WSZYSTKICH trybów (dotąd tylko dla
+PDF).** Właściciel poprosił o rozszerzenie istniejącej naprawy z (y) (PDF)
+na Obraz, potem Tekst, potem Link — ten sam powód za każdym razem:
+kliknięcie i tak kończyło się tylko alertem każącym uzupełnić pole, więc
+klikalność bez treści nic nie dawała. `updateAnalyzeBtnDisabledState()`
+sprawdza teraz wszystkie 4 tryby:
+- `pdf`: brak wybranego pliku (bez zmian od (y)).
+- `image`: `selectedImageFiles.length === 0` — odświeżane w
+  `renderImagePreviewList()` (wywoływanej i przy dodaniu, i przy usunięciu
+  zdjęcia), więc jedno miejsce pokrywa oba kierunki.
+- `text`: puste pole tekstu (`textInput`), odświeżane na `input`.
+- `url`: pole adresu NIE pasuje do `/^https?:\/\//i` — CELOWO ten sam
+  wzorzec, który już wcześniej sprawdzał poprawność linku przy kliknięciu
+  (`alert_invalid_link`), żeby przycisk odblokowywał się dokładnie wtedy,
+  gdy kliknięcie i tak by przeszło, a nie wcześniej.
+
+Weryfikacja: `node --check` na wyekstrahowanym `<script>` z `index.html`
+bez błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

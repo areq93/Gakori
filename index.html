@@ -938,10 +938,16 @@
         // tak kończyło się tylko alertem każącym najpierw wybrać PDF, więc
         // klikalność nic nie dawała. Wyszarzony/nieklikalny, dopóki plik nie
         // zostanie wybrany, jest jaśniejszym sygnałem niż "kliknij i zobacz
-        // alert". Dotyczy WYŁĄCZNIE trybu PDF — pozostałe tryby (link/tekst/
-        // obraz) mają własną walidację przy kliknięciu i nie są tu ruszane.
+        // alert". POPRAWKA 2026-08-28(zg) — ten sam powód, ta sama naprawa dla
+        // WSZYSTKICH trybów: Obraz (dotąd klikalny bez wybranego zdjęcia),
+        // Tekst (dotąd klikalny z pustym polem), Link (dotąd klikalny z
+        // pustym polem adresu).
         function updateAnalyzeBtnDisabledState() {
-            document.getElementById('analyzeBtn').disabled = (currentMode === 'pdf' && !selectedPdfFile);
+            document.getElementById('analyzeBtn').disabled =
+                (currentMode === 'pdf' && !selectedPdfFile) ||
+                (currentMode === 'image' && selectedImageFiles.length === 0) ||
+                (currentMode === 'text' && document.getElementById('textInput').value.trim() === '') ||
+                (currentMode === 'url' && !/^https?:\/\//i.test(document.getElementById('urlInput').value.trim()));
         }
         document.querySelectorAll('.tab-btn[data-mode]').forEach(btn => {
             btn.addEventListener('click', () => setMode(btn.dataset.mode));
@@ -965,6 +971,8 @@
                 : '';
         }
         textInputEl.addEventListener('input', updateTextCostEstimate);
+        textInputEl.addEventListener('input', updateAnalyzeBtnDisabledState);
+        document.getElementById('urlInput').addEventListener('input', updateAnalyzeBtnDisabledState);
 
         // 4. Wybór obrazów — ręcznie z pliku (przycisk, można zaznaczyć kilka
         // naraz), wklejone ze schowka (jeden na raz — tak działa wklejanie) ALBO
@@ -1024,6 +1032,7 @@
             imageCostEl.innerText = selectedImageFiles.length > 0
                 ? t('live_cost_estimate', { cost: EST_IMAGE_SCAN_COST * selectedImageFiles.length })
                 : '';
+            updateAnalyzeBtnDisabledState();
         }
 
         function addSelectedImageFiles(files) {
