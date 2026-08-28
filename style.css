@@ -478,6 +478,24 @@ a { color: var(--accent); }
     button:not(.tab-btn):not(.image-preview-remove) {
         width: auto; min-width: 240px; display: block; margin: 0 auto;
     }
+    /* POPRAWKA 2026-08-28(p) — ta sama uwaga co przy przyciskach (POPRAWKA
+       (j)), teraz dla pól wpisywania/wyboru (link/tekst/select w koncie
+       itd.) — na dużym, poszerzonym ekranie (POPRAWKA (i), karta 640px)
+       pola rozciągnięte na pełną szerokość karty wyglądały "zdecydowanie
+       źle" (zgłoszenie właściciela, kilka zrzutów ekranu na raz). Węższe
+       niż karta, ale świadomie SZERSZE niż minimalna szerokość przycisku
+       (480px, nie 240px) — pole do wpisania linku/tekstu z natury
+       potrzebuje więcej miejsca niż podpis przycisku. Zostają
+       wyrównane do lewej (pod etykietą pola, też wyrównaną do lewej) —
+       to przyciski dostały wyśrodkowanie, bo są pojedynczym wezwaniem do
+       działania, pola formularza zostają w naturalnym, czytelnym układzie
+       "etykieta nad polem". Telefon (poniżej progu) bez zmian.
+       `<select>` ma dziś `style="width:100%"` wprost w HTML (nie
+       `max-width`) — to nie koliduje: `max-width` zawsze ogranicza
+       policzoną szerokość, niezależnie od specyficzności/kolejności. */
+    input:not([type="checkbox"]):not([type="radio"]), textarea, select {
+        max-width: 480px;
+    }
 }
 /* POPRAWKA 2026-08-18: odznaka wyniku i tagi wzorców (niżej) były płaskim,
    jednolitym kolorem — jedyny element w appce bez żadnej gry światła,

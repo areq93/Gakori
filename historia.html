@@ -261,18 +261,23 @@
                     return anyTypeHasItems;
                 }
 
+                // POPRAWKA 2026-08-28(p) — pasek wyszukiwania widoczny ZAWSZE
+                // (tak jak wyszukiwarka publicznych analiz na stronie głównej,
+                // która też nigdy się nie chowa), nie tylko gdy jest już
+                // przynajmniej jedna prywatna analiza — właściciel zgłosił, że
+                // przy pustej liście w ogóle nie widział okienka wyszukiwania,
+                // co wyglądało jak brak tej funkcji, nie jak jej celowe
+                // ukrycie.
+                const searchEl = document.getElementById('historySearch');
+                searchEl.style.display = 'block';
+                let debounceHandle = null;
+                searchEl.addEventListener('input', () => {
+                    clearTimeout(debounceHandle);
+                    debounceHandle = setTimeout(() => render(searchEl.value), 150);
+                });
+
                 const hasAnything = render('');
-                if (!hasAnything) {
-                    document.getElementById('historyEmpty').style.display = 'block';
-                } else {
-                    const searchEl = document.getElementById('historySearch');
-                    searchEl.style.display = 'block';
-                    let debounceHandle = null;
-                    searchEl.addEventListener('input', () => {
-                        clearTimeout(debounceHandle);
-                        debounceHandle = setTimeout(() => render(searchEl.value), 150);
-                    });
-                }
+                document.getElementById('historyEmpty').style.display = hasAnything ? 'none' : 'block';
             });
         }
     </script>

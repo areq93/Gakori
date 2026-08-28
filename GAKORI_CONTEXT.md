@@ -5469,6 +5469,34 @@ Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css`
 (128/128) — czysta zmiana CSS, bez zmian HTML/JS/backendu — nic do
 wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(p) — pola formularzy (link/tekst/select) węższe na
+dużym ekranie + wyszukiwarka prywatnych analiz widoczna ZAWSZE, nie
+tylko gdy jest już przynajmniej jedna analiza.** Dwa ostatnie zgłoszenia z
+tej samej, długiej rundy porządkowania estetyki:
+1. Pola wpisywania linku/tekstu i listy wyboru (`Język aplikacji`/
+   `Motyw` w koncie) dalej rozciągały się na pełną szerokość poszerzonej
+   karty (640px, POPRAWKA (i)) — "zdecydowanie źle to wygląda". Naprawa
+   analogiczna do przycisków (POPRAWKA (j)), ale osobna wartość: `max-
+   width: 480px` (nie 240px jak przyciski — pole do wpisania treści z
+   natury potrzebuje więcej miejsca niż podpis przycisku), WYŁĄCZNIE na
+   dużym ekranie, i BEZ wyśrodkowania (zostają wyrównane do lewej, pod
+   swoją etykietą — to przyciski jako pojedyncze wezwanie do działania
+   dostały wyśrodkowanie, pola formularza zostają w naturalnym układzie).
+2. Pasek wyszukiwania w `historia.html` (`#historySearch`) pokazywał się
+   dotąd DOPIERO gdy istniała choć jedna prywatna analiza — przy pustej
+   liście (typowy stan na start, przed pierwszą prywatną analizą)
+   właściciel w ogóle nie widział okienka wyszukiwania i zgłosił to jako
+   brak funkcji. Naprawa: pasek pokazuje się teraz ZAWSZE, dokładnie tak
+   jak wyszukiwarka publicznych analiz na stronie głównej (`#publicScansCard`),
+   która też nigdy się nie chowa — komunikat "Nie masz jeszcze żadnych
+   prywatnych analiz" pokazuje się NIEZALEŻNIE, pod paskiem, nie zamiast
+   niego.
+
+Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css` (129/129)
+oraz `node --check` dla wyciągniętego skryptu inline z `historia.html` —
+bez błędów. Czysto wizualna zmiana CSS/HTML/JS front-endu, bez zmian w
+backendzie — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
