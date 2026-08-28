@@ -355,6 +355,19 @@ Deno.serve(async (req: Request) => {
   // człowiek ~10-11% — 10% zostawia bezpieczny margines między nimi.
   const BOT_MIN_ATTEMPTS = 4 // potrzeba min. 3 odstępów, żeby zmienność miała sens
   const BOT_MAX_COEFFICIENT_OF_VARIATION = 0.10 // 10% — bardzo ciasna regularność, typowa dla zegara skryptu
+  // POPRAWKA 2026-08-28(b) — właściciel zapytał, czy dodać jeszcze jakieś
+  // sygnały botowe. Dwa dodane, oba WYŁĄCZNIE odczyt z bazy + liczenie w
+  // pamięci tej funkcji (zero zapytań do Gemini, zero kosztu dolarowego —
+  // właściciel wprost o to zapytał, potwierdzone): (1) TA SAMA logika
+  // regularności zastosowana też do `content_reanalysis_attempts`
+  // (powtarzane "Sprawdź, czy coś się zmieniło" na TYM SAMYM linku —
+  // grupowane po (user_id, content_hash) razem, tak jak już robi to
+  // istniejący limit SAME_FILE_ATTEMPT_LIMIT w analyze/index.ts, żeby
+  // odstępy liczyły się dla jednej, konkretnej treści, nie zlepka
+  // wszystkich linków danego użytkownika); (2) sygnał NIEZALEŻNY od
+  // regularności — nietypowo DUŻA liczba prób w ciągu dnia (nawet gdy bot
+  // świadomie losuje odstępy, żeby ominąć wykrywanie regularności).
+  const BOT_VOLUME_THRESHOLD = 20 // znacznie więcej niż realistyczny człowiek w jeden dzień
 
   function stdDev(nums: number[], meanVal: number): number {
     if (nums.length === 0) return 0
@@ -362,13 +375,45 @@ Deno.serve(async (req: Request) => {
     return Math.sqrt(variance)
   }
 
-  let suspiciousBotAccounts: {
-    user_id: string
-    email: string
-    attempts: number
-    avgGapSeconds: number
-    coefficientOfVariation: number
-  }[] = []
+  function groupBy(rows: { key: string; created_at: string }[]): Record<string, string[]> {
+    const byKey: Record<string, string[]> = {}
+    for (const r of rows) {
+      if (!byKey[r.key]) byKey[r.key] = []
+      byKey[r.key].push(r.created_at)
+    }
+    return byKey
+  }
+
+  function gapStats(timestampsSorted: string[]): { meanGap: number; coefficientOfVariation: number } | null {
+    if (timestampsSorted.length < 2) return null
+    const gaps: number[] = []
+    for (let i = 1; i < timestampsSorted.length; i++) {
+      gaps.push((new Date(timestampsSorted[i]).getTime() - new Date(timestampsSorted[i - 1]).getTime()) / 1000)
+    }
+    const meanGap = avg(gaps)
+    if (meanGap === null || meanGap <= 0) return null
+    return { meanGap, coefficientOfVariation: stdDev(gaps, meanGap) / meanGap }
+  }
+
+  // Adres e-mail zamiast gołego UUID — dociągany TYLKO dla flagowanych
+  // kont (zawsze mała liczba), żeby nie robić dodatkowego zapytania per
+  // użytkownik na co dzień. Fail-open per konto: zostaje user_id, jeśli
+  // nie uda się dociągnąć adresu.
+  async function attachEmails(accounts: { user_id: string; email: string }[]): Promise<void> {
+    for (const acc of accounts) {
+      try {
+        const { data: userData } = await supabase.auth.admin.getUserById(acc.user_id)
+        if (userData?.user?.email) acc.email = userData.user.email
+      } catch (_e) {
+        // zostaje user_id jako etykieta
+      }
+    }
+  }
+
+  type RegularityFlag = { user_id: string; email: string; attempts: number; avgGapSeconds: number; coefficientOfVariation: number }
+
+  let suspiciousBotAccounts: RegularityFlag[] = []
+  let volumeOutlierAccounts: { user_id: string; email: string; attempts: number }[] = []
   try {
     const { data, error } = await supabase
       .from('failed_scan_attempts')
@@ -377,45 +422,57 @@ Deno.serve(async (req: Request) => {
       .lt('created_at', yr.end)
       .order('created_at', { ascending: true })
     if (error) throw error
-    const byUser: Record<string, string[]> = {}
-    for (const r of data as { user_id: string; created_at: string }[]) {
-      if (!byUser[r.user_id]) byUser[r.user_id] = []
-      byUser[r.user_id].push(r.created_at)
-    }
+    const byUser = groupBy((data as { user_id: string; created_at: string }[]).map((r) => ({ key: r.user_id, created_at: r.created_at })))
     for (const [uid, timestamps] of Object.entries(byUser)) {
-      if (timestamps.length < BOT_MIN_ATTEMPTS) continue
-      const gaps: number[] = []
-      for (let i = 1; i < timestamps.length; i++) {
-        gaps.push((new Date(timestamps[i]).getTime() - new Date(timestamps[i - 1]).getTime()) / 1000)
+      if (timestamps.length >= BOT_VOLUME_THRESHOLD) {
+        volumeOutlierAccounts.push({ user_id: uid, email: uid, attempts: timestamps.length })
       }
-      const meanGap = avg(gaps)
-      if (meanGap === null || meanGap <= 0) continue
-      const coefficientOfVariation = stdDev(gaps, meanGap) / meanGap
-      if (coefficientOfVariation <= BOT_MAX_COEFFICIENT_OF_VARIATION) {
-        suspiciousBotAccounts.push({
-          user_id: uid,
-          email: uid,
-          attempts: timestamps.length,
-          avgGapSeconds: meanGap,
-          coefficientOfVariation,
-        })
+      if (timestamps.length < BOT_MIN_ATTEMPTS) continue
+      const stats = gapStats(timestamps)
+      if (!stats) continue
+      if (stats.coefficientOfVariation <= BOT_MAX_COEFFICIENT_OF_VARIATION) {
+        suspiciousBotAccounts.push({ user_id: uid, email: uid, attempts: timestamps.length, avgGapSeconds: stats.meanGap, coefficientOfVariation: stats.coefficientOfVariation })
       }
     }
     suspiciousBotAccounts.sort((a, b) => b.attempts - a.attempts)
-    // Adres e-mail zamiast gołego UUID — tylko dla FLAGOWANYCH kont (mała
-    // liczba), żeby nie robić dodatkowego zapytania per użytkownik na co
-    // dzień. Fail-open na pojedyncze konto: zostaje UUID, jeśli nie uda
-    // się dociągnąć adresu.
-    for (const acc of suspiciousBotAccounts) {
-      try {
-        const { data: userData } = await supabase.auth.admin.getUserById(acc.user_id)
-        if (userData?.user?.email) acc.email = userData.user.email
-      } catch (_e) {
-        // zostaje user_id jako etykieta
-      }
-    }
+    volumeOutlierAccounts.sort((a, b) => b.attempts - a.attempts)
+    await attachEmails(suspiciousBotAccounts)
+    await attachEmails(volumeOutlierAccounts)
   } catch (_err) {
     // metryka wykrywania botów niedostępna — reszta raportu leci dalej
+  }
+
+  let suspiciousReanalysisAccounts: (RegularityFlag & { contentHashPrefix: string })[] = []
+  try {
+    const { data, error } = await supabase
+      .from('content_reanalysis_attempts')
+      .select('user_id, content_hash, created_at')
+      .gte('created_at', yr.start)
+      .lt('created_at', yr.end)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    const rows = data as { user_id: string; content_hash: string; created_at: string }[]
+    const byUserContent = groupBy(rows.map((r) => ({ key: `${r.user_id}::${r.content_hash}`, created_at: r.created_at })))
+    for (const [key, timestamps] of Object.entries(byUserContent)) {
+      if (timestamps.length < BOT_MIN_ATTEMPTS) continue
+      const stats = gapStats(timestamps)
+      if (!stats) continue
+      if (stats.coefficientOfVariation <= BOT_MAX_COEFFICIENT_OF_VARIATION) {
+        const [uid, contentHash] = key.split('::')
+        suspiciousReanalysisAccounts.push({
+          user_id: uid,
+          email: uid,
+          attempts: timestamps.length,
+          avgGapSeconds: stats.meanGap,
+          coefficientOfVariation: stats.coefficientOfVariation,
+          contentHashPrefix: contentHash.slice(0, 12),
+        })
+      }
+    }
+    suspiciousReanalysisAccounts.sort((a, b) => b.attempts - a.attempts)
+    await attachEmails(suspiciousReanalysisAccounts)
+  } catch (_err) {
+    // metryka powtórnego sprawdzania niedostępna — reszta raportu leci dalej
   }
 
   // --- Budowanie treści maila ---
@@ -501,21 +558,50 @@ Deno.serve(async (req: Request) => {
 <div style="font-size:14px;color:#374151;margin-top:6px;">zgłoszeń niezgodności wczoraj: ${fmt(reports24h)} — to działa w pełni automatycznie, nic nie musisz robić.</div>`
   )
 
-  const botHtml =
-    suspiciousBotAccounts.length === 0
-      ? '<p style="color:#6b7280;font-size:14px;margin:0;">Brak podejrzanych wzorców wczoraj.</p>'
-      : `<p style="color:#b91c1c;font-weight:600;margin:0 0 8px;">Wykryto ${suspiciousBotAccounts.length} konto(-a) z bardzo regularnymi odstępami między nieudanymi próbami — może to być skrypt/bot, nie człowiek:</p>
-<ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;">
-${suspiciousBotAccounts
+  const regularityListHtml = (accounts: RegularityFlag[], noun: string) =>
+    accounts.length === 0
+      ? '<p style="color:#6b7280;margin:0;">Brak.</p>'
+      : `<ul style="margin:0;padding-left:20px;">
+${accounts
   .map(
     (a) =>
-      `<li style="margin-bottom:2px;">${a.email} — ${a.attempts} nieudanych prób, średni odstęp ${Math.round(a.avgGapSeconds)}s (zmienność ${(a.coefficientOfVariation * 100).toFixed(0)}%)</li>`
+      `<li style="margin-bottom:2px;">${a.email} — ${a.attempts} ${noun}, średni odstęp ${Math.round(a.avgGapSeconds)}s (zmienność ${(a.coefficientOfVariation * 100).toFixed(0)}%)</li>`
   )
   .join('')}
-</ul>
-<p style="color:#9ca3af;font-size:12px;margin-top:8px;">To WYŁĄCZNIE widoczność — mechanizm blokad już działa niezależnie od tego (patrz progi w analyze/index.ts), to konto mogło już zostać zablokowane samo.</p>`
+</ul>`
 
-  const botCard = card('Wykrywanie botów (regularne odstępy prób)', botHtml)
+  const botHtml = `<div style="margin-bottom:14px;">
+  <div style="font-weight:600;color:#111827;margin-bottom:4px;">Regularne odstępy — nieudane próby analizy</div>
+  <div style="font-size:14px;color:#374151;">${regularityListHtml(suspiciousBotAccounts, 'nieudanych prób')}</div>
+</div>
+<div style="margin-bottom:14px;">
+  <div style="font-weight:600;color:#111827;margin-bottom:4px;">Regularne odstępy — powtórne sprawdzanie tego samego linku</div>
+  <div style="font-size:14px;color:#374151;">${
+    suspiciousReanalysisAccounts.length === 0
+      ? '<p style="color:#6b7280;margin:0;">Brak.</p>'
+      : `<ul style="margin:0;padding-left:20px;">
+${suspiciousReanalysisAccounts
+  .map(
+    (a) =>
+      `<li style="margin-bottom:2px;">${a.email} — ${a.attempts}× ta sama treść (${a.contentHashPrefix}…), średni odstęp ${Math.round(a.avgGapSeconds)}s (zmienność ${(a.coefficientOfVariation * 100).toFixed(0)}%)</li>`
+  )
+  .join('')}
+</ul>`
+  }</div>
+</div>
+<div>
+  <div style="font-weight:600;color:#111827;margin-bottom:4px;">Nietypowo duża liczba prób w ciągu dnia (niezależnie od regularności)</div>
+  <div style="font-size:14px;color:#374151;">${
+    volumeOutlierAccounts.length === 0
+      ? '<p style="color:#6b7280;margin:0;">Brak.</p>'
+      : `<ul style="margin:0;padding-left:20px;">
+${volumeOutlierAccounts.map((a) => `<li style="margin-bottom:2px;">${a.email} — ${a.attempts} nieudanych prób wczoraj (próg: ${BOT_VOLUME_THRESHOLD})</li>`).join('')}
+</ul>`
+  }</div>
+</div>
+<p style="color:#9ca3af;font-size:12px;margin-top:10px;">To WYŁĄCZNIE widoczność — mechanizm blokad już działa niezależnie od tego (patrz progi w analyze/index.ts), te konta mogły już zostać zablokowane same.</p>`
+
+  const botCard = card('Wykrywanie botów', botHtml)
 
   const htmlContent = `<p style="font-size:16px;color:#111827;">Hej! Oto Twój przegląd Gakori za wczoraj — ${dateStr}.</p>
 ${registrationsCard}

@@ -4833,6 +4833,42 @@ zmienności przetestowana osobno w Node (scratchpad) na czterech
 syntetycznych przypadkach (dwa "boty", jeden wyraźnie nieregularny
 człowiek, jeden przypadkowo regularny człowiek) przed ustaleniem progu.
 
+**POPRAWKA 2026-08-28(b) — rozszerzenie wykrywania botów o dwa kolejne
+sygnały, na pytanie właściciela "czy jeszcze jakiś sygnałów botowych nie
+powinniśmy dodać".** Właściciel wprost zapytał, czy nowe kontrole kosztują
+— odpowiedź: NIE, obie to WYŁĄCZNIE odczyty z bazy (SELECT) + liczenie w
+pamięci tej samej funkcji, zero zapytań do Gemini, zero kosztu dolarowego
+(dokładnie jak pierwsza wersja mechanizmu).
+
+1. **Ta sama logika regularności zastosowana do `content_reanalysis_attempts`**
+   (powtarzane "Sprawdź, czy coś się zmieniło" na TYM SAMYM linku) —
+   grupowane po PARZE `(user_id, content_hash)` razem (klucz złożony
+   `"${user_id}::${content_hash}"`), tak jak już robi to istniejący limit
+   `SAME_FILE_ATTEMPT_LIMIT` w `analyze/index.ts` — żeby odstępy liczyły
+   się dla JEDNEJ, konkretnej treści, nie zlepka wszystkich linków danego
+   użytkownika naraz (mieszanie różnych treści zaburzałoby sygnał
+   regularności). Przetestowane w Node (scratchpad): użytkownik hammerujący
+   jeden `content_hash` co ~20s wykryty (cv 0%), ten sam użytkownik
+   sporadycznie sprawdzający INNĄ treść poprawnie zignorowany (za mało
+   próbek, nie miesza się z pierwszym sygnałem).
+2. **Nowy, NIEZALEŻNY od regularności sygnał objętościowy** —
+   `BOT_VOLUME_THRESHOLD = 20`: konto z 20+ nieudanymi próbami w ciągu
+   jednej doby, nawet jeśli odstępy są celowo rozlosowane (bot świadomie
+   unikający wykrycia po regularności) — liczone z TYCH SAMYCH danych co
+   punkt (1) z poprzedniej poprawki (`failed_scan_attempts`), bez
+   dodatkowego zapytania do bazy.
+
+Wspólny pomocniczy kod (`groupBy()`, `gapStats()`, `attachEmails()`)
+wydzielony z pierwszej wersji, żeby oba sygnały (nieudane próby,
+powtórne sprawdzanie) używały identycznej logiki bez duplikacji. Karta
+maila "Wykrywanie botów" rozszerzona o trzy podsekcje (regularne odstępy
+— nieudane próby / regularne odstępy — powtórne sprawdzanie / nietypowa
+objętość), każda pokazuje "Brak." gdy nic się nie znajdzie.
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` (te same znane błędy
+środowiskowe) oraz `node --experimental-strip-types --check` — brak
+błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
