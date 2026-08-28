@@ -5790,6 +5790,32 @@ Weryfikacja: składnia wbudowanych skryptów `index.html`/`account.html`
 sprawdzona (`node --check`) — bez błędów. Czysta zmiana CSS/HTML/JS, bez
 backendu — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(z) — kolejna runda tego samego zastrzeżenia
+("znowu komunikat niewyśrodkowany"): notatka o szacowanym koszcie w
+trybie Tekst, oraz przy okazji te same notatki w trybie Obraz/PDF i cały
+ekran potwierdzenia kosztu.** Konkretne zgłoszenie dotyczyło
+`#textCostEstimate` ("1120 znaków — Szacowany koszt: 4 kredytów") —
+zwykły `<p>` bez wyrównania. Zamiast łatać punktowo tylko to jedno
+miejsce (ten sam wzorzec błędu powtórzył się już kilka razy w tej
+sesji — POPRAWKA (v)/(u)), sprawdzone i naprawione od razu wszystkie
+analogiczne notatki:
+- `#textCostEstimate`, `#imageCostEstimate` (inline `text-align: center`
+  w `index.html` — brakowało go tylko tu, mimo że to bliźniacze elementy)
+- `#imageSelectionInfo`, `#pdfSelectionInfo` (dopisane w `style.css`,
+  gdzie już i tak miały swoją regułę — jeden dopisany property zamiast
+  przenoszenia do HTML)
+- Cały ekran potwierdzenia kosztu PDF/linku (`#pdfConfirmOverlay`) — pięć
+  osobnych `<p>` (liczba stron, liczba znaków, koszt, porównanie
+  kaw/herbat, notatka o czyszczeniu strony) miało TEN SAM brak
+  wyrównania. Zamiast pięciu osobnych poprawek — jedna reguła
+  `.modal-overlay .card p { text-align: center; }` w `style.css`,
+  obejmująca cały modal naraz (także przyszłe dopiski w tym miejscu).
+
+Weryfikacja: nawiasy klamrowe w `style.css` sparowane (134/134), składnia
+wbudowanego skryptu `index.html` sprawdzona (`node --check`) — bez
+błędów. Czysta zmiana CSS/HTML, bez backendu — nic do wklejenia w
+Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

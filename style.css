@@ -414,12 +414,12 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
    przyciski — ID ma wyższą specyficzność, więc wygrywa tu mimo tego). */
 #analyzeBtn { margin-top: 20px; }
 
-#imageSelectionInfo { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+#imageSelectionInfo { font-size: 13px; color: var(--ink-soft); margin-top: 4px; text-align: center; }
 /* Nazwy plików (zwłaszcza PDF z systemów typu ESPI/EBI) bywają jednym
    długim ciągiem znaków bez spacji (same kropki/podkreślenia) — bez tej
    reguły przeglądarka nie ma gdzie "złamać" tekstu do nowej linii i nazwa
    wyjeżdża poza ramkę karty (zgłoszone 2026-08-19). */
-#pdfSelectionInfo { font-size: 13px; color: var(--ink-soft); margin-top: 4px; overflow-wrap: break-word; word-break: break-word; }
+#pdfSelectionInfo { font-size: 13px; color: var(--ink-soft); margin-top: 4px; overflow-wrap: break-word; word-break: break-word; text-align: center; }
 
 /* Siatka miniaturek wybranych obrazów (index.html, tryb "Obraz" — teraz
    można dodać więcej niż jeden naraz) — każda miniaturka ma własny przycisk
@@ -827,4 +827,11 @@ a { color: var(--accent); }
     display: flex; align-items: center; justify-content: center;
     padding: 20px; box-sizing: border-box;
 }
+/* Ekran potwierdzenia kosztu (`#pdfConfirmOverlay`) miał kilka zwykłych
+   `<p>` (liczba stron, liczba znaków, koszt, porównanie kaw/herbat) bez
+   własnego wyrównania — zgłoszone przy okazji tego samego, powtarzającego
+   się zastrzeżenia co komunikaty statusu (POPRAWKA (v)): wszystko w
+   aplikacji ma być wyśrodkowane. Jedna reguła na cały modal, zamiast
+   dopisywania `text-align: center` do każdego `<p>` z osobna. */
+.modal-overlay .card p { text-align: center; }
 
