@@ -80,6 +80,10 @@
             <p id="textCostEstimate" style="font-size:12px; color:var(--ink-soft); margin-top:4px;"></p>
             <p data-i18n="label_text_source_url_optional">Opcjonalnie: link do źródła (doda się do wyniku):</p>
             <input type="url" id="textSourceUrlInput" data-i18n-placeholder="placeholder_url" placeholder="https://...">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin-top:10px; cursor:pointer;">
+                <input type="checkbox" id="textPrivateCheckbox">
+                <span data-i18n="label_text_private">Zachowaj tę analizę jako prywatną (widoczna tylko dla Ciebie)</span>
+            </label>
         </div>
 
         <div class="mode-panel" id="panel-image">
@@ -1521,6 +1525,10 @@
                 // wygodna informacja zwrotna.
                 const textSourceUrl = document.getElementById('textSourceUrlInput').value.trim();
                 if (textSourceUrl && /^https?:\/\//i.test(textSourceUrl)) payload.source_url = textSourceUrl;
+                // POPRAWKA 2026-08-28(g) — backend i tak ignoruje to pole bez
+                // zalogowanego konta (patrz analyze/index.ts), tu wysyłamy po
+                // prostu stan checkboxa.
+                if (document.getElementById('textPrivateCheckbox').checked) payload.is_private = true;
 
             } else if (currentMode === 'image') {
                 const files = selectedImageFiles;
@@ -1553,7 +1561,10 @@
                 // zestaw albo inna kolejność to inna analiza, więc musi dać
                 // inny content_hash w cache'u.
                 const combinedHash = await sha256Hex(new TextEncoder().encode(hashParts.join(':')));
-                payload = { input_type: 'image', content_hash: combinedHash, images_base64: imagesBase64, language: getCurrentLanguage() };
+                // POPRAWKA 2026-08-28(g) — nazwy oryginalnych plików, WYŁĄCZNIE
+                // etykieta do prywatnej historii (patrz `historia.html`) — obrazy
+                // są teraz zawsze prywatne, jak PDF-y (patrz analyze/index.ts).
+                payload = { input_type: 'image', content_hash: combinedHash, images_base64: imagesBase64, image_filenames: files.map((f) => f.name), language: getCurrentLanguage() };
 
             } else if (currentMode === 'pdf') {
                 if (!selectedPdfFile) return alert(t('alert_choose_pdf_file'));

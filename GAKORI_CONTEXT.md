@@ -3764,9 +3764,9 @@ sprawdź, czy ten wyzwalacz nadal istnieje**
 — szukaj `on_auth_user_created` wśród standardowych
 `RI_ConstraintTrigger_...`), zanim zaczniesz szukać gdzie indziej.
 
-**`scans`** (współdzielony cache analiz; publiczny odczyt w RLS dla
-`text`/`url`/`image` — **`pdf` jest wyjątkiem, patrz RLS niżej i
-`scan_access`**):
+**`scans`** (współdzielony cache analiz; publiczny odczyt w RLS dla `url`
+zawsze i `text` gdy `is_private = false` — **`pdf`/`image` zawsze, i `text`
+gdy `is_private = true`, są wyjątkiem, patrz RLS niżej i `scan_access`**):
 - `id`, `content_hash` (klucz cache'u treści), `input_type` (`text`/`url`/
   `image`/`pdf`), `language` (text, `NOT NULL DEFAULT 'en'` — **razem z
   `content_hash` tworzy właściwy klucz cache'u**), `is_translation`
@@ -3796,6 +3796,13 @@ sprawdź, czy ten wyzwalacz nadal istnieje**
     wyświetleniach, patrz POPRAWKA 2026-08-23(a) wyżej). Wyklucza wiersz z
     normalnego trafienia w cache i z mechanizmu ratunkowego — sam wiersz
     NIE jest kasowany, dalej widoczny pod swoim linkiem z ostrzeżeniem.
+  - `is_private` (boolean, `NOT NULL DEFAULT false`, dodane POPRAWKA
+    2026-08-28(g)) — świadomy wybór użytkownika (checkbox w `index.html`,
+    tylko przy trybie "text") żeby TĘ KONKRETNĄ analizę tekstu zachować
+    prywatną, jak PDF/obraz, zamiast domyślnie publiczną. Dotyczy
+    WYŁĄCZNIE `input_type = 'text'` — dla `pdf`/`image`/`url` ta kolumna
+    nic nie znaczy (ich prywatność zależy wyłącznie od `input_type`, patrz
+    RLS niżej).
 
 **`link_view_confirmations`** (dodane 2026-08-21, punkt 5 audytu
 bezpieczeństwa) — ciche potwierdzenia dla treści oznaczonej
@@ -3834,10 +3841,15 @@ niżej):
 - `id`, `user_id`, `content_hash`, `created_at`
 
 **`scan_access`** (dodane 2026-08-19 — kto ma prawo zobaczyć dany PDF,
-patrz "Prywatność PDF-ów" niżej):
+patrz "Prywatność PDF-ów" niżej; POPRAWKA 2026-08-28(g) rozszerzyła tę samą
+tabelę/mechanizm też na obrazy — zawsze prywatne — i na teksty oznaczone
+jako prywatne, `scans.is_private = true`):
 - `id`, `scan_id` (FK do `scans.id`, `ON DELETE CASCADE`), `user_id` (FK do
   `auth.users.id`, `ON DELETE CASCADE`), `source_filename` (text, nullable —
-  oryginalna nazwa pliku, TYLKO etykieta, nie wpływa na cenę/analizę),
+  oryginalna nazwa pliku (PDF) albo nazwy plików obrazów połączone
+  przecinkiem (obraz), TYLKO etykieta, nie wpływa na cenę/analizę; zawsze
+  `null` dla prywatnego tekstu — nie ma tam pojęcia "nazwa pliku",
+  `historia.html` pokazuje w zamian krótki fragment treści),
   `created_at`.
 - `UNIQUE (scan_id, user_id)` — backend robi `upsert` z `onConflict:
   'scan_id,user_id'`, więc ponowne przesłanie tego samego pliku przez tę
@@ -3850,11 +3862,14 @@ platformy (502/503/504), patrz tamtejszy opis: `id`, `created_at`,
 zalogowani), brak publicznej polityki `SELECT` — odczyt wyłącznie przez
 `service_role` w `daily-report`.
 
-RLS: `scans` ma publiczny odczyt dla `input_type <> 'pdf'` (używane przez
-niezalogowanych w przeglądarce publicznych analiz i na `scan.html`). Dla
-`input_type = 'pdf'` odczyt ma WYŁĄCZNIE ten, kto ma odpowiadający wiersz w
-`scan_access` (`EXISTS (... WHERE scan_id = scans.id AND user_id =
-auth.uid())`) — patrz "Prywatność PDF-ów" niżej po pełne uzasadnienie i SQL.
+RLS (rozszerzone POPRAWKĄ 2026-08-28(g), patrz niżej po pełne SQL): `scans`
+ma publiczny odczyt dla `input_type = 'url'` (zawsze) oraz `input_type =
+'text' AND is_private = false` (domyślne zachowanie tekstu, gdy checkbox
+nie jest zaznaczony). Dla `input_type IN ('pdf', 'image')` (zawsze) oraz
+`input_type = 'text' AND is_private = true` odczyt ma WYŁĄCZNIE ten, kto ma
+odpowiadający wiersz w `scan_access` (`EXISTS (... WHERE scan_id =
+scans.id AND user_id = auth.uid())`) — patrz "Prywatność PDF-ów" niżej po
+pierwotne uzasadnienie tego mechanizmu (rozszerzone niżej o obraz/tekst).
 `scan_access` ma RLS `SELECT` tylko dla `auth.uid() = user_id` (każdy widzi
 wyłącznie własne wiersze). Zapis do `scans`/`scan_access`/`profiles`/
 `wallet_transactions`/`failed_scan_attempts`/`rate_limit_blocks` idzie przez
@@ -4953,6 +4968,111 @@ element w tablicy).
 Weryfikacja: `tsc --noEmit --skipLibCheck` (te same znane błędy
 środowiskowe) oraz `node --experimental-strip-types --check` — brak
 błędów.
+
+**POPRAWKA 2026-08-28(g) — obrazy dostają PRAWDZIWĄ prywatność (jak PDF-y)
++ nowy checkbox "prywatna analiza" dla wklejonego tekstu.** Właściciel
+poprosił: (1) obrazy mają zostawać w prywatnej historii, dokładnie jak
+PDF-y; (2) dla tekstu — checkbox, którym użytkownik SAM decyduje, czy dana
+konkretna analiza ma być prywatna; (3) obraz sam w sobie nigdy nie ma
+trafiać do bazy, tylko jego nazwa jako źródło (to już było prawdą — obraz
+zawsze istniał tylko chwilowo w pamięci, do wysłania do Gemini, nigdy nie
+trafiał do `scans`/żadnego magazynu plików).
+
+Sprawdzone przed wdrożeniem: obrazy dziś NIE są widoczne na stronie
+głównej z publicznymi analizami (`index.html` już filtruje `input_type`
+`image`/`pdf` z tej listy), ale — tak jak kiedyś PDF-y przed POPRAWKĄ
+2026-08-19(b) — wynik nadal dało się otworzyć pod `scan.html?id=...`, jeśli
+ktoś poznał/zgadł link (RLS na `scans` dawała publiczny odczyt wszystkiemu
+poza `pdf`). To właśnie naprawione — rozszerzenie DOKŁADNIE tego samego
+mechanizmu `scan_access`, który już chronił PDF-y.
+
+**Ustalenia z właścicielem** (`AskUserQuestion`): (a) checkbox prywatności
+dotyczy WYŁĄCZNIE wklejonego tekstu (`input_type = 'text'`) — link (`url`)
+zawsze zostaje publiczny, bez wyjątku; (b) na `historia.html` trzy OSOBNE
+sekcje pod sobą (PDF-y / Obrazy / Prywatne teksty), nie jedna wspólna
+lista.
+
+**Zmiany:**
+1. **`scans`**: nowa kolumna `is_private` (boolean, domyślnie `false`) —
+   ma znaczenie WYŁĄCZNIE dla `input_type = 'text'`. Dla `pdf`/`image`
+   prywatność wynika już z samego `input_type` (zawsze prywatne); dla
+   `url` zawsze publiczne.
+2. **RLS na `scans`** (ten sam wzorzec samoczyszczącego skryptu co przy
+   pierwotnej prywatności PDF-ów — usuwa WSZYSTKIE stare reguły `SELECT`,
+   niezależnie od nazwy, i stawia dwie nowe): publiczny odczyt dla `url`
+   ZAWSZE oraz `text` gdy `is_private = false`; odczyt wyłącznie przez
+   `scan_access` dla `pdf`/`image` ZAWSZE oraz `text` gdy `is_private =
+   true`.
+3. **`analyze/index.ts`**: nowe pola w body — `image_filenames` (nazwy
+   przesłanych plików obrazów, może być kilka naraz, łączone przecinkiem
+   do etykiety w `scan_access.source_filename`, analogicznie do
+   `pdf_filename`) i `is_private` (checkbox tekstu). Rozszerzony mechanizm
+   przyznawania dostępu w `scan_access` — dotąd WYŁĄCZNIE dla
+   `input_type === 'pdf'`, teraz też dla `image` (zawsze) i `text` gdy
+   `isPrivateText` — w OBU miejscach, gdzie wynik trafia do kogoś
+   (trafienie w cache i świeża analiza), dokładnie tak samo jak PDF-y już
+   działały. **Ważne zabezpieczenie**: `isPrivateText` wymaga zalogowanego
+   `user_id` — gość zaznaczający checkbox jest po cichu ignorowany (analiza
+   zostaje publiczna), bo bez konta nie ma komu przyznać dostępu w
+   `scan_access` — inaczej wynik byłby NA ZAWSZE niedostępny dla nikogo
+   (uwięziony za RLS bez pasującego `auth.uid()`).
+4. **`index.html`**: nowy checkbox "Zachować tę analizę jako prywatną" w
+   panelu tekstu; przy obrazach wysyłane są teraz też nazwy oryginalnych
+   plików (`file.name` z realnego wyboru pliku).
+5. **`historia.html`**: przemianowana na "Twoje prywatne analizy" (też w
+   `<title>` i linku z `account.html`), trzy osobne sekcje (PDF-y / Obrazy
+   / Prywatne teksty) — widoczna tylko ta sekcja, w której są jakieś
+   wyniki. Dla obrazów etykieta to nazwa(-y) pliku (jak PDF); dla tekstu
+   nie ma pojęcia "nazwa pliku" — pokazywany jest zamiast tego krótki
+   (60 znaków) fragment samej treści.
+6. **`scan.html`**: komentarz przy `sessionReady` (mechanizm czekania na
+   sesję PRZED zapytaniem do `scans`, żeby właściciel prywatnego wyniku nie
+   dostał fałszywego "nie znaleziono") zaktualizowany — mechanizm był już
+   ogólny (nie tylko dla PDF), tylko opis tego nie odzwierciedlał.
+
+**SQL migracji** (wklejony i uruchomiony ręcznie w Supabase SQL Editor):
+```sql
+alter table public.scans add column if not exists is_private boolean not null default false;
+
+DO $$
+DECLARE pol record;
+BEGIN
+  FOR pol IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'scans' AND cmd = 'SELECT'
+  LOOP
+    EXECUTE format('DROP POLICY %I ON public.scans', pol.policyname);
+  END LOOP;
+END $$;
+
+CREATE POLICY "scans_select_public" ON public.scans
+  FOR SELECT USING (
+    input_type = 'url'
+    OR (input_type = 'text' AND is_private = false)
+  );
+
+CREATE POLICY "scans_select_own_private" ON public.scans
+  FOR SELECT USING (
+    (
+      input_type = 'pdf'
+      OR input_type = 'image'
+      OR (input_type = 'text' AND is_private = true)
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.scan_access sa
+      WHERE sa.scan_id = scans.id AND sa.user_id = auth.uid()
+    )
+  );
+```
+Ten skrypt sam znajduje i usuwa WSZYSTKIE dotychczasowe reguły `SELECT` na
+`scans` (niezależnie od nazwy) i zastępuje je dwiema nowymi — bezpieczny do
+wielokrotnego uruchomienia. Zero zmian w `scan_access` (struktura tabeli
+bez zmian, tylko więcej typów wierszy w niej ląduje).
+
+Weryfikacja: `node --experimental-strip-types --check` (poprawna składnia,
+też dla `historia.html`/`index.html` — wyciągnięte i sprawdzone osobno
+przez `node --check`) oraz `tsc --noEmit --skipLibCheck` dla
+`analyze/index.ts` (te same znane błędy środowiskowe co zawsze).
 
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 

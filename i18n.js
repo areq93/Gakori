@@ -110,7 +110,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "Nie zgadzasz się? Wklej własną treść",
        
         scan_retracted_notice: "Ta treść została automatycznie wycofana — wiele osób zgłosiło, że nie zgadza się już z aktualną treścią źródła. Wynik nadal jest widoczny, ale nie jest już serwowany jako aktualny innym osobom.",
-        scan_pdf_source_label: "Plik: ", pattern_page_label: "Strona {page}", pattern_image_label: "Obraz {index}", link_pdf_history: "Twoje analizy PDF →", history_back: "← Wróć do konta", history_title: "Twoje analizy PDF", history_intro: "Tylko Ty widzisz tę listę — analizy PDF nie są publiczne.", history_empty: "Nie masz jeszcze żadnych analiz PDF.", history_unnamed_file: "plik bez nazwy",
+        scan_pdf_source_label: "Plik: ", pattern_page_label: "Strona {page}", pattern_image_label: "Obraz {index}", link_pdf_history: "Twoje prywatne analizy →", history_back: "← Wróć do konta", history_title: "Twoje prywatne analizy", history_intro: "Tylko Ty widzisz tę listę — te analizy nie są publiczne.", history_empty: "Nie masz jeszcze żadnych prywatnych analiz.", history_unnamed_file: "plik bez nazwy", history_section_pdf: "PDF-y", history_section_image: "Obrazy", history_section_text: "Prywatne teksty", history_unnamed_image: "obraz bez nazwy", history_unnamed_text: "prywatny tekst", label_text_private: "Zachowaj tę analizę jako prywatną (widoczna tylko dla Ciebie)",
         tip_label: "Co teraz zrobić:", stakes_label: "Konkretnie:", pattern_tag_manipulation: "WZORZEC", pattern_tag_reasoning: "OBSERWACJA", summary_label: "Podsumowanie", suggested_actions_label: "Sugerowane działania", chapter_fallback_title: "Rozdział {number}",
         scan_load_error: "Nie udało się wczytać analizy (sprawdź połączenie z internetem i odśwież stronę).",
     },
@@ -199,7 +199,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "Don't agree? Paste your own content",
        
         scan_retracted_notice: "This content has been automatically retracted — many people reported that it no longer matches the current source content. The result is still visible, but it's no longer served as current to other people.",
-        scan_pdf_source_label: "File: ", pattern_page_label: "Page {page}", pattern_image_label: "Image {index}", link_pdf_history: "Your PDF analyses →", history_back: "← Back to account", history_title: "Your PDF analyses", history_intro: "Only you can see this list — PDF analyses are not public.", history_empty: "You don't have any PDF analyses yet.", history_unnamed_file: "unnamed file",
+        scan_pdf_source_label: "File: ", pattern_page_label: "Page {page}", pattern_image_label: "Image {index}", link_pdf_history: "Your private analyses →", history_back: "← Back to account", history_title: "Your private analyses", history_intro: "Only you can see this list — these analyses are not public.", history_empty: "You don't have any private analyses yet.", history_unnamed_file: "unnamed file", history_section_pdf: "PDFs", history_section_image: "Images", history_section_text: "Private texts", history_unnamed_image: "unnamed image", history_unnamed_text: "private text", label_text_private: "Keep this analysis private (visible only to you)",
         tip_label: "What to do now:", stakes_label: "Concretely:", pattern_tag_manipulation: "PATTERN", pattern_tag_reasoning: "OBSERVATION", summary_label: "Summary", suggested_actions_label: "Suggested actions", chapter_fallback_title: "Chapter {number}",
         scan_load_error: "Couldn't load the analysis (check your connection and reload the page).",
     },
@@ -288,7 +288,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "¿No estás de acuerdo? Pega tu propio contenido",
        
         scan_retracted_notice: "Este contenido se ha retirado automáticamente — muchas personas informaron que ya no coincide con el contenido actual de la fuente. El resultado sigue siendo visible, pero ya no se ofrece como actual a otras personas.",
-        scan_pdf_source_label: "Archivo: ", pattern_page_label: "Página {page}", pattern_image_label: "Imagen {index}", link_pdf_history: "Tus análisis de PDF →", history_back: "← Volver a la cuenta", history_title: "Tus análisis de PDF", history_intro: "Solo tú puedes ver esta lista — los análisis de PDF no son públicos.", history_empty: "Todavía no tienes ningún análisis de PDF.", history_unnamed_file: "archivo sin nombre",
+        scan_pdf_source_label: "Archivo: ", pattern_page_label: "Página {page}", pattern_image_label: "Imagen {index}", link_pdf_history: "Tus análisis privados →", history_back: "← Volver a la cuenta", history_title: "Tus análisis privados", history_intro: "Solo tú puedes ver esta lista — estos análisis no son públicos.", history_empty: "Todavía no tienes ningún análisis privado.", history_unnamed_file: "archivo sin nombre", history_section_pdf: "PDF", history_section_image: "Imágenes", history_section_text: "Textos privados", history_unnamed_image: "imagen sin nombre", history_unnamed_text: "texto privado", label_text_private: "Guardar este análisis como privado (solo tú lo verás)",
         tip_label: "Qué hacer ahora:", stakes_label: "En concreto:", pattern_tag_manipulation: "PATRÓN", pattern_tag_reasoning: "OBSERVACIÓN", summary_label: "Resumen", suggested_actions_label: "Acciones sugeridas", chapter_fallback_title: "Capítulo {number}",
         scan_load_error: "No se pudo cargar el análisis (revisa tu conexión y recarga la página).",
     },
@@ -377,7 +377,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "Nicht einverstanden? Eigenen Inhalt einfügen",
        
         scan_retracted_notice: "Dieser Inhalt wurde automatisch zurückgezogen — viele Personen haben gemeldet, dass er nicht mehr mit dem aktuellen Quellinhalt übereinstimmt. Das Ergebnis ist weiterhin sichtbar, wird aber anderen Personen nicht mehr als aktuell angezeigt.",
-        scan_pdf_source_label: "Datei: ", pattern_page_label: "Seite {page}", pattern_image_label: "Bild {index}", link_pdf_history: "Deine PDF-Analysen →", history_back: "← Zurück zum Konto", history_title: "Deine PDF-Analysen", history_intro: "Nur du siehst diese Liste — PDF-Analysen sind nicht öffentlich.", history_empty: "Du hast noch keine PDF-Analysen.", history_unnamed_file: "Datei ohne Namen",
+        scan_pdf_source_label: "Datei: ", pattern_page_label: "Seite {page}", pattern_image_label: "Bild {index}", link_pdf_history: "Deine privaten Analysen →", history_back: "← Zurück zum Konto", history_title: "Deine privaten Analysen", history_intro: "Nur du siehst diese Liste — diese Analysen sind nicht öffentlich.", history_empty: "Du hast noch keine privaten Analysen.", history_unnamed_file: "Datei ohne Namen", history_section_pdf: "PDFs", history_section_image: "Bilder", history_section_text: "Private Texte", history_unnamed_image: "Bild ohne Namen", history_unnamed_text: "privater Text", label_text_private: "Diese Analyse privat halten (nur für dich sichtbar)",
         tip_label: "Was jetzt tun:", stakes_label: "Konkret:", pattern_tag_manipulation: "MUSTER", pattern_tag_reasoning: "BEOBACHTUNG", summary_label: "Zusammenfassung", suggested_actions_label: "Empfohlene Maßnahmen", chapter_fallback_title: "Kapitel {number}",
         scan_load_error: "Analyse konnte nicht geladen werden (Verbindung prüfen und Seite neu laden).",
     },
@@ -466,7 +466,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "Pas d'accord ? Collez votre propre contenu",
        
         scan_retracted_notice: "Ce contenu a été retiré automatiquement — de nombreuses personnes ont signalé qu'il ne correspond plus au contenu actuel de la source. Le résultat reste visible, mais n'est plus présenté comme actuel aux autres personnes.",
-        scan_pdf_source_label: "Fichier : ", pattern_page_label: "Page {page}", pattern_image_label: "Image {index}", link_pdf_history: "Vos analyses de PDF →", history_back: "← Retour au compte", history_title: "Vos analyses de PDF", history_intro: "Vous seul voyez cette liste — les analyses de PDF ne sont pas publiques.", history_empty: "Vous n'avez pas encore d'analyse de PDF.", history_unnamed_file: "fichier sans nom",
+        scan_pdf_source_label: "Fichier : ", pattern_page_label: "Page {page}", pattern_image_label: "Image {index}", link_pdf_history: "Vos analyses privées →", history_back: "← Retour au compte", history_title: "Vos analyses privées", history_intro: "Vous seul voyez cette liste — ces analyses ne sont pas publiques.", history_empty: "Vous n'avez pas encore d'analyse privée.", history_unnamed_file: "fichier sans nom", history_section_pdf: "PDF", history_section_image: "Images", history_section_text: "Textes privés", history_unnamed_image: "image sans nom", history_unnamed_text: "texte privé", label_text_private: "Garder cette analyse privée (visible uniquement par vous)",
         tip_label: "Que faire maintenant :", stakes_label: "Concrètement :", pattern_tag_manipulation: "SCHÉMA", pattern_tag_reasoning: "OBSERVATION", summary_label: "Résumé", suggested_actions_label: "Actions suggérées", chapter_fallback_title: "Chapitre {number}",
         scan_load_error: "Impossible de charger l'analyse (vérifiez votre connexion et rechargez la page).",
     },
@@ -555,7 +555,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "Не согласны? Вставьте свой текст",
        
         scan_retracted_notice: "Этот контент был автоматически отозван — многие сообщили, что он больше не соответствует текущему содержанию источника. Результат по-прежнему виден, но больше не предоставляется другим как актуальный.",
-        scan_pdf_source_label: "Файл: ", pattern_page_label: "Страница {page}", pattern_image_label: "Изображение {index}", link_pdf_history: "Ваши анализы PDF →", history_back: "← Назад в аккаунт", history_title: "Ваши анализы PDF", history_intro: "Этот список видите только вы — анализы PDF не публичные.", history_empty: "У вас пока нет ни одного анализа PDF.", history_unnamed_file: "файл без названия",
+        scan_pdf_source_label: "Файл: ", pattern_page_label: "Страница {page}", pattern_image_label: "Изображение {index}", link_pdf_history: "Ваши приватные анализы →", history_back: "← Назад в аккаунт", history_title: "Ваши приватные анализы", history_intro: "Этот список видите только вы — эти анализы не публичные.", history_empty: "У вас пока нет ни одного приватного анализа.", history_unnamed_file: "файл без названия", history_section_pdf: "PDF", history_section_image: "Изображения", history_section_text: "Приватные тексты", history_unnamed_image: "изображение без названия", history_unnamed_text: "приватный текст", label_text_private: "Сохранить этот анализ как приватный (виден только вам)",
         tip_label: "Что делать сейчас:", stakes_label: "Конкретно:", pattern_tag_manipulation: "ПРИЁМ", pattern_tag_reasoning: "НАБЛЮДЕНИЕ", summary_label: "Итог", suggested_actions_label: "Рекомендуемые действия", chapter_fallback_title: "Глава {number}",
         scan_load_error: "Не удалось загрузить анализ (проверьте подключение и обновите страницу).",
     },
@@ -644,7 +644,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "不同意？粘贴你自己的内容",
        
         scan_retracted_notice: "此内容已被自动撤回——许多人报告它与当前来源内容不再一致。结果仍然可见，但不再作为最新内容提供给其他人。",
-        scan_pdf_source_label: "文件：", pattern_page_label: "第 {page} 页", pattern_image_label: "图片 {index}", link_pdf_history: "你的 PDF 分析 →", history_back: "← 返回账户", history_title: "你的 PDF 分析", history_intro: "只有你能看到这份列表——PDF 分析不公开。", history_empty: "你还没有任何 PDF 分析。", history_unnamed_file: "未命名文件",
+        scan_pdf_source_label: "文件：", pattern_page_label: "第 {page} 页", pattern_image_label: "图片 {index}", link_pdf_history: "你的私密分析 →", history_back: "← 返回账户", history_title: "你的私密分析", history_intro: "只有你能看到这份列表——这些分析不公开。", history_empty: "你还没有任何私密分析。", history_unnamed_file: "未命名文件", history_section_pdf: "PDF", history_section_image: "图片", history_section_text: "私密文本", history_unnamed_image: "未命名图片", history_unnamed_text: "私密文本", label_text_private: "将此分析保存为私密(仅你可见)",
         tip_label: "现在该怎么做：", stakes_label: "具体来说：", pattern_tag_manipulation: "手法", pattern_tag_reasoning: "观察", summary_label: "总结", suggested_actions_label: "建议行动", chapter_fallback_title: "第 {number} 章",
         scan_load_error: "无法加载分析结果（请检查网络连接并刷新页面）。",
     },
@@ -733,7 +733,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "納得できない場合は、自分で内容を貼り付ける",
        
         scan_retracted_notice: "このコンテンツは自動的に撤回されました — 多くの人が、現在の元コンテンツと一致しなくなったと報告しています。結果は引き続き表示されますが、他の人には最新の内容として提供されなくなります。",
-        scan_pdf_source_label: "ファイル：", pattern_page_label: "{page} ページ", pattern_image_label: "画像 {index}", link_pdf_history: "あなたのPDF分析 →", history_back: "← アカウントに戻る", history_title: "あなたのPDF分析", history_intro: "このリストはあなただけが見ることができます — PDFの分析は公開されません。", history_empty: "まだPDFの分析はありません。", history_unnamed_file: "名前のないファイル",
+        scan_pdf_source_label: "ファイル：", pattern_page_label: "{page} ページ", pattern_image_label: "画像 {index}", link_pdf_history: "あなたの非公開分析 →", history_back: "← アカウントに戻る", history_title: "あなたの非公開分析", history_intro: "このリストはあなただけが見ることができます — これらの分析は公開されません。", history_empty: "まだ非公開の分析はありません。", history_unnamed_file: "名前のないファイル", history_section_pdf: "PDF", history_section_image: "画像", history_section_text: "非公開テキスト", history_unnamed_image: "名前のない画像", history_unnamed_text: "非公開テキスト", label_text_private: "この分析を非公開として保存する(あなただけが閲覧できます)",
         tip_label: "今できること：", stakes_label: "具体的には：", pattern_tag_manipulation: "パターン", pattern_tag_reasoning: "気づき", summary_label: "まとめ", suggested_actions_label: "推奨されるアクション", chapter_fallback_title: "第{number}章",
         scan_load_error: "分析結果を読み込めませんでした（接続を確認してページを再読み込みしてください）。",
     },
@@ -822,7 +822,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "सहमत नहीं हैं? अपनी खुद की सामग्री पेस्ट करें",
        
         scan_retracted_notice: "इस सामग्री को स्वचालित रूप से वापस ले लिया गया है — कई लोगों ने बताया कि यह अब मूल स्रोत सामग्री से मेल नहीं खाती। परिणाम अभी भी दिखाई देता है, लेकिन अब इसे दूसरों को वर्तमान के रूप में नहीं दिखाया जाता।",
-        scan_pdf_source_label: "फ़ाइल: ", pattern_page_label: "पृष्ठ {page}", pattern_image_label: "छवि {index}", link_pdf_history: "आपके PDF विश्लेषण →", history_back: "← खाते पर वापस जाएं", history_title: "आपके PDF विश्लेषण", history_intro: "यह सूची केवल आप देख सकते हैं — PDF विश्लेषण सार्वजनिक नहीं होते।", history_empty: "अभी तक आपका कोई PDF विश्लेषण नहीं है।", history_unnamed_file: "बिना नाम वाली फ़ाइल",
+        scan_pdf_source_label: "फ़ाइल: ", pattern_page_label: "पृष्ठ {page}", pattern_image_label: "छवि {index}", link_pdf_history: "आपके निजी विश्लेषण →", history_back: "← खाते पर वापस जाएं", history_title: "आपके निजी विश्लेषण", history_intro: "यह सूची केवल आप देख सकते हैं — ये विश्लेषण सार्वजनिक नहीं होते।", history_empty: "अभी तक आपका कोई निजी विश्लेषण नहीं है।", history_unnamed_file: "बिना नाम वाली फ़ाइल", history_section_pdf: "PDF", history_section_image: "छवियाँ", history_section_text: "निजी टेक्स्ट", history_unnamed_image: "बिना नाम वाली छवि", history_unnamed_text: "निजी टेक्स्ट", label_text_private: "इस विश्लेषण को निजी रखें (केवल आपको दिखाई देगा)",
         tip_label: "अभी क्या करें:", stakes_label: "स्पष्ट रूप से:", pattern_tag_manipulation: "पैटर्न", pattern_tag_reasoning: "अवलोकन", summary_label: "सारांश", suggested_actions_label: "सुझाए गए कदम", chapter_fallback_title: "अध्याय {number}",
         scan_load_error: "विश्लेषण लोड नहीं हो सका (कनेक्शन जांचें और पेज रीलोड करें)।",
     },
@@ -911,7 +911,7 @@ const TRANSLATIONS = {
         btn_paste_own_content: "لا توافق؟ الصق المحتوى الخاص بك",
        
         scan_retracted_notice: "تم سحب هذا المحتوى تلقائيًا — أبلغ العديد من الأشخاص أنه لم يعد يتطابق مع محتوى المصدر الحالي. لا تزال النتيجة مرئية، لكنها لم تعد تُقدَّم للآخرين على أنها حديثة.",
-        scan_pdf_source_label: "الملف: ", pattern_page_label: "الصفحة {page}", pattern_image_label: "الصورة {index}", link_pdf_history: "تحليلات PDF الخاصة بك →", history_back: "← العودة إلى الحساب", history_title: "تحليلات PDF الخاصة بك", history_intro: "أنت فقط من يرى هذه القائمة — تحليلات PDF ليست عامة.", history_empty: "ليس لديك أي تحليل PDF بعد.", history_unnamed_file: "ملف بدون اسم",
+        scan_pdf_source_label: "الملف: ", pattern_page_label: "الصفحة {page}", pattern_image_label: "الصورة {index}", link_pdf_history: "تحليلاتك الخاصة →", history_back: "← العودة إلى الحساب", history_title: "تحليلاتك الخاصة", history_intro: "أنت فقط من يرى هذه القائمة — هذه التحليلات ليست عامة.", history_empty: "ليس لديك أي تحليل خاص بعد.", history_unnamed_file: "ملف بدون اسم", history_section_pdf: "PDF", history_section_image: "الصور", history_section_text: "نصوص خاصة", history_unnamed_image: "صورة بدون اسم", history_unnamed_text: "نص خاص", label_text_private: "احتفظ بهذا التحليل كخاص (يظهر لك فقط)",
         tip_label: "ماذا تفعل الآن:", stakes_label: "بالتحديد:", pattern_tag_manipulation: "نمط", pattern_tag_reasoning: "ملاحظة", summary_label: "الملخص", suggested_actions_label: "الإجراءات المقترحة", chapter_fallback_title: "الفصل {number}",
         scan_load_error: "تعذّر تحميل التحليل (تحقق من الاتصال وأعد تحميل الصفحة).",
     },

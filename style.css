@@ -585,6 +585,12 @@ a { color: var(--accent); }
 .scan-row-arrow { flex-shrink: 0; color: var(--ink-soft); }
 #publicScansList p.status-err, #publicScansList p.status-ok { text-align: center; }
 
+/* historia.html — sekcje "Twoje prywatne analizy" (PDF/Obrazy/Prywatne teksty) */
+.history-section-title {
+    font-size: 14px; font-weight: 600; color: var(--ink-soft);
+    margin: 18px 0 4px 0; text-transform: uppercase; letter-spacing: 0.02em;
+}
+
 /* Panel debugowania — tylko dla developera, patrz sekcja 1 w skrypcie (?debug=1) */
 #debug { display: none; margin-top: 20px; padding: 10px; background: var(--debug-bg); border-radius: 10px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed var(--debug-border); box-sizing: border-box; color: var(--ink-soft); }
 .status-ok { color: var(--ok-text); font-weight: bold; }

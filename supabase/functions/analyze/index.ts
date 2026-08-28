@@ -1964,7 +1964,7 @@ Deno.serve(async (req: Request) => {
     recordSpendRef = recordSpendAndCheckThresholds
 
     const body = await req.json()
-    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, confirmed, force_refresh, refresh_scan_id } = body
+    const { content_hash, input_type, text_content, source_url, char_count, language, images_base64, pdf_base64, pdf_filename, image_filenames, is_private, confirmed, force_refresh, refresh_scan_id } = body
     // Punkt 5 audytu bezpieczeństwa — "Sprawdź, czy coś się zmieniło",
     // WYŁĄCZNIE świadomy, płatny wybór użytkownika (nigdy automatyczny —
     // patrz GAKORI_CONTEXT.md). Omija cache i ratunek z ręcznie wklejonej
@@ -1982,6 +1982,23 @@ Deno.serve(async (req: Request) => {
     // prywatnej historii użytkownika (patrz `scan_access` niżej), nigdy nie
     // wpływa na cenę ani analizę. Ucinamy do rozsądnej długości.
     const pdfFilename = typeof pdf_filename === 'string' && pdf_filename ? pdf_filename.slice(0, 255) : null
+    // POPRAWKA 2026-08-28(g) — analogiczna etykieta dla obrazów: WYŁĄCZNIE
+    // nazwa(-y) do wyświetlenia w prywatnej historii użytkownika (patrz
+    // `scan_access` niżej), nigdy nie wpływa na cenę ani analizę. Może być
+    // kilka obrazów naraz (patrz MAX_IMAGES_PER_SCAN) — łączymy nazwy w
+    // jeden czytelny tekst.
+    const imageFilenames = Array.isArray(image_filenames)
+      ? image_filenames.filter((f: unknown): f is string => typeof f === 'string' && !!f).slice(0, MAX_IMAGES_PER_SCAN)
+      : []
+    const imageFilenameLabel = imageFilenames.length > 0 ? imageFilenames.join(', ').slice(0, 500) : null
+    // POPRAWKA 2026-08-28(g) — świadomy wybór użytkownika (checkbox przy
+    // wklejonym tekście w `index.html`), żeby TĘ KONKRETNĄ analizę tekstu
+    // zachować jako prywatną (jak PDF/obraz) zamiast domyślnie publiczną/
+    // odkrywalną. Dotyczy WYŁĄCZNIE trybu "text" — link (url) zawsze
+    // zostaje publiczny, tak jak dziś (patrz GAKORI_CONTEXT.md). Ostateczna
+    // wartość (`isPrivateText`, uwzględniająca też czy jest zalogowany
+    // użytkownik) liczona niżej, PO sekcji UWIERZYTELNIENIE — patrz tam.
+    const isPrivateTextRequested = input_type === 'text' && is_private === true
     // POPRAWKA 2026-08-21(c) — opcjonalny link do źródła przy trybie
     // "Tekst" (użytkownik wkleił treść ręcznie, np. bo automatyczne
     // pobranie linku zawiodło, ale chce zachować odnośnik do oryginału w
@@ -2036,6 +2053,13 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // POPRAWKA 2026-08-28(g) — dopiero TERAZ znamy `user_id`. Bez
+    // zalogowanego konta nie ma komu przyznać dostępu w `scan_access`, więc
+    // wynik byłby NA ZAWSZE niedostępny (RLS wymaga dopasowania do
+    // `auth.uid()`) — dla gościa checkbox jest po prostu ignorowany
+    // (analiza zostaje publiczna, tak jak bez zaznaczenia).
+    const isPrivateText = isPrivateTextRequested && !!user_id
+
     let profile: { wallet_balance: number; is_admin?: boolean } | null = null
     if (user_id) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user_id).single()
@@ -2081,18 +2105,27 @@ Deno.serve(async (req: Request) => {
         .update({ view_count: existing.view_count + 1 })
         .eq('id', existing.id)
 
-      // PDF: w przeciwieństwie do reszty trybów, wynik NIE jest publicznie
-      // czytelny (patrz RLS na `scans` w GAKORI_CONTEXT.md) — dostęp mają
-      // WYŁĄCZNIE osoby z wpisem w `scan_access`. Jeśli dwie różne osoby
-      // prześlą DOKŁADNIE ten sam plik (to samo `content_hash`) w tym samym
-      // języku, druga też musi dostać własny wpis (z WŁASNĄ nazwą pliku,
-      // która mogła być inna niż u pierwszej osoby) — inaczej mimo że to
-      // ona poprosiła o analizę, nigdy nie mogłaby do niej wrócić.
-      if (existing.input_type === 'pdf' && user_id) {
+      // PDF/obraz/prywatny tekst: w przeciwieństwie do reszty trybów, wynik
+      // NIE jest publicznie czytelny (patrz RLS na `scans` w
+      // GAKORI_CONTEXT.md) — dostęp mają WYŁĄCZNIE osoby z wpisem w
+      // `scan_access`. Jeśli dwie różne osoby prześlą DOKŁADNIE tę samą
+      // treść (to samo `content_hash`) w tym samym języku, druga też musi
+      // dostać własny wpis (z WŁASNĄ nazwą pliku, która mogła być inna niż
+      // u pierwszej osoby) — inaczej mimo że to ona poprosiła o analizę,
+      // nigdy nie mogłaby do niej wrócić. POPRAWKA 2026-08-28(g) —
+      // rozszerzone z samego PDF-a na obraz (zawsze prywatny) i tekst
+      // oznaczony przez `existing.is_private` (prywatność jest cechą
+      // ZAPISANEGO wiersza, nie tego konkretnego zapytania — kto trafi w
+      // ten sam prywatny wpis, dostaje dostęp tak samo jak przy PDF-ie).
+      if ((existing.input_type === 'pdf' || existing.input_type === 'image' || (existing.input_type === 'text' && existing.is_private)) && user_id) {
         await supabase
           .from('scan_access')
           .upsert(
-            { scan_id: existing.id, user_id, source_filename: pdfFilename },
+            {
+              scan_id: existing.id,
+              user_id,
+              source_filename: existing.input_type === 'pdf' ? pdfFilename : existing.input_type === 'image' ? imageFilenameLabel : null,
+            },
             { onConflict: 'scan_id,user_id' }
           )
       }
@@ -3783,6 +3816,11 @@ ${compactExisting}`
       // (bezpośrednio albo przez tłumaczenie) z ręcznego wklejenia,
       // patrz GAKORI_CONTEXT.md, "Zaufanie do ręcznie wklejonych linków".
       is_manual_source: sourcedFromManualPaste || (input_type === 'text' && !!textSourceUrl),
+      // POPRAWKA 2026-08-28(g) — patrz `isPrivateText` wyżej i RLS na
+      // `scans` w GAKORI_CONTEXT.md. Dla trybów innych niż "text" zawsze
+      // `false` — ich prywatność (PDF/obraz zawsze prywatne, link zawsze
+      // publiczny) zależy WYŁĄCZNIE od `input_type`, nie od tej kolumny.
+      is_private: isPrivateText,
       // Punkt B audytu bezpieczeństwa — jeśli ten wiersz był wcześniej
       // automatycznie wycofany (`retracted`, patrz `report-link-mismatch`),
       // to dotarcie aż tutaj oznacza, że właśnie zapłacono za PRAWDZIWĄ,
@@ -3820,13 +3858,18 @@ ${compactExisting}`
       )
     }
 
-    // PDF: przyznajemy dostęp do prywatnego wyniku temu, kto go zlecił —
-    // ten sam mechanizm i uzasadnienie co przy trafieniu w cache wyżej.
-    if (input_type === 'pdf' && user_id) {
+    // PDF/obraz/prywatny tekst: przyznajemy dostęp do prywatnego wyniku
+    // temu, kto go zlecił — ten sam mechanizm i uzasadnienie co przy
+    // trafieniu w cache wyżej (POPRAWKA 2026-08-28(g)).
+    if ((input_type === 'pdf' || input_type === 'image' || isPrivateText) && user_id) {
       await supabase
         .from('scan_access')
         .upsert(
-          { scan_id: newScan.id, user_id, source_filename: pdfFilename },
+          {
+            scan_id: newScan.id,
+            user_id,
+            source_filename: input_type === 'pdf' ? pdfFilename : input_type === 'image' ? imageFilenameLabel : null,
+          },
           { onConflict: 'scan_id,user_id' }
         )
     }

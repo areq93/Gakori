@@ -4,7 +4,7 @@
     <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('gakori_theme') || 'light');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gakori - Twoje analizy PDF</title>
+    <title>Gakori - Twoje prywatne analizy</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="shortcut icon" href="icon-192.png">
@@ -35,15 +35,28 @@
 
     <div class="card" style="max-width:480px; width:100%;">
         <a href="account.html" class="back-link" data-i18n="history_back">← Wróć do konta</a>
-        <h2 data-i18n="history_title">Twoje analizy PDF</h2>
-        <p style="color:var(--ink-soft); font-size:13.5px; margin:0 0 14px 0;" data-i18n="history_intro">Tylko Ty widzisz tę listę — analizy PDF nie są publiczne.</p>
+        <h2 data-i18n="history_title">Twoje prywatne analizy</h2>
+        <p style="color:var(--ink-soft); font-size:13.5px; margin:0 0 14px 0;" data-i18n="history_intro">Tylko Ty widzisz tę listę — te analizy nie są publiczne.</p>
 
         <div id="historyLoading">
             <p style="color:var(--ink-soft); margin:0;" data-i18n="loading">Ładowanie...</p>
         </div>
 
-        <div id="historyList" style="display:none;"></div>
-        <p id="historyEmpty" style="display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych analiz PDF.</p>
+        <div id="historyContent" style="display:none;">
+            <div id="historySectionPdf" style="display:none;">
+                <h3 class="history-section-title" data-i18n="history_section_pdf">PDF-y</h3>
+                <div id="historyListPdf"></div>
+            </div>
+            <div id="historySectionImage" style="display:none;">
+                <h3 class="history-section-title" data-i18n="history_section_image">Obrazy</h3>
+                <div id="historyListImage"></div>
+            </div>
+            <div id="historySectionText" style="display:none;">
+                <h3 class="history-section-title" data-i18n="history_section_text">Prywatne teksty</h3>
+                <div id="historyListText"></div>
+            </div>
+        </div>
+        <p id="historyEmpty" style="display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych prywatnych analiz.</p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -87,10 +100,14 @@
                 // złączenie PostgREST — RLS na `scans` i tak pozwoli tu tylko
                 // na wiersze, do których ten użytkownik ma wpis w scan_access,
                 // więc to złączenie nie ujawnia nic więcej niż zapytanie samo
-                // w sobie już pozwala.
+                // w sobie już pozwala. POPRAWKA 2026-08-28(g) — `scan_access`
+                // trzyma teraz też obrazy (zawsze prywatne) i teksty oznaczone
+                // jako prywatne (`is_private`, patrz analyze/index.ts) — jedno
+                // zapytanie, rozdzielone niżej na trzy sekcje po
+                // `scans.input_type`.
                 const { data, error } = await sb
                     .from('scan_access')
-                    .select('scan_id, source_filename, created_at, scans(result)')
+                    .select('scan_id, source_filename, created_at, scans(result, input_type, text_content)')
                     .eq('user_id', session.user.id)
                     .order('created_at', { ascending: false })
                     .limit(100);
@@ -102,10 +119,11 @@
                     return;
                 }
 
-                const listEl = document.getElementById('historyList');
                 const dateFmt = new Intl.DateTimeFormat(getCurrentLanguage(), { dateStyle: 'medium', timeStyle: 'short' });
 
-                data.forEach((row) => {
+                // Buduje jeden wiersz listy (wspólny dla PDF/obrazu/tekstu) —
+                // różni się tylko ikoną i sposobem wyznaczenia etykiety.
+                function buildRow(row, icon, labelText) {
                     const r = (row.scans && row.scans.result) || {};
                     const score = r.q_score;
                     let badgeClass = 'badge-red', label = (typeof score === 'number' ? score : '?') + '/100';
@@ -116,22 +134,19 @@
                     link.className = 'scan-row';
                     link.href = 'scan.html?id=' + encodeURIComponent(row.scan_id);
 
-                    const icon = document.createElement('span');
-                    icon.className = 'scan-row-icon';
-                    icon.innerText = '📄';
-                    link.appendChild(icon);
+                    const iconEl = document.createElement('span');
+                    iconEl.className = 'scan-row-icon';
+                    iconEl.innerText = icon;
+                    link.appendChild(iconEl);
 
                     const badge = document.createElement('span');
                     badge.className = 'result-badge ' + badgeClass;
                     badge.innerText = label;
                     link.appendChild(badge);
 
-                    // Nazwa pliku + data — jak "snippet" na liście publicznych
-                    // analiz w index.html, tylko tu to nazwa pliku, nie cytat.
                     const snippet = document.createElement('span');
                     snippet.className = 'scan-row-snippet';
-                    const name = row.source_filename || t('history_unnamed_file');
-                    snippet.innerText = name + ' · ' + dateFmt.format(new Date(row.created_at));
+                    snippet.innerText = labelText + ' · ' + dateFmt.format(new Date(row.created_at));
                     link.appendChild(snippet);
 
                     const arrow = document.createElement('span');
@@ -139,10 +154,48 @@
                     arrow.innerText = '→';
                     link.appendChild(arrow);
 
-                    listEl.appendChild(link);
+                    return link;
+                }
+
+                const byType = { pdf: [], image: [], text: [] };
+                data.forEach((row) => {
+                    const type = row.scans && row.scans.input_type;
+                    if (byType[type]) byType[type].push(row);
                 });
 
-                listEl.style.display = 'block';
+                if (byType.pdf.length > 0) {
+                    const listEl = document.getElementById('historyListPdf');
+                    byType.pdf.forEach((row) => {
+                        listEl.appendChild(buildRow(row, '📄', row.source_filename || t('history_unnamed_file')));
+                    });
+                    document.getElementById('historySectionPdf').style.display = 'block';
+                }
+
+                if (byType.image.length > 0) {
+                    const listEl = document.getElementById('historyListImage');
+                    byType.image.forEach((row) => {
+                        listEl.appendChild(buildRow(row, '🖼️', row.source_filename || t('history_unnamed_image')));
+                    });
+                    document.getElementById('historySectionImage').style.display = 'block';
+                }
+
+                if (byType.text.length > 0) {
+                    const listEl = document.getElementById('historyListText');
+                    byType.text.forEach((row) => {
+                        // Nie ma tu "nazwy pliku" (to wklejony tekst) — pokazujemy
+                        // krótki fragment samej treści zamiast nazwy.
+                        const raw = (row.scans && row.scans.text_content) || '';
+                        const snippet = raw.length > 60 ? raw.slice(0, 60).trim() + '…' : raw;
+                        listEl.appendChild(buildRow(row, '📝', snippet || t('history_unnamed_text')));
+                    });
+                    document.getElementById('historySectionText').style.display = 'block';
+                }
+
+                if (byType.pdf.length === 0 && byType.image.length === 0 && byType.text.length === 0) {
+                    document.getElementById('historyEmpty').style.display = 'block';
+                } else {
+                    document.getElementById('historyContent').style.display = 'block';
+                }
             });
         }
     </script>

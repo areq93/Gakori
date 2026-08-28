@@ -145,11 +145,11 @@
             // Pasek profilu/kredytów — niezależnie od reszty strony (nie
             // blokuje pokazania wyniku skanu), tylko dla zalogowanych.
             // `currentSession`/`sessionReady` są też potrzebne PRZED
-            // zapytaniem do `scans` niżej: PDF-y są teraz prywatne (RLS
-            // sprawdza auth.uid()), więc bez poczekania na sesję zapytanie
-            // mogłoby polecieć bez tokenu zalogowanego użytkownika i
-            // dostać "nie znaleziono" mimo że to WŁAŚCICIEL patrzy na
-            // własny wynik.
+            // zapytaniem do `scans` niżej: PDF-y/obrazy/oznaczone jako
+            // prywatne teksty są prywatne (RLS sprawdza auth.uid()), więc
+            // bez poczekania na sesję zapytanie mogłoby polecieć bez
+            // tokenu zalogowanego użytkownika i dostać "nie znaleziono"
+            // mimo że to WŁAŚCICIEL patrzy na własny wynik.
             let currentSession = null;
             const sessionReady = sb.auth.getSession().then(({ data: { session } }) => {
                 currentSession = session;
