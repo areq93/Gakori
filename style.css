@@ -272,6 +272,16 @@ input[type="checkbox"], input[type="radio"] {
     text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 6px 0;
 }
 .field-label:first-child { margin-top: 0; }
+/* Etykieta obok checkboxa (np. "Zachowaj tę analizę jako prywatną") —
+   zgłoszona jako niespójna z resztą aplikacji (bez ustalonego koloru/
+   wielkości, jak reszta tekstu pomocniczego). Ten sam stonowany kolor i
+   rozmiar co inne teksty pomocnicze w appce (np. `.pattern-explanation`,
+   `#textCostEstimate`) — nie osobny, nowy styl. */
+.checkbox-label {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-family: inherit; font-size: 13px; color: var(--ink-soft);
+    margin-top: 10px; cursor: pointer;
+}
 /* Każdy przycisk w aplikacji (główny, drugoplanowy, aktywna zakładka,
    ikona konta) — JEDEN spójny, matowo-"perłowy" styl, bez wyjątków
    (POPRAWKA 2026-08-18(j): wcześniej tylko główny przycisk i aktywna
