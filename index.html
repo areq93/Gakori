@@ -918,6 +918,17 @@
             document.getElementById('analyzeBtn').innerText = labels[mode];
             document.getElementById('status').innerText = '';
             document.getElementById('resultCard').style.display = 'none';
+            updateAnalyzeBtnDisabledState();
+        }
+        // Drobna, ale realna niespójność zgłoszona przez właściciela: przycisk
+        // "Analizuj PDF" był klikalny nawet BEZ wybranego pliku — kliknięcie i
+        // tak kończyło się tylko alertem każącym najpierw wybrać PDF, więc
+        // klikalność nic nie dawała. Wyszarzony/nieklikalny, dopóki plik nie
+        // zostanie wybrany, jest jaśniejszym sygnałem niż "kliknij i zobacz
+        // alert". Dotyczy WYŁĄCZNIE trybu PDF — pozostałe tryby (link/tekst/
+        // obraz) mają własną walidację przy kliknięciu i nie są tu ruszane.
+        function updateAnalyzeBtnDisabledState() {
+            document.getElementById('analyzeBtn').disabled = (currentMode === 'pdf' && !selectedPdfFile);
         }
         document.querySelectorAll('.tab-btn[data-mode]').forEach(btn => {
             btn.addEventListener('click', () => setMode(btn.dataset.mode));
@@ -1103,6 +1114,7 @@
             const infoEl = document.getElementById('pdfSelectionInfo');
             if (!selectedPdfFile) {
                 infoEl.innerText = '';
+                updateAnalyzeBtnDisabledState();
                 return;
             }
             let text = t('label_pdf_selected', { name: selectedPdfFile.name });
@@ -1110,6 +1122,7 @@
                 text += ' ' + t('label_pdf_large_file_notice');
             }
             infoEl.innerText = text;
+            updateAnalyzeBtnDisabledState();
         }
         document.getElementById('pdfInputTrigger').addEventListener('click', () => {
             document.getElementById('pdfInput').click();

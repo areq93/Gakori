@@ -5756,6 +5756,40 @@ kart/przycisków/etykiet, które zostają na poziomie z POPRAWKI (w).
 Weryfikacja: nawiasy klamrowe w `style.css` sparowane (133/133) — czysta
 zmiana CSS, bez backendu — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(y) — przycisk "Analizuj PDF" wyszarzony/nieklikalny
+dopóki nie wybrano pliku; napis "Zalogowano jako:" i e-mail na koncie
+większe.**
+
+1. **"Analizuj PDF" bez sensu klikalny bez pliku.** Właściciel zgłosił
+   drobną niespójność: w trybie PDF przycisk "Analizuj PDF" był zawsze
+   klikalny, ale bez wybranego pliku kliknięcie i tak kończyło się tylko
+   alertem "najpierw wybierz PDF" — klikalność nic nie dawała. Dodana
+   funkcja `updateAnalyzeBtnDisabledState()` w `index.html`
+   (`document.getElementById('analyzeBtn').disabled = currentMode ===
+   'pdf' && !selectedPdfFile`), wywoływana z dwóch miejsc, gdzie zmienia
+   się to, co decyduje o jej wyniku: `setMode()` (zmiana trybu) i
+   `renderPdfSelectionInfo()` (zmiana wybranego/odznaczonego pliku PDF —
+   ten sam hook, który już i tak odpalał się przy każdej zmianie
+   `selectedPdfFile`, więc nie trzeba było szukać nowych miejsc do
+   podpięcia). Wygląd wyszarzonego przycisku to już istniejąca reguła
+   `button:disabled` w `style.css` — nic nowego do dodania w CSS. Dotyczy
+   WYŁĄCZNIE trybu PDF — pozostałe tryby (link/tekst/obraz) mają własną
+   walidację przy kliknięciu i celowo nie są tu ruszane (nie było o to
+   proszone, a każdy z nich waliduje inaczej — np. obraz dopuszcza kilka
+   plików naraz).
+2. **"Zalogowano jako:" i adres e-mail na koncie większe.** Właściciel
+   poprosił o powiększenie "na tyle, na ile pozwala estetyka" — bez
+   zmiany globalnej klasy `.field-label` (używanej w wielu innych,
+   świadomie małych miejscach w appce), tylko lokalny, inline'owy
+   override w `account.html`: etykieta `12.5px` (dziedziczone z
+   `.field-label`) → `14px`, adres e-mail (`<strong id="accountEmail">`,
+   dotąd bez własnego rozmiaru, dziedziczył domyślny rozmiar akapitu) →
+   `18px`.
+
+Weryfikacja: składnia wbudowanych skryptów `index.html`/`account.html`
+sprawdzona (`node --check`) — bez błędów. Czysta zmiana CSS/HTML/JS, bez
+backendu — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
