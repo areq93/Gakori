@@ -4741,9 +4741,25 @@ błędy typów + dwa NOWE, oczekiwane błędy "Cannot find module" dla
 `npm:linkedom@0.18.13`/`npm:@mozilla/readability@0.6.0` — ten sam,
 znany, nieszkodliwy efekt uboczny środowiska bez Deno, jak przy
 `jsr:@supabase/supabase-js@2`/`npm:pdf-lib@1.17.1` od zawsze) oraz `node
---experimental-strip-types --check` — brak błędów. Ostateczne
-potwierdzenie na żywo wymaga ręcznego wdrożenia w Supabase Dashboard i
-ponownego testu na tym samym linku interia.pl.
+--experimental-strip-types --check` — brak błędów.
+
+**Potwierdzenie na żywo (ten sam link interia.pl)**: 12696 znaków
+wyciągniętych (poprzednio 2088), WSZYSTKIE cztery śródartykułowe boksy
+"Zobacz również" usunięte, cała prawdziwa treść wywiadu zachowana od
+początku do końca — 6 trafnych wzorców wykrytych (poprzednio 1). **Jeden
+drobny, znany wyjątek**: pojedyncza, ostatnia linijka na samym końcu
+strony ("Polityczny WF": Nawrocki nadpremierem?... INTERIA.PL") przeżyła
+oba filtry — to prawdopodobnie fragment bez znacznika `<a>` (np.
+JS-owa nawigacja) albo struktura, której Readability nie oceniło jako
+szum. Świadomie NIE łatane na ślepo (brak dostępu do prawdziwego HTML-a
+tej strony z tego środowiska, sprawdzone przez `curl`/`WebFetch` — oba
+zablokowane politką sieciową) — ryzyko: zgadnięty warunek (np. "usuń
+krótki akapit na końcu") mógłby przypadkiem skasować prawdziwe, krótkie
+zdanie kończące artykuł (np. bezpośrednio sąsiadujące "Rozmawiał Łukasz
+Szpyrka", które MUSI zostać). Właściciel zaakceptował zamknięcie tematu w
+tym stanie — będzie dalej testował na innych stronach, a przy kolejnym
+podobnym żywym przypadku (z konkretnym "Pokaż pełny tekst źródłowy" do
+analizy) wrócimy do tego z realnymi danymi zamiast zgadywania.
 
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
