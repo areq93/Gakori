@@ -46,6 +46,20 @@ const LANGUAGES: { code: string; name: string }[] = [
   { code: 'ar', name: 'arabski' },
 ]
 
+// POPRAWKA 2026-08-28(zk) — baza księgowa (patrz GAKORI_CONTEXT.md, "USTALONE
+// 2026-08-20 — finalny cennik pakietów kredytów"). System sprzedaży kredytów
+// JESZCZE NIE ISTNIEJE — to NIE jest prawdziwa cena, tylko punkt odniesienia
+// z ustalonego DOCELOWEGO cennika (pakiet Mały: 5 USD / 500 kredytów = 0,01
+// USD/kredyt), używany WYŁĄCZNIE do liczenia PROJEKTOWANEJ marży, żeby mieć
+// jakikolwiek punkt odniesienia zanim powstanie prawdziwy system płatności.
+// Zmień w JEDNYM miejscu, jeśli docelowy cennik się kiedyś zmieni.
+const CREDIT_VALUE_USD = 0.01
+
+// POPRAWKA 2026-08-28(zk) — darmowy bonus przy rejestracji, MUSI być zgodny
+// z INITIAL_WALLET_BONUS w analyze/index.ts (druga kopia tej samej stałej,
+// bo to dwie osobne funkcje Edge — jeśli zmienisz tamtą, zmień i tę).
+const INITIAL_WALLET_BONUS = 20
+
 // POPRAWKA 2026-08-27 — właściciel poprosił o 100% dokładność: raport ma
 // opisywać DOKŁADNIE pełną WCZORAJSZĄ dobę czasu polskiego (00:00-24:00
 // Europe/Warsaw), nie "ostatnie 24 godziny licząc od momentu uruchomienia"
@@ -160,6 +174,12 @@ Deno.serve(async (req: Request) => {
   let newYesterday: number | null = null
   let avg7d: number | null = null
   let burstWarning = false
+  // POPRAWKA 2026-08-28(zk) — baza księgowa: całkowita liczba kont =
+  // całkowita liczba rozdanych darmowych bonusów rejestracyjnych
+  // (INITIAL_WALLET_BONUS = 20 w analyze/index.ts). Liczone TUTAJ, przy
+  // okazji już istniejącego pobrania WSZYSTKICH kont (poniżej), żeby nie
+  // robić drugiego, identycznego zapytania do Supabase Auth.
+  let totalUsersCount: number | null = null
   try {
     const allUsers: { created_at: string }[] = []
     let page = 1
@@ -171,6 +191,7 @@ Deno.serve(async (req: Request) => {
       if (data.users.length < perPage) break
       page++
     }
+    totalUsersCount = allUsers.length
 
     newYesterday = allUsers.filter((u) => u.created_at >= yr.start && u.created_at < yr.end).length
 
@@ -324,6 +345,51 @@ Deno.serve(async (req: Request) => {
     aiCostYesterdayUsd = data?.total_usd ?? 0
   } catch (_err) {
     // metryka kosztu AI niedostępna — reszta raportu leci dalej
+  }
+
+  // --- POPRAWKA 2026-08-28(zk) — baza księgowa: marża WG TYPU TREŚCI,
+  // liczona z nowej kolumny `scans.gemini_cost_usd` (patrz
+  // analyze/index.ts) — dopiero od teraz zapisywanej, więc stare wiersze
+  // (sprzed tej poprawki) mają tu `null` i są pomijane. Każdy wiersz
+  // `scans` powstały wczoraj to JEDNA świeżo opłacona/przeanalizowana
+  // treść (cache'owane trafienia nie tworzą nowego wiersza) — to
+  // dokładnie ten poziom szczegółowości, którego brakowało: realny koszt
+  // Gemini I naliczone kredyty, per typ, per wiersz, nie tylko jeden
+  // wspólny licznik dzienny. `assumedRevenueUsd`/`marginPercent` liczone
+  // wg DOCELOWEGO cennika (`CREDIT_VALUE_USD`, patrz stała wyżej) —
+  // PROJEKCJA, nie prawdziwy przychód (systemu sprzedaży jeszcze nie ma).
+  type MarginRow = { inputType: string; creditsCharged: number; realCostUsd: number; count: number }
+  let marginByType: MarginRow[] = []
+  let marginTotal: MarginRow | null = null
+  try {
+    const { data, error } = await supabase
+      .from('scans')
+      .select('input_type, credits_charged, gemini_cost_usd')
+      .gte('created_at', yr.start)
+      .lt('created_at', yr.end)
+      .not('gemini_cost_usd', 'is', null)
+    if (error) throw error
+    const rows = data as { input_type: string; credits_charged: number | null; gemini_cost_usd: number | null }[]
+    const byType: Record<string, MarginRow> = {}
+    for (const r of rows) {
+      const key = r.input_type
+      if (!byType[key]) byType[key] = { inputType: key, creditsCharged: 0, realCostUsd: 0, count: 0 }
+      byType[key].creditsCharged += r.credits_charged ?? 0
+      byType[key].realCostUsd += r.gemini_cost_usd ?? 0
+      byType[key].count += 1
+    }
+    marginByType = Object.values(byType).sort((a, b) => b.creditsCharged - a.creditsCharged)
+    marginTotal = marginByType.reduce(
+      (acc, r) => ({
+        inputType: 'total',
+        creditsCharged: acc.creditsCharged + r.creditsCharged,
+        realCostUsd: acc.realCostUsd + r.realCostUsd,
+        count: acc.count + r.count,
+      }),
+      { inputType: 'total', creditsCharged: 0, realCostUsd: 0, count: 0 }
+    )
+  } catch (_err) {
+    // metryka marży niedostępna — reszta raportu leci dalej
   }
 
   // --- Maile: wczoraj i suma od początku miesiąca (wg statystyk Brevo) ---
@@ -615,6 +681,35 @@ Deno.serve(async (req: Request) => {
 <div style="font-size:14px;color:#374151;margin-top:6px;">realny koszt AI wczoraj: <strong>${fmtUsd(aiCostYesterdayUsd)}</strong> (dzienny limit bezpieczeństwa: $125 — patrz system_thresholds.daily_budget_usd)</div>`
   )
 
+  // POPRAWKA 2026-08-28(zk) — baza księgowa: marża wg typu treści, licząc z
+  // `scans.gemini_cost_usd` (patrz blok `marginByType`/`marginTotal` wyżej).
+  // `CREDIT_VALUE_USD` to PROJEKCJA wg docelowego cennika (system sprzedaży
+  // jeszcze nie istnieje) — jasno opisane w treści maila, żeby nikt nie
+  // pomylił tego z prawdziwym przychodem.
+  const INPUT_TYPE_LABELS: Record<string, string> = { text: 'Tekst', url: 'Link', image: 'Obraz', pdf: 'PDF' }
+  const fmtMargin = (r: MarginRow): string => {
+    const revenue = r.creditsCharged * CREDIT_VALUE_USD
+    const marginPct = revenue > 0 ? ((revenue - r.realCostUsd) / revenue) * 100 : null
+    const marginStr = marginPct === null ? 'brak danych' : `${Math.round(marginPct)}%`
+    return `${INPUT_TYPE_LABELS[r.inputType] || r.inputType}: ${r.count}× · ${r.creditsCharged} kr. (≈${fmtUsd(revenue)}) · realny koszt ${fmtUsd(r.realCostUsd)} · marża ${marginStr}`
+  }
+  const marginRowsHtml =
+    marginByType.length === 0
+      ? '<p style="color:#9ca3af;font-size:13px;margin:4px 0;">Brak danych (żadna analiza wczoraj jeszcze nie ma zapisanego realnego kosztu — nowa metryka, licząca od teraz).</p>'
+      : `<ul style="margin:4px 0;padding-left:20px;color:#374151;font-size:14px;">
+${marginByType.map((r) => `<li style="margin-bottom:2px;">${fmtMargin(r)}</li>`).join('')}
+</ul>`
+  const marginTotalHtml =
+    marginTotal && marginTotal.count > 0
+      ? `<div style="font-size:14px;color:#111827;font-weight:600;margin-top:6px;">Razem: ${fmtMargin(marginTotal)}</div>`
+      : ''
+  const freeCreditsLiabilityUsd = totalUsersCount !== null ? totalUsersCount * INITIAL_WALLET_BONUS * CREDIT_VALUE_USD : null
+  const marginCard = card(
+    'Marża wg typu treści (baza księgowa, projekcja wg docelowego cennika: 1 kredyt = $0,01)',
+    `${marginRowsHtml}${marginTotalHtml}
+<div style="font-size:13px;color:#6b7280;margin-top:10px;">Zobowiązanie z darmowych kredytów rejestracyjnych (${fmt(totalUsersCount)} kont × ${INITIAL_WALLET_BONUS} kr.): ${fmtUsd(freeCreditsLiabilityUsd)} wg docelowego cennika — to NIE jest prawdziwy przychód, system sprzedaży kredytów jeszcze nie istnieje.</div>`
+  )
+
   const retriesHtml =
     edgeRetries24h && edgeRetries24h > 0
       ? `<p style="color:#b91c1c;font-weight:600;margin:8px 0 0;">Uwaga: ${edgeRetries24h}× wczoraj przeglądarka musiała sama ponowić zapytanie po błędzie platformy — każde takie ponowienie to ryzyko podwójnie opłaconego zapytania do Gemini. Jeśli ta liczba rośnie, warto to zbadać.</p>`
@@ -715,6 +810,7 @@ ${volumeOutlierAccounts.map((a) => `<li style="margin-bottom:2px;">${a.email} �
 ${registrationsCard}
 ${scansCard}
 ${creditsCard}
+${marginCard}
 ${retriesCard}
 ${emailsCard}
 ${trustCard}

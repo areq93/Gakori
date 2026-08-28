@@ -6331,6 +6331,84 @@ wyczyszczeniu wszystkich pól.
 Weryfikacja: `node --check` na wyekstrahowanym `<script>` z `index.html`
 bez błędów. Zmiana czysto frontendowa.
 
+**POPRAWKA 2026-08-28(zk) — pierwsza wersja "bazy księgowej": realny koszt
+Gemini zapisywany per-analiza, docelowa wartość kredytu, i nowa karta
+marży wg typu treści w `daily-report`.** Właściciel poprosił o pełny
+przegląd finansowy systemu ("koszty kredytów realnie, płynność, rabaty")
+— po wspólnym ustaleniu, że (1) system sprzedaży kredytów jeszcze nie
+istnieje (na dziś 100% koszt, 0% przychód), (2) potrzebne są ceny
+JEDNOSTKOWE (ile kosztuje NAS jedna analiza, nie próba zgadywania
+wolumenu/ruchu, którego assystent nie ma jak sprawdzić bez dostępu do
+bazy) — zatwierdzony plan, liczący **od teraz, do przodu** (stare
+analizy nie mają zapisanego realnego kosztu, świadomie NIE próbujemy
+tego odtwarzać wstecz).
+
+**A) `scans.gemini_cost_usd` (nowa kolumna, wymaga migracji SQL)** —
+realny koszt Gemini dla KONKRETNEJ analizy, liczony już od dawna
+(`costTracker.totalUsd`, prawdziwe liczby tokenów zwrócone przez Gemini,
+nie szacunek), ale dotąd wyrzucany po doliczeniu do wspólnego,
+dziennego licznika (`system_daily_spend`). Zapisywany w `scanRow` w
+JEDYNYM miejscu, gdzie w ogóle powstaje nowy/zaktualizowany wiersz
+`scans` (patrz POPRAWKA (zc) — ten sam punkt). `null` dla starych
+wierszy.
+
+**B) Ustalona wartość 1 kredytu w USD — `CREDIT_VALUE_USD = 0.01`**
+(nowa stała w `daily-report/index.ts`), wg docelowego cennika pakietu
+Małego (5 USD / 500 kredytów, patrz "USTALONE 2026-08-20 — finalny
+cennik pakietów kredytów" niżej). WYRAŹNIE opisana w kodzie i w treści
+maila jako PROJEKCJA, nie prawdziwy przychód — system sprzedaży kredytów
+jeszcze nie istnieje.
+
+**C) Zobowiązanie z darmowych kredytów** — liczone jako
+`liczba_kont × INITIAL_WALLET_BONUS (20) × CREDIT_VALUE_USD`, pokazywane
+w tej samej karcie maila. `INITIAL_WALLET_BONUS` to druga kopia tej
+samej stałej co w `analyze/index.ts` (dwie osobne funkcje Edge — jeśli
+zmienisz jedną, zmień i drugą). Liczba kont dociągana PRZY OKAZJI już
+istniejącego pobrania wszystkich kont Supabase Auth (metryka rejestracji
+wyżej w tym samym pliku) — bez dodatkowego zapytania.
+
+**D) Nowa karta w `daily-report`: "Marża wg typu treści"** — dla każdej
+analizy zapisanej WCZORAJ z niepustym `gemini_cost_usd`, grupowanie po
+`input_type`: liczba analiz, suma naliczonych kredytów, przeliczona
+wartość tych kredytów (`credits × CREDIT_VALUE_USD`), suma realnego
+kosztu Gemini, i marża % (`(przychód - koszt) / przychód × 100`). Plus
+wiersz "Razem". Fail-open jak reszta raportu — pusty wynik pokazuje
+czytelny komunikat, nie wywala reszty maila.
+
+**Wstępne, orientacyjne przeliczenie (na typowych rozmiarach treści, NIE
+dokładny pomiar — to właśnie ta niepewność uzasadnia całą tę poprawkę)**:
+tekst/link ~81-86% marży (niżej niż ustalony cel 88-95%, głównie przez
+wcześniej zaniżony 2× rozmiar biblioteki modeli mentalnych i podwójny
+koszt Etapu 3 — patrz POPRAWKA (zi) wyżej), obraz ~93%, PDF ~92%. Po
+wdrożeniu (A)-(D) te liczby zastąpią się PRAWDZIWYMI, dzień po dniu, bez
+zgadywania.
+
+**Kontekst dla przyszłych decyzji (zanotowane, NIE wdrożone)**:
+- Weryfikacja cennika Gemini na żywo (28.08.2026, `ai.google.dev`)
+  potwierdziła: ceny `gemini-3.5-flash-lite` w kodzie ($0,30/$2,50 za
+  milion tokenów, tryb Standardowy) są dokładnie aktualne. Dodatkowo
+  ujawniła: **buforowanie kontekstu (context caching) kosztuje $0,03 za
+  milion tokenów — 10× taniej niż zwykłe wejście** — potencjalna, duża
+  oszczędność na powtarzającej się bibliotece modeli mentalnych
+  (~14 900 znaków, wysyłanej w pełni w 7 z 10 typów zapytań do Gemini),
+  ale dostępna WYŁĄCZNIE w płatnym poziomie Google (dziś jesteśmy na
+  darmowym — świadoma decyzja właściciela na etapie budowy/testów,
+  przejście na płatny planowane przy starcie publicznym).
+- Płatny poziom Google daje też: wyższe limity RPM (rozwiązałoby problem,
+  przez który PDF_HARD_MAX_PAGES obniżono ze 160 do 36, patrz POPRAWKA
+  2026-08-26(ah)), i "treści NIE są wykorzystywane do ulepszania usług
+  Google" (dziś, na darmowym poziomie, są — realna rozbieżność z obietnicą
+  prywatności aplikacji, wartościowa do rozwiązania przy przejściu).
+- Warianty "Wsad"/"Flex" tego samego modelu dają ~50% niższą cenę wejścia,
+  ale ich dokładne działanie operacyjne (czy nadają się do analizy w
+  czasie rzeczywistym, na której opiera się cały dzisiejszy interfejs)
+  NIE zostało sprawdzone — świadomie NIE zgadywane, do zbadania osobno
+  przed jakąkolwiek decyzją o przełączeniu.
+
+Weryfikacja: `node --experimental-strip-types --check` na
+`analyze/index.ts` i `daily-report/index.ts` bez nowych błędów (te same
+znane linie co zawsze — moduły/`Deno`/implicit-any).
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

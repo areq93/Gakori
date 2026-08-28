@@ -4148,6 +4148,17 @@ ${compactExisting}`
       text_content: input_type === 'text' ? text_content : input_type === 'url' ? preFetchedText : null,
       char_count: input_type === 'text' ? char_count : input_type === 'url' ? (urlFetchedCharCount ?? 0) : 0,
       credits_charged: finalCost,
+      // POPRAWKA 2026-08-28(zk) — baza księgowa (patrz GAKORI_CONTEXT.md):
+      // realny koszt Gemini dla TEJ KONKRETNEJ analizy, liczony już od
+      // dawna (`costTracker.totalUsd`, prawdziwe liczby tokenów zwrócone
+      // przez Gemini — patrz `computeGeminiCostUsd()` wyżej), ale dotąd
+      // WYRZUCANY po doliczeniu do wspólnego, dziennego licznika
+      // (`system_daily_spend`, reguła 10). Bez zapisu per-analiza nie da
+      // się policzyć prawdziwej marży wg typu treści — tylko zgadywać.
+      // `null` dla starych, już istniejących wierszy (liczymy od teraz, do
+      // przodu — świadoma decyzja właściciela, nie próbujemy odtwarzać
+      // przeszłości).
+      gemini_cost_usd: costTracker.totalUsd,
       result,
       discovered_by: user_id ?? null,
       // Punkt 5 audytu bezpieczeństwa — oznacza treść, która pochodzi
