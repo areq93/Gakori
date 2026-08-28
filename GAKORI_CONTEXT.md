@@ -4800,6 +4800,57 @@ akceptowane jako koszt tego podejścia, do punktowego doprecyzowania
 TYLKO gdy pojawią się z realnymi danymi (żywy przykład + "Pokaż pełny
 tekst źródłowy"), nigdy przez zgadywanie na ślepo.
 
+**POPRAWKA 2026-08-28(f) — `buildSystemPrompt()`: zakaz używania nazwy
+DZIEDZINY jako nazwy wzorca + ostrożność przy modelach łatwych do
+naciągnięcia.** Właściciel poprosił o wzmocnienie wykrywania wzorców
+("model bywa zbyt zachowawczy"), ale nie miał konkretnego przykładu —
+zamiast zgadywać, poprosił o analizę realnych danych z cotygodniowego
+maila `weekly-model-report` (50 analiz, rozkład częstości modeli z
+ostatnich 7 dni, z prawdziwymi cytatami). Analiza tych danych NIE
+potwierdziła "za mało wzorców" (dobra różnorodność, ponad 40 różnych
+modeli użytych w tygodniu) — za to ujawniła dwa konkretne, realne błędy:
+
+1. Jeden wzorzec miał w polu "name" dosłownie **"Matematyka i
+   statystyka"** — to nazwa całej DZIEDZINY z `MENTAL_MODELS_BY_CATEGORY`
+   (nagłówek WIELKIMI LITERAMI przed dwukropkiem w każdym wpisie
+   biblioteki), nie nazwa konkretnego, nazwanego modelu z jej wnętrza
+   (jak "Istotność Statystyczna" czy "Błąd Przeżywalności"). Prompt
+   dotąd o tym nie ostrzegał wprost — sekcja "BIBLIOTEKA MODELI
+   MENTALNYCH" mówiła tylko "wybierz najtrafniej pasujący model", nie
+   precyzując, że sam nagłówek dziedziny nigdy nie jest poprawną
+   odpowiedzią.
+2. Kilka słabych/naciąganych dopasowań, głównie pod nazwą "Modułowość"
+   (np. spis treści książki albo lista nowych przepisów nazwane
+   "Modułowością", choć to zwykłe wyliczenia, nie elementy systemu
+   wymienialne niezależnie od siebie) — model najwyraźniej używał tej
+   nazwy jako wygodnej, luźno pasującej "łatki" zamiast sprawdzać pełną
+   definicję.
+
+**Naprawa** (`supabase/functions/analyze/index.ts`, `buildSystemPrompt()`,
+zaraz po sekcji "BIBLIOTEKA MODELI MENTALNYCH"): dwie nowe sekcje w
+prompcie.
+- "NIGDY NAZWA DZIEDZINY ZAMIAST KONKRETNEGO MODELU" — wprost tłumaczy,
+  że nagłówki WIELKIMI LITERAMI przed dwukropkiem (np. "MATEMATYKA I
+  STATYSTYKA:") to tylko porządkujące etykiety, nigdy wartość pola
+  "name" — z dokładnie tym złym przykładem, który się zdarzył
+  ("Matematyka i statystyka"), i dobrym kontrprzykładem dla tego samego
+  fragmentu ("Istotność Statystyczna" / "Błąd Przeżywalności").
+- "OSTROŻNIE Z MODELAMI ŁATWYMI DO NACIĄGNIĘCIA" — każe modelowi przed
+  użyciem modeli o szerokiej, technicznej nazwie (podany przykład:
+  "Modułowość") w myślach sprawdzić PEŁNĄ definicję z biblioteki, nie
+  tylko samą nazwę, z konkretnym wyjaśnieniem czym "Modułowość" NIE jest
+  (zwykłe wyliczenie/lista to nie to samo, co elementy wymienialne
+  niezależnie od reszty systemu) — jeśli fragment nie spełnia pełnej
+  definicji, model ma szukać trafniejszego modelu albo nie zgłaszać
+  wzorca wcale.
+
+Zero zmian w schemacie odpowiedzi, zero nowych zapytań do Gemini — to
+wyłącznie doprecyzowanie istniejącej instrukcji.
+
+Weryfikacja: `node --experimental-strip-types --check` (poprawna
+składnia) oraz `tsc --noEmit --skipLibCheck` (te same znane błędy
+środowiskowe co zawsze, niezwiązane z tą zmianą).
+
 **POPRAWKA 2026-08-28 — `daily-report`: wykrywanie botów (punkt 3 z
 listy "opanujmy 1,2,3", odłożony wcześniej w tej sesji).** Właściciel
 potwierdził dwie rzeczy: (1) definicja — dodatkowa WIDOCZNOŚĆ nieudanych
