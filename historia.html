@@ -127,7 +127,7 @@
                 // wyświetlania (20/typ), żeby wyszukiwanie miało w czym szukać.
                 const { data, error } = await sb
                     .from('scan_access')
-                    .select('scan_id, source_filename, created_at, scans(result, input_type, text_content)')
+                    .select('scan_id, source_filename, created_at, scans(result, input_type, text_content, is_private)')
                     .eq('user_id', session.user.id)
                     .order('created_at', { ascending: false })
                     .limit(300);
@@ -187,6 +187,17 @@
                     dateEl.className = 'scan-row-date';
                     dateEl.innerText = dateFmt.format(new Date(row.created_at));
                     snippet.appendChild(dateEl);
+                    // POPRAWKA 2026-08-28(za) — prywatna analiza tekstu mogła zostać
+                    // upubliczniona przez kogoś innego, kto wkleił dokładnie tę samą
+                    // treść bez zaznaczania prywatności (patrz GAKORI_CONTEXT.md,
+                    // scenariusz 4). Pozycja ZOSTAJE na tej liście, ale musi być jasno
+                    // oznaczona, że faktycznie już nie jest prywatna.
+                    if (row.scans && row.scans.input_type === 'text' && row.scans.is_private === false) {
+                        const publicBadge = document.createElement('span');
+                        publicBadge.className = 'scan-row-public-badge';
+                        publicBadge.innerText = t('history_now_public');
+                        snippet.appendChild(publicBadge);
+                    }
                     link.appendChild(snippet);
 
                     const arrow = document.createElement('span');

@@ -106,6 +106,7 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_IitZfwgddsrCIo3iepG0Fg_CVqN-GBd';
         const SUPABASE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/analyze';
         const REPORT_MISMATCH_FUNCTION_URL = SUPABASE_URL + '/functions/v1/report-link-mismatch';
+        const RECORD_VIEW_FUNCTION_URL = SUPABASE_URL + '/functions/v1/record-view';
 
         // Ten sam sposób liczenia hasha co w index.html (musi dać identyczny
         // wynik dla tego samego linku, żeby trafić w ten sam wiersz cache'u).
@@ -359,6 +360,18 @@
                             showNotFound();
                             return;
                         }
+                        // POPRAWKA 2026-08-28(za) — "Wyświetlono X razy" ma teraz liczyć
+                        // FAKTYCZNE wyświetlenia tej strony (różne adresy IP), nie ponowne
+                        // analizy identycznej treści (patrz GAKORI_CONTEXT.md). Fire-and-
+                        // forget — nie czekamy na odpowiedź i nie blokujemy nią renderowania
+                        // wyniku; funkcja jest świadomie fail-open (nigdy nie zwraca błędu,
+                        // który dałoby się tu zauważyć), więc `.catch()` tylko wycisza
+                        // ewentualny błąd sieci, nie zgłasza go dalej.
+                        fetch(RECORD_VIEW_FUNCTION_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+                            body: JSON.stringify({ scan_id: scanId })
+                        }).catch(() => {});
                         // Jeśli to WŁAŚNIE ta osoba przed chwilą przesłała te obrazy do
                         // analizy, index.html zostawił ich pomniejszone miniatury w
                         // sessionStorage jako tablicę JSON (patrz index.html, sekcja 7) —

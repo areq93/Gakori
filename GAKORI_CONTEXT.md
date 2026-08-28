@@ -5816,6 +5816,185 @@ wbudowanego skryptu `index.html` sprawdzona (`node --check`) — bez
 błędów. Czysta zmiana CSS/HTML, bez backendu — nic do wklejenia w
 Supabase.
 
+**POPRAWKA 2026-08-28(za) — DUŻY PAKIET: prawdziwa prywatność tekstu
+(scenariusze łączenia/scalania z cache'em), ochrona PDF-a/obrazu przed
+anonimowym dostępem, "Wyświetlono X razy" liczone od realnych wyświetleń
+strony, jednorazowa naprawa jednej analizy.**
+
+**Zgłoszenie właściciela**: zrobił prywatną analizę tekstu, a mimo to
+znalazł ją w publicznej wyszukiwarce na stronie głównej — "nikt nie
+powinien jej tu widzieć". Doprecyzował: "moja wyszukiwarka prywatna i ta
+w głównym panelu to dwie różne wyszukiwarki, niezależne — prywatna
+analiza nigdy nie może się pojawiać w głównej wyszukiwarce".
+
+**Prawdziwa przyczyna** (znaleziona w kodzie, nie zgadywana): cache
+`analyze/index.ts` dopasowywał wynik WYŁĄCZNIE po `(content_hash,
+language)`, bez względu na to, kto o co prosi. Dwie realne luki:
+1. Ktoś zaznaczał "prywatna", ale jeśli identyczna treść była już
+   kiedyś w bazie jako PUBLICZNA, dostawał z powrotem TĘ starą, publiczną
+   analizę — checkbox po cichu ignorowany.
+2. Dla PDF-a/obrazu (zawsze prywatne) i tekstu-już-prywatnego, wynik
+   (`existing.result`) był oddawany w odpowiedzi BEZ SPRAWDZENIA, czy
+   pytający w ogóle ma do niego prawo — `scan_access` był tylko
+   DOPISYWANY przy okazji, nigdy wymagany. Anonimowy użytkownik, który
+   prześle bajt-w-bajt identyczny plik/tekst co czyjaś prywatna analiza,
+   dostawałby ją za darmo, bez logowania.
+
+**5 scenariuszy ustalonych wspólnie z właścicielem** (kilka rund
+doprecyzowań na żywo w rozmowie):
+1. Nikt wcześniej tego nie analizował, ktoś zaznacza "prywatna" → nowa,
+   płatna, wyłącznie prywatna analiza (osobny wiersz).
+2. Treść była JUŻ publiczna, ktoś teraz zaznacza "prywatna" →
+   sprywatyzowanie "po fakcie" niemożliwe (ktoś inny mógł już to
+   zobaczyć/zapisać) — oddajemy ten publiczny wynik ZA DARMO, z jasnym
+   komunikatem (`privatize_denied` → `notice_privatize_denied`), zamiast
+   po cichu ignorować checkbox jak dawniej.
+3. Ten sam użytkownik już wcześniej skanował to prywatnie → darmowy
+   cache jego WŁASNEGO wcześniejszego wyniku (szukane przez
+   `scan_access`, nigdy przez sam `is_private`, żeby nie dało się trafić
+   w cudzy prywatny wiersz).
+4. Treść była prywatna u jednej lub kilku osób, ktoś nowy skanuje BEZ
+   zaznaczania prywatności → dostaje zwykłą publiczną analizę (darmową —
+   jedna z istniejących prywatnych kopii zostaje "awansowana" na
+   publiczną zamiast płacenia za analizę od nowa). WSZYSTKIE istniejące
+   prywatne kopie tej treści zostają SCALONE w ten jeden wiersz — każda
+   osoba, która miała to prywatnie, zachowuje pozycję w "Twoich
+   prywatnych analizach" (przez przepięty `scan_access`), ale oznaczoną
+   jako "🌐 Teraz publiczna" (`historia.html`). Zapisywana jest też
+   notatka pod przyszłą skrzynkę odbiorczą (`scan_privacy_notices`) —
+   samo wysyłanie/pokazywanie powiadomień to osobna funkcja, świadomie
+   odłożona na później (właściciel: "będziemy musieli zrobić
+   użytkownikom skrzynkę odbiorczą — kolejny przycisk w prawym górnym
+   rogu").
+5. Treść była już publiczna, ktoś nowy skanuje bez zaznaczania
+   prywatności → bez zmian, jak dziś, darmowy publiczny cache.
+   Dotyczy WYŁĄCZNIE trybu Tekst — PDF/obraz nie mają opcji "upublicznij",
+   więc scenariusz 4 ich nie dotyczy.
+
+**Zmiany w `analyze/index.ts`**:
+- Sekcja "2. CACHE" przepisana na trzy osobne ścieżki wyszukiwania
+  zamiast jednego wspólnego zapytania: (a) `text` + zaznaczona prywatność
+  → najpierw sprawdź publiczny wynik (scenariusz 2), potem WŁASNY
+  prywatny przez `scan_access` (scenariusz 3); (b) `text` bez zaznaczenia
+  → tylko publiczne wiersze, z fallbackiem na
+  `promotePrivateTextDuplicatesToPublic()` (scenariusz 4); (c) url/pdf/
+  image → bez zmian względem starej logiki.
+- Nowa funkcja `promotePrivateTextDuplicatesToPublic(supabase,
+  contentHash, language)`: znajduje WSZYSTKIE prywatne wiersze tekstu z
+  tym content_hash+language, "awansuje" najstarszy na publiczny
+  (`is_private = false`), przepina `scan_access` wszystkich posiadaczy
+  pozostałych duplikatów na ten jeden wiersz, usuwa duplikaty, zapisuje
+  notatkę w `scan_privacy_notices` dla każdej dotkniętej osoby (w tym
+  właściciela kanonicznego wiersza — jego prywatna analiza też właśnie
+  stała się publiczna).
+- Nowa ochrona: `if (existing.input_type === 'pdf' || 'image') &&
+  !user_id` → zwraca `401 login_required` zamiast oddać wynik za darmo
+  anonimowi. Zalogowany przepływ bez zmian.
+- `view_count` NIE jest już zwiększane przy trafieniu w cache (patrz
+  niżej — inny mechanizm liczenia).
+- Odpowiedź cache-hit ma nowe pole `privatize_denied` (true wyłącznie w
+  scenariuszu 2).
+
+**"Wyświetlono X razy" — nowy mechanizm.** Właściciel: "one się nabijają
+tylko przy trafieniu w cache, a ja chcę żeby wyświetlenie nabijało się,
+kiedy różne IP po prostu je wyświetla". Rozwiązanie: nowa Edge Function
+`record-view` (wołana przez `scan.html` przy KAŻDYM otwarciu strony z
+wynikiem, fire-and-forget, fail-open) — liczy odcisk adresu IP
+(`hashIp()`, ten sam mechanizm co `link_view_confirmations`), zapisuje do
+nowej tabeli `scan_view_ips` z `UNIQUE (scan_id, ip_hash)` (ten sam adres
+wracający wielokrotnie liczy się raz), a TRIGGER na tej tabeli
+(`bump_scan_view_count()`) atomowo zwiększa `scans.view_count` — bez
+ryzyka wyścigu, bez dodatkowego zapytania z poziomu edge function. Nowe
+wiersze `scans` startują teraz od `view_count = 0` (nie 1) — pierwsze
+faktyczne wyświetlenie (przekierowanie od razu po analizie) samo doliczy
+się jako "1"; start od 1 liczyłby to podwójnie.
+
+**SQL migracji** (wklejony i uruchomiony ręcznie w Supabase SQL Editor —
+pełna treść też w pliku wysłanym właścicielowi):
+```sql
+-- (1) unikalność (content_hash, language) TYLKO dla publicznych wierszy
+DO $$
+DECLARE con record;
+BEGIN
+  FOR con IN
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+    WHERE c.conrelid = 'public.scans'::regclass AND c.contype = 'u'
+    GROUP BY c.conname
+    HAVING array_agg(a.attname ORDER BY a.attname) = ARRAY['content_hash','language']::name[]
+  LOOP
+    EXECUTE format('ALTER TABLE public.scans DROP CONSTRAINT %I', con.conname);
+  END LOOP;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS scans_public_content_hash_language_idx
+  ON public.scans (content_hash, language)
+  WHERE is_private = false;
+
+-- (2) notatki pod przyszłą skrzynkę odbiorczą
+CREATE TABLE IF NOT EXISTS public.scan_privacy_notices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scan_id uuid NOT NULL REFERENCES public.scans(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  seen boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.scan_privacy_notices ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "scan_privacy_notices_select_own" ON public.scan_privacy_notices
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- (3) liczniki wyświetleń po IP + trigger
+CREATE TABLE IF NOT EXISTS public.scan_view_ips (
+  scan_id uuid NOT NULL REFERENCES public.scans(id) ON DELETE CASCADE,
+  ip_hash text NOT NULL,
+  viewed_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (scan_id, ip_hash)
+);
+ALTER TABLE public.scan_view_ips ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.bump_scan_view_count()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.scans SET view_count = view_count + 1 WHERE id = NEW.scan_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_scan_view_ips_bump ON public.scan_view_ips;
+CREATE TRIGGER trg_scan_view_ips_bump
+AFTER INSERT ON public.scan_view_ips
+FOR EACH ROW EXECUTE FUNCTION public.bump_scan_view_count();
+```
+
+**Jednorazowa naprawa** tej konkretnej analizy ("Spór o fałszywe reklamy w
+internecie", `id = 81950104-fa14-4e3f-9383-31130bffa575`) — ustawiona
+ręcznie na `is_private = true` + wpis w `scan_access` dla właściciela
+(znaleziony po e-mailu w `auth.users`), tym samym SQL-em.
+
+**Inne zmiany frontendu**:
+- `index.html`: `fetchAndRenderScans()` (publiczna wyszukiwarka) dostała
+  jawny filtr `.eq('is_private', false)` — druga, niezależna warstwa
+  ochrony OBOK RLS, nie zamiast niej (obrona w głąb — ten sam błąd nie
+  powinien móc wystawić prywatnej treści nawet gdyby coś innego zawiodło).
+  Nowa obsługa `data.privatize_denied` (alert) i błędu `login_required`
+  (`errorMessageKeys`).
+- `scan.html`: wywołanie `record-view` przy każdym otwarciu wyniku.
+- `historia.html`: zapytanie o `scan_access` dociąga teraz też
+  `scans.is_private`; `buildRow()` dokleja znacznik "🌐 Teraz publiczna"
+  (`.scan-row-public-badge`, nowa klasa w `style.css`) dla pozycji
+  tekstowych, które przestały być prywatne przez scenariusz 4.
+- `i18n.js`: nowe klucze `err_login_required`, `notice_privatize_denied`,
+  `history_now_public` (10 języków).
+
+Weryfikacja: `node --experimental-strip-types --check` dla
+`analyze/index.ts` i nowego `record-view/index.ts` (bez błędów),
+`tsc --noEmit --skipLibCheck` dla obu (te same znane błędy środowiskowe
+co zawsze — importy `jsr:`/`npm:`, globalne `Deno`, 2 stare implicit-any
+niezwiązane z tą zmianą). Nawiasy klamrowe w `style.css` sparowane
+(135/135). Składnia wbudowanych skryptów `index.html`/`scan.html`/
+`historia.html` sprawdzona (`node --check`) — bez błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

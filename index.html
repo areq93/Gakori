@@ -410,7 +410,14 @@
             // odkrywalności — patrz GAKORI_CONTEXT.md). Bezpośredni link do
             // takiej analizy (scan.html?id=...) nadal działa dla osoby, która
             // go ma — po prostu nie jest "odkrywalny".
-            let request = sb.from('scans').select('id, content_hash, input_type, result, created_at').eq('language', currentLang).not('input_type', 'in', '(image,pdf)');
+            // POPRAWKA 2026-08-28(za) — jawny filtr `is_private=false` tutaj,
+            // NIE tylko poleganie na RLS w bazie — druga, niezależna warstwa
+            // ochrony przed tym samym błędem, który już raz wpuścił
+            // prywatną analizę tekstu do TEJ wyszukiwarki (patrz
+            // GAKORI_CONTEXT.md). Ta wyszukiwarka i "Twoje prywatne
+            // analizy" (historia.html) to dwa NIEZALEŻNE mechanizmy —
+            // wynik prywatny nie może się pojawić w obu naraz.
+            let request = sb.from('scans').select('id, content_hash, input_type, result, created_at').eq('language', currentLang).eq('is_private', false).not('input_type', 'in', '(image,pdf)');
             if (query) {
                 // POPRAWKA 2026-08-28(h) — dawniej szukało WYŁĄCZNIE w
                 // "source_quote"/"summary", ale to, co czytelnik faktycznie
@@ -1299,6 +1306,7 @@
                     too_many_images: 'err_too_many_images',
                     invalid_pdf: 'err_invalid_pdf',
                     system_paused: 'err_system_paused',
+                    login_required: 'err_login_required',
                 };
                 if (data.error === 'pdf_too_long') {
                     summary.innerText = t('err_pdf_too_long', { count: data.page_count, max: data.max_pages });
@@ -1476,6 +1484,13 @@
                     } catch {
                         // limit miejsca w sessionStorage — pomijamy "paragon", nie blokujemy przejścia
                     }
+                    // POPRAWKA 2026-08-28(za) — scenariusz 2: ktoś zaznaczył
+                    // "prywatna", ale treść była już publiczna wcześniej —
+                    // sprywatyzowanie "po fakcie" nie jest możliwe. Backend
+                    // i tak oddał darmowy, publiczny wynik (patrz niżej) —
+                    // tylko informujemy, żeby checkbox nie wyglądał na po
+                    // cichu zignorowany.
+                    if (data.privatize_denied) alert(t('notice_privatize_denied'));
                     // Przechodzimy w TEJ SAMEJ karcie na stronę z wynikiem
                     // (nie otwieramy nowej karty przeglądarki).
                     window.location.href = 'scan.html?id=' + encodeURIComponent(data.id);

@@ -149,6 +149,75 @@ async function logQuietConfirmation(supabase: ReturnType<typeof createClient>, s
   )
 }
 
+// POPRAWKA 2026-08-28(za) — scenariusz 4 z prywatnością tekstu (patrz
+// GAKORI_CONTEXT.md po pełny opis 5 scenariuszy ustalonych z właścicielem):
+// ktoś publikuje treść, która wcześniej istniała WYŁĄCZNIE jako prywatna
+// kopia (kopie) u innej osoby/innych osób. Zamiast płacić za nową analizę
+// (treść jest identyczna — content_hash się zgadza — więc wynik i tak
+// byłby ten sam), "awansujemy" JEDNĄ z istniejących prywatnych kopii na
+// publiczną i przepinamy dostęp WSZYSTKICH dotychczasowych posiadaczy na
+// TEN SAM, jedyny odtąd wiersz — każdy z nich zachowuje wpis w swoich
+// prywatnych analizach (przez `scan_access`), ale wynik jest teraz
+// publiczny (historia.html rozpoznaje to po `scans.is_private` i pokazuje
+// etykietę "Publiczna"). Duplikaty (wiersze inne niż wybrany kanoniczny)
+// są usuwane — inaczej mielibyśmy kilka wierszy z tym samym
+// content_hash+language jednocześnie oznaczonych jako publiczne, co łamie
+// założenie "jeden publiczny wynik na treść+język" (patrz częściowy
+// indeks unikalności w SQL migracji).
+// Zapisuje też notatkę pod przyszłą skrzynkę odbiorczą
+// (`scan_privacy_notices`) dla każdej osoby, której to dotyczy — samo
+// wysyłanie/pokazywanie powiadomień to osobna funkcja, którą właściciel
+// świadomie odłożył na później (patrz rozmowa 2026-08-28).
+async function promotePrivateTextDuplicatesToPublic(
+  supabase: ReturnType<typeof createClient>,
+  contentHash: string,
+  language: string
+): Promise<Record<string, unknown> | null> {
+  const { data: duplicates } = await supabase
+    .from('scans')
+    .select('*')
+    .eq('content_hash', contentHash)
+    .eq('language', language)
+    .eq('input_type', 'text')
+    .eq('is_private', true)
+    .order('created_at', { ascending: true })
+  if (!duplicates || duplicates.length === 0) return null
+
+  const [canonical, ...rest] = duplicates as Array<Record<string, unknown>>
+
+  const { data: promoted } = await supabase
+    .from('scans')
+    .update({ is_private: false })
+    .eq('id', canonical.id)
+    .select()
+    .single()
+
+  // Notatka dla właściciela(-i) samego kanonicznego wiersza — ich prywatna
+  // analiza też właśnie stała się publiczna, dokładnie tak samo jak
+  // posiadaczom duplikatów niżej.
+  const { data: canonicalAccessRows } = await supabase.from('scan_access').select('user_id').eq('scan_id', canonical.id)
+  for (const row of canonicalAccessRows ?? []) {
+    await supabase.from('scan_privacy_notices').insert({ scan_id: canonical.id, user_id: row.user_id })
+  }
+
+  for (const dup of rest) {
+    const { data: dupAccessRows } = await supabase.from('scan_access').select('user_id').eq('scan_id', dup.id)
+    for (const row of dupAccessRows ?? []) {
+      // `upsert`, nie `insert` — na wypadek (mało prawdopodobny, ale
+      // bezpieczny), gdyby ta sama osoba miała dostęp też do wiersza
+      // kanonicznego już wcześniej.
+      await supabase
+        .from('scan_access')
+        .upsert({ scan_id: canonical.id, user_id: row.user_id, source_filename: null }, { onConflict: 'scan_id,user_id' })
+      await supabase.from('scan_privacy_notices').insert({ scan_id: canonical.id, user_id: row.user_id })
+    }
+    await supabase.from('scan_access').delete().eq('scan_id', dup.id)
+    await supabase.from('scans').delete().eq('id', dup.id)
+  }
+
+  return (promoted as Record<string, unknown> | null) ?? canonical
+}
+
 // Warstwa 1 (bonus, darmowa, gdy to możliwe) — patrz GAKORI_CONTEXT.md.
 // Throttlowane: sprawdzamy świeżość NAJWYŻEJ raz na 24h na dany wpis, nie
 // przy każdym wyświetleniu — inaczej obciążalibyśmy cudze strony
@@ -2103,12 +2172,111 @@ Deno.serve(async (req: Request) => {
     // Cache jest wspólny dla wszystkich użytkowników, ale wynik AI jest teraz
     // generowany w wybranym języku — bez filtra po języku ktoś analizujący
     // po polsku mógłby dostać z cache'u wynik po angielsku (albo odwrotnie).
-    const { data: existing } = await supabase
-      .from('scans')
-      .select('*')
-      .eq('content_hash', effectiveContentHash)
-      .eq('language', outputLanguage)
-      .maybeSingle()
+    //
+    // POPRAWKA 2026-08-28(za) — PRYWATNOŚĆ TEKSTU A WSPÓLNY CACHE. Dawniej
+    // był to JEDEN prosty lookup po (content_hash, language), bez względu na
+    // to, kto o co prosi — miało to dwie realne luki, obie zgłoszone przez
+    // właściciela (prywatna analiza tekstu widoczna w publicznej
+    // wyszukiwarce głównej strony):
+    // (1) ktoś zaznaczał "prywatna", ale jeśli identyczna treść była już
+    //     kiedyś w bazie jako PUBLICZNA, dostawał z powrotem TĘ starą,
+    //     publiczną analizę — checkbox po cichu ignorowany.
+    // (2) dla PDF/obrazu (zawsze prywatne) i tekstu-już-prywatnego, wynik
+    //     (`existing.result`) był oddawany w odpowiedzi BEZ SPRAWDZENIA, czy
+    //     pytający w ogóle ma do niego prawo — `scan_access` był tylko
+    //     DOPISYWANY przy okazji, nigdy wymagany. Anonimowy użytkownik, który
+    //     prześle bajt-w-bajt identyczny plik/tekst co czyjaś prywatna
+    //     analiza, dostawałby ją za darmo, bez logowania.
+    //
+    // Rozwiązanie — osobna ścieżka wyszukiwania w zależności od tego, o co
+    // proszę (5 scenariuszy ustalonych wspólnie z właścicielem, pełny opis w
+    // GAKORI_CONTEXT.md):
+    // deno-lint-ignore no-explicit-any
+    let existing: any = null
+    // Ustawiane WYŁĄCZNIE w scenariuszu 2 (treść już publiczna, ktoś próbuje
+    // ją teraz sprywatyzować) — frontend pokaże wtedy krótki komunikat, że
+    // sprywatyzowanie już publicznej treści nie jest możliwe.
+    let privatizeDenied = false
+
+    if (input_type === 'text' && isPrivateTextRequested) {
+      // Scenariusz 2: treść mogła już być publiczna — sprywatyzowanie "po
+      // fakcie" nie jest możliwe (ktoś inny mógł już ją zobaczyć/zapisać
+      // sobie link). Oddajemy wtedy ten publiczny wynik za darmo, z jasnym
+      // komunikatem, zamiast po cichu ignorować checkbox jak dawniej.
+      const { data: publicHit } = await supabase
+        .from('scans')
+        .select('*')
+        .eq('content_hash', effectiveContentHash)
+        .eq('language', outputLanguage)
+        .eq('is_private', false)
+        .maybeSingle()
+      if (publicHit) {
+        existing = publicHit
+        privatizeDenied = true
+      } else if (user_id) {
+        // Scenariusz 3: czy TEN KONKRETNY użytkownik ma już WŁASNĄ prywatną
+        // analizę tej samej treści? Szukamy przez `scan_access` (nie samo
+        // `scans.is_private`), żeby dostać TYLKO wiersz, do którego ten
+        // użytkownik faktycznie ma przyznany dostęp — nigdy cudzy prywatny.
+        const { data: ownAccess } = await supabase
+          .from('scan_access')
+          .select('scans!inner(*)')
+          .eq('user_id', user_id)
+          .eq('scans.content_hash', effectiveContentHash)
+          .eq('scans.language', outputLanguage)
+          .eq('scans.is_private', true)
+          .maybeSingle()
+        existing = ownAccess?.scans ?? null
+      }
+      // Jeśli dalej `null` — nikt (albo ktoś inny) miał to prywatnie: leci
+      // do pełnej, nowej, płatnej, WYŁĄCZNIE prywatnej analizy niżej (bez
+      // wczesnego return) — scenariusz 1.
+    } else if (input_type === 'text') {
+      // Zwykłe żądanie publiczne (checkbox NIE zaznaczony) — szukamy
+      // WYŁĄCZNIE wśród publicznych wierszy, nigdy wśród cudzych prywatnych.
+      const { data: publicHit } = await supabase
+        .from('scans')
+        .select('*')
+        .eq('content_hash', effectiveContentHash)
+        .eq('language', outputLanguage)
+        .eq('is_private', false)
+        .maybeSingle()
+      existing = publicHit
+      if (!existing) {
+        // Scenariusz 4: może istnieć jedna lub więcej PRYWATNYCH kopii tej
+        // samej treści u innych osób — scalamy je w jeden, teraz publiczny
+        // wynik (i przepinamy dostęp/notatkę dla każdej osoby, która go
+        // dotąd miała prywatnie — patrz promotePrivateTextDuplicatesToPublic
+        // wyżej), zamiast płacić za analizę od nowa.
+        existing = await promotePrivateTextDuplicatesToPublic(supabase, effectiveContentHash, outputLanguage)
+      }
+    } else {
+      // url / pdf / image — bez zmian względem dotychczasowej logiki
+      // (proste dopasowanie po content_hash+language); PDF/obraz mają
+      // dodatkową ochronę przed anonimowym dostępem tuż niżej.
+      const { data } = await supabase
+        .from('scans')
+        .select('*')
+        .eq('content_hash', effectiveContentHash)
+        .eq('language', outputLanguage)
+        .maybeSingle()
+      existing = data
+    }
+
+    // Ochrona przed anonimowym dostępem do cudzej prywatnej treści przez
+    // PDF/obraz — patrz punkt (2) w komentarzu wyżej. Dotyczy WYŁĄCZNIE
+    // sytuacji, gdy ktoś BEZ zalogowania prześle bajt-w-bajt identyczny
+    // plik co czyjaś już zapisana, prywatna analiza — zalogowany przepływ
+    // (gdziekolwiek indziej w tym pliku) bez zmian.
+    if (existing && (existing.input_type === 'pdf' || existing.input_type === 'image') && !user_id) {
+      return new Response(
+        JSON.stringify({
+          error: 'login_required',
+          message: 'Ta treść jest prywatna — zaloguj się, żeby ją zobaczyć.',
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // POPRAWKA 2026-08-23(a), punkt B — treść automatycznie wycofana
     // (`retracted`, patrz `report-link-mismatch`) NIGDY nie jest serwowana
@@ -2125,10 +2293,11 @@ Deno.serve(async (req: Request) => {
       if (input_type === 'url' && forceRefresh) {
         console.log(`[refresh-debug] wczesny cache po content_hash trafiony dla url=${source_url}, id=${existing.id}, is_manual_source=${existing.is_manual_source}`)
       }
-      await supabase
-        .from('scans')
-        .update({ view_count: existing.view_count + 1 })
-        .eq('id', existing.id)
+      // POPRAWKA 2026-08-28(za) — `view_count` NIE jest już zwiększane tutaj.
+      // "Wyświetlono X razy" na scan.html ma teraz liczyć FAKTYCZNE
+      // wyświetlenia strony (przez różne adresy IP), nie ponowne analizy
+      // identycznej treści — patrz nowa funkcja `record-view` wołana przez
+      // scan.html, i GAKORI_CONTEXT.md po pełne uzasadnienie.
 
       // PDF/obraz/prywatny tekst: w przeciwieństwie do reszty trybów, wynik
       // NIE jest publicznie czytelny (patrz RLS na `scans` w
@@ -2182,6 +2351,11 @@ Deno.serve(async (req: Request) => {
           // "url" (z refresh_scan_id) niezależnie od tego, w jakim trybie
           // ta treść powstała pierwotnie (patrz punkt A1, GAKORI_CONTEXT.md).
           source_url: existing.source_url,
+          // POPRAWKA 2026-08-28(za) — patrz `privatizeDenied` wyżej: true
+          // WYŁĄCZNIE w scenariuszu 2 (próba sprywatyzowania już publicznej
+          // treści) — frontend pokazuje wtedy krótki komunikat zamiast
+          // milczącego zignorowania checkboxa.
+          privatize_denied: privatizeDenied,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -3877,12 +4051,17 @@ ${compactExisting}`
     // `view_count` NIE jest częścią odświeżenia — przy `refreshScanId`
     // zachowujemy dotychczasowy licznik wyświetleń wiersza (m.in. wchodzi do
     // wzoru procentowego automatycznego wycofania, punkt B audytu, patrz
-    // GAKORI_CONTEXT.md). Nowy wiersz startuje od 1, jak dawniej.
+    // GAKORI_CONTEXT.md). POPRAWKA 2026-08-28(za) — nowy wiersz startuje
+    // teraz od 0, nie 1: "Wyświetlono X razy" liczy odtąd FAKTYCZNE
+    // wyświetlenia strony wyniku (przez różne adresy IP, patrz funkcja
+    // `record-view`), a pierwsze wyświetlenie (przekierowanie od razu po
+    // analizie) samo doliczy się jako pierwsze "1" — start od 1 tutaj
+    // policzyłby to podwójnie.
     const { data: newScan, error: insertError } = refreshScanId
       ? await supabase.from('scans').update(scanRow).eq('id', refreshScanId).select().single()
       : await supabase
           .from('scans')
-          .upsert({ ...scanRow, view_count: 1 }, { onConflict: 'content_hash,language' })
+          .upsert({ ...scanRow, view_count: 0 }, { onConflict: 'content_hash,language' })
           .select()
           .single()
 
