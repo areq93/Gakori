@@ -6156,6 +6156,37 @@ znanych linii). Składnia wszystkich zmienionych plików HTML (inline
 kątem zbalansowania klamer. `sw.js` `CACHE_NAME` podbite, żeby przeglądarki
 pobrały nowe pliki.
 
+**POPRAWKA 2026-08-28(zf) — właściciel zgłosił dwa problemy zaraz po
+wdrożeniu (ze): (1) zbędny, redundantny przycisk "Twoje analizy" na dole
+`account.html`, skoro ikonka w prawym górnym rogu robi to samo; (2)
+prywatne analizy zniknęły z listy "Twoje analizy".** Przyczyna (2):
+`historia.html` zaczęła pobierać dane z NOWEJ tabeli `scan_history`
+zamiast ze starej `scan_access` — ale `scan_history` jest pusta dla
+WSZYSTKICH analiz sprzed tego wdrożenia (zapisuje się tylko od teraz,
+przy nowych zapytaniach). Stare prywatne analizy nadal mają swój wpis w
+`scan_access`, ale nigdy nie trafiły do `scan_history`, więc znikły z
+widoku. Naprawa dwuczęściowa:
+- `account.html`: usunięty duplikat przycisku "Twoje analizy →" (dodany w
+  (ze)) razem z jego obsługą w JS — zostaje wyłącznie ikonka w prawym
+  górnym rogu (`historyBtn`), tak jak było wcześniej.
+- Jednorazowe uzupełnienie danych (właściciel musi uruchomić RAZ, po
+  migracji z (ze)): przepisanie wszystkich istniejących wierszy
+  `scan_access` do `scan_history`, żeby stare prywatne analizy od razu
+  wróciły na listę:
+  ```sql
+  INSERT INTO public.scan_history (scan_id, user_id, source_filename)
+  SELECT scan_id, user_id, source_filename FROM public.scan_access
+  ON CONFLICT (scan_id, user_id) DO NOTHING;
+  ```
+  To NIE przywraca historii starych PUBLICZNYCH analiz (link/publiczny
+  tekst) sprzed (ze) — dla nich nigdy nie istniał żaden mechanizm
+  śledzenia "kto to zrobił", więc nie ma skąd tego odtworzyć; od teraz (od
+  wdrożenia (ze)) każda nowa analiza, także publiczna, zapisuje się
+  poprawnie. Właściciel został o tym wprost poinformowany.
+
+Weryfikacja: `node --check` na wyekstrahowanym `<script>` z `account.html`
+bez błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

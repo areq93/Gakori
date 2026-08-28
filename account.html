@@ -83,18 +83,7 @@
             </div>
             <div id="accountStatus" style="margin-top:10px; font-size:13px; text-align:center; color:var(--ink-soft);"></div>
 
-            <!-- POPRAWKA 2026-08-28(ze) — dodatkowe, redundantne wejście do
-                 "Twoje analizy" na dole panelu konta, obok ikonki w prawym
-                 górnym rogu (widocznej wszędzie) — właściciel poprosił
-                 wprost o taki dodatkowy panel "na samym dole". Zwykły
-                 <button> z przekierowaniem zamiast <a>, żeby dziedziczył tę
-                 samą, gotową stylistykę co reszta przycisków bez nowej
-                 klasy CSS. -->
             <div style="margin-top:18px;">
-                <button id="myAnalysesLink" type="button" data-i18n="link_pdf_history">Twoje analizy →</button>
-            </div>
-
-            <div style="margin-top:10px;">
                 <button id="logoutBtn" type="button" data-i18n="btn_logout">Wyloguj</button>
             </div>
         </div>
@@ -249,10 +238,6 @@
                 document.getElementById('accountEmail').innerText = session.user.email;
                 document.getElementById('accountLoading').style.display = 'none';
                 document.getElementById('accountContent').style.display = 'block';
-            });
-
-            document.getElementById('myAnalysesLink').addEventListener('click', () => {
-                window.location.href = 'historia.html';
             });
 
             document.getElementById('logoutBtn').addEventListener('click', async () => {
