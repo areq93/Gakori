@@ -5074,6 +5074,142 @@ też dla `historia.html`/`index.html` — wyciągnięte i sprawdzone osobno
 przez `node --check`) oraz `tsc --noEmit --skipLibCheck` dla
 `analyze/index.ts` (te same znane błędy środowiskowe co zawsze).
 
+**POPRAWKA 2026-08-28(g2) — checkbox prywatności wyglądał "paskudnie"
+(zgłoszenie właściciela ze zrzutem ekranu): rozjechana belka zamiast
+małego kwadracika.** Przyczyna: globalna reguła `input, textarea { width:
+100%; padding: ...; border: ...; }` w `style.css` (myślana dla pól
+tekstowych) stosowała się też do `<input type="checkbox">`, bo selektor
+`input` łapie WSZYSTKIE typy pól. Naprawa: selektor zawężony do
+`input:not([type="checkbox"]):not([type="radio"])`, plus nowa, osobna,
+mała reguła `input[type="checkbox"], input[type="radio"] { width: 16px;
+height: 16px; ... }`. Poprawiony też `align-items` etykiety w `index.html`
+(`flex-start` zamiast `center`), żeby dwuwierszowy tekst obok checkboxa
+wyglądał naturalnie.
+
+**POPRAWKA 2026-08-28(h) — duży pakiet: prawdziwe tytuły analiz + naprawa
+ucinania tekstu WSZĘDZIE + przebudowa "Twoje prywatne analizy" (3 karty +
+wspólna wyszukiwarka + limit 20/typ) + naprawa słabego wyszukiwania na
+stronie głównej.** Właściciel zgłosił żywym zrzutem ekranu (lista "Twoje
+prywatne analizy"), że wolałby osobne karty na typ, wspólną wyszukiwarkę
+przeszukującą wszystkie typy naraz, limit do 20 wyników — i przy okazji
+zauważył, że tytuły się ucinają (dotyczy też strony głównej, "Wyszukaj
+analizę" — drugi zrzut ekranu). Zapytany wprost, dlaczego wyszukiwarka na
+stronie głównej "słabo szuka", odpowiedział, że koncept NADAWANIA tytułów
+też trzeba ustalić, bo dzisiejsze są "chaotyczne i bez znaczenia".
+
+**Diagnoza (przed jakąkolwiek zmianą)**: dzisiejszy "tytuł" na obu listach
+to w praktyce PRZYPADKOWY fragment — pierwszy wykryty cytat wzorca albo
+`source_quote`/`summary` — nie prawdziwy tytuł treści. To samo źródło
+tłumaczy oba zgłoszenia naraz: (1) wygląda chaotycznie, bo to nie jest
+zaprojektowany tytuł, tylko urwany środek zdania; (2) wyszukiwarka na
+stronie głównej sprawdzała WYŁĄCZNIE `source_quote`/`summary` — czyli
+często coś INNEGO niż to, co faktycznie wyświetlała jako tytuł
+(`patterns[0].quote`) — więc wpisanie dokładnie tego, co widać na liście,
+regularnie nic nie znajdowało.
+
+**Ustalona z właścicielem koncepcja tytułu** (`AskUserQuestion` — kierunek
+paska: pionowy, nie poziomy/karuzela; tytuł tekstu: wygenerowany przez AI,
+nie pierwsze znaki treści):
+- **Link** — PRAWDZIWY tytuł strony, wyciągnięty przez Readability
+  (`article.title` — INNY, dużo bardziej niezawodny mechanizm niż zawodny
+  `article.excerpt` z POPRAWKI (e): `title` pochodzi z `<title>`/nagłówka
+  strony, nie z meta-opisu SEO). Darmowe, dokładne, zero ryzyka
+  "wymyślenia" złego tytułu.
+- **PDF i obraz** — bez zmian, mają już sensowny tytuł: prawdziwą nazwę
+  pliku (`scan_access.source_filename`).
+- **Wklejony tekst** — nie ma naturalnego tytułu, więc Gemini generuje go
+  jako część TEJ SAMEJ analizy (zero dodatkowych zapytań/kosztu) — nowe
+  pole "title" w schemacie odpowiedzi.
+
+**Zmiany w `analyze/index.ts`:**
+1. Nowa sekcja "TYTUŁ" w `buildSystemPrompt()` (i bullet w "Zasady") —
+   3-8 słów, w języku wyniku, opisuje TEMAT treści (jak nagłówek
+   artykułu), WPROST zakazane słowa oceniające ("manipulacja", "uważaj",
+   "fałsz" itd. — ten sam duch co sekcja NEUTRALNOŚĆ) z jawnym złym
+   przykładem ("Manipulacyjny artykuł o..." — to ocena, nie temat).
+2. Nowe pole `title: { type: 'string' }` w `RESPONSE_SCHEMA` i
+   `DETECTION_RESPONSE_SCHEMA` (wymagane) — celowo UMIESZCZONE PO
+   `patterns`/`summary` w kolejności schematu (Gemini wypełnia pola po
+   kolei), żeby model najpierw przetrawił całą treść i własne
+   podsumowanie, zanim napisze zwięzły tytuł — dokładnie ten sam
+   mechanizm co "reasoning_steps na początku" z POPRAWKI 2026-08-20(c),
+   tylko w drugą stronę (tu chcemy tytuł NA KOŃCU, nie na początku).
+3. `fetchUrlAsText()` zwraca teraz `{ text, title }` zamiast samego
+   tekstu (title = `article.title` z Readability, przycięty do 200
+   znaków, bez prób obcinania nazwy serwisu z końca — zbyt ryzykowne,
+   zależne od strony). Oba miejsca wywołania (`maybeRecheckLinkFreshness`,
+   główna gałąź "url") zaktualizowane.
+4. Dla linku z własnym, udanym pobraniem: `result.title` NADPISYWANY
+   prawdziwym tytułem strony zaraz po sparsowaniu odpowiedzi Gemini —
+   tytuł od AI zostaje WYŁĄCZNIE gdy własne pobranie nie dało tytułu albo
+   to ścieżka awaryjna (Gemini "URL context", nigdy własnego pobrania).
+5. `translateResult()` — "title" dopisany do listy tłumaczonych pól
+   (razem z name/explanation/tip/stakes/summary) — działa automatycznie,
+   bo funkcja już używa `RESPONSE_SCHEMA` (teraz z "title") jako domyślny
+   schemat.
+6. **Brak nowej kolumny/migracji SQL** — "title" to nowy klucz WEWNĄTRZ
+   istniejącego jsonb `scans.result` (dokładnie tak jak "summary"/
+   "q_score"), nie osobna kolumna — płynie przez cache/tłumaczenia/scalanie
+   bez żadnych dodatkowych zmian w bazie.
+7. Stare analizy sprzed tej zmiany NIE mają pola "title" (brak
+   backfillu) — każde miejsce, które go czyta, ma fallback na starą
+   metodę (patrz frontend niżej).
+
+**Zmiany w `style.css` (naprawa ucinania — dotyczy WSZYSTKICH list w
+całej aplikacji, nie tylko `historia.html`):** `.scan-row-snippet`
+(dawniej `overflow: hidden; text-overflow: ellipsis; white-space: nowrap`
+— stąd "Polisa-400-0681903.pdf · 28 sie 2026, 1...") zamieniona na
+`display: flex; flex-direction: column;` z dwoma nowymi klasami:
+`.scan-row-title` (zawija się w pełni, `overflow-wrap: break-word`) i
+`.scan-row-date` (mniejsza, osobna linia pod spodem). `min-width: 0` na
+`.scan-row-snippet` jest konieczne — bez tego flex-item nie pozwala
+tekstowi się zawinąć. Nowa klasa `.scan-list-scroll` (`max-height: 320px;
+overflow-y: auto`) do pionowego przewijania list per typ w
+`historia.html` — właściciel wprost potwierdził kierunek PIONOWY, nie
+poziomy/karuzelę.
+
+**Zmiany w `index.html` (lista publiczna "Wyszukaj analizę"):**
+1. Wiersz listy pokazuje teraz `result.title` (z fallbackiem na starą
+   metodę cytatu dla analiz bez pola "title") jako tytuł ORAZ osobną linię
+   z datą analizy (`scanDateFmt`, dawniej data nigdzie nie była pokazywana
+   na tej liście — "przydałyby się daty", zgłoszenie właściciela).
+2. Filtr wyszukiwania (`request.or(...)`) rozszerzony o
+   `result->>title.ilike...` (obok istniejących `source_quote`/
+   `summary`) — teraz szuka DOKŁADNIE w tym, co pokazuje jako tytuł,
+   zamiast w innych, rzadko wypełnionych polach.
+
+**Przebudowa `historia.html` ("Twoje prywatne analizy"):**
+1. Trzy OSOBNE karty (`.card`) zamiast jednej wspólnej z sekcjami — PDF-y
+   / Obrazy / Prywatne teksty, każda z licznikiem `(N)` w nagłówku, każda
+   chowana całkowicie, gdy pusta.
+2. JEDEN wspólny pasek wyszukiwania nad kartami (`#historySearch`,
+   pokazywany dopiero gdy jest cokolwiek do przeszukania) — filtruje
+   WSZYSTKIE trzy typy naraz, każdy niezależnie, po stronie klienta
+   (debounce 150ms) — bez kolejnego zapytania do bazy przy każdym
+   wciśniętym znaku. Limit zapytania do Supabase podniesiony ze 100 do
+   300 wierszy, żeby wyszukiwarka miała w czym szukać (limit
+   WYŚWIETLANIA zostaje 20/typ, ale trzeba pobrać więcej niż 20, żeby
+   filtrowanie miało sens).
+3. Etykieta "Prywatne teksty" używa teraz `result.title` (z fallbackiem na
+   starą metodę — fragment `text_content` — dla analiz sprzed tej
+   zmiany).
+4. Limit **20 wyników na typ, zawsze** (i bez wyszukiwania, i w trakcie)
+   — świadomy wybór (nie tylko dla wyszukiwania), ta sama zasada co
+   publiczna lista na stronie głównej. Gdy wyszukiwanie zwęzi listę,
+   licznik pokazuje `(pasujące/wszystkie)`, np. `(3/47)`.
+5. Każda karta dostała własną, pionowo przewijaną listę
+   (`.scan-list-scroll`, maks. 320px wysokości) zamiast jednej długiej,
+   nieograniczonej listy.
+
+**Nowe klucze i18n (10 języków)**: `history_search_placeholder`,
+`history_no_match`.
+
+Weryfikacja: `node --experimental-strip-types --check` dla
+`analyze/index.ts` oraz `node --check` dla wyciągniętych osobno skryptów
+inline z `index.html`/`historia.html` (i `i18n.js` wprost) — wszystko
+czyste. `tsc --noEmit --skipLibCheck` — te same znane błędy środowiskowe
+co zawsze, nic nowego.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

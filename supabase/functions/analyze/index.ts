@@ -187,9 +187,9 @@ async function maybeRecheckLinkFreshness(
   await supabase.from('scans').update({ link_last_checked_at: new Date().toISOString() }).eq('id', scanRow.id)
 
   const runCheck = async () => {
-    const fresh = await fetchUrlAsText(scanRow.source_url!)
-    if (!fresh) return // strona dalej niepobieralna — zgodnie z oczekiwaniami, nic nie robimy
-    if (looksSubstantiallyDifferent(scanRow.text_content!, fresh)) {
+    const fetched = await fetchUrlAsText(scanRow.source_url!)
+    if (!fetched) return // strona dalej niepobieralna — zgodnie z oczekiwaniami, nic nie robimy
+    if (looksSubstantiallyDifferent(scanRow.text_content!, fetched.text)) {
       // POPRAWKA 2026-08-23(a) — dawniej ten darmowy, HEURYSTYCZNY test
       // (prosty, bez człowieka) kasował ciche potwierdzenia. Punkt B
       // audytu zastąpił cały mechanizm zaufania systemem procentowym
@@ -688,6 +688,8 @@ KONKRETNA STAWKA (pole "stakes", KRYTYCZNIE WAŻNE — to jest sedno wartości G
 
 SZUKANIE SPRZECZNOŚCI MIĘDZY TWIERDZENIAMI (WAŻNE): Oprócz nazwanych wzorców z biblioteki, aktywnie porównuj ze sobą konkretne, sprawdzalne twierdzenia (liczby, daty, obietnice, dane) rozsiane w RÓŻNYCH miejscach całego tekstu — nie tylko w jednym fragmencie na raz. Jeśli dwa twierdzenia z różnych części tego samego tekstu przeczą sobie nawzajem (np. wcześniej podana liczba nie zgadza się z późniejszą, albo obietnica w jednym miejscu jest podważona faktem w innym) — to osobny, ważny wzorzec do zgłoszenia (najczęściej pasujący do modelu "Błąd Narracji" z biblioteki, ale nie tylko), z polem "stakes" pokazującym wprost, na czym polega ta sprzeczność liczbowa/faktyczna.
 
+TYTUŁ (pole "title", WAŻNE — służy WYŁĄCZNIE do rozpoznania tej analizy na liście wśród innych, np. "Twoje analizy"): krótki, rzeczowy tytuł CAŁEJ analizowanej treści — od 3 do 8 słów, w języku ${langName}, napisany jak nagłówek artykułu (temat, o czym jest treść), NIGDY jak wyrok czy ocena tej treści. Zakazane słowa/ton: "manipulacja", "oszustwo", "uważaj", "fałsz", "fake news" i podobne — patrz sekcja NEUTRALNOŚĆ wyżej, ten sam zakaz dotyczy tytułu. Dobry przykład: "Rządowy program dopłat do mieszkań". Zły przykład (to gotowa ocena, nie temat): "Manipulacyjny artykuł o dopłatach do mieszkań". Jeśli treść ma już naturalny, rozpoznawalny temat — opisz go własnymi, prostymi słowami, zwięźle, bez cytowania całych zdań z tekstu.
+
 Zasady:
 - Zwróć wynik WYŁĄCZNIE w strukturze zgodnej ze schematem.
 - q_score: liczba 0-100, gdzie 100 = w pełni merytoryczny tekst bez manipulacji, 0 = czysta manipulacja bez wartości.
@@ -698,7 +700,8 @@ Zasady:
   - explanation: jedno proste zdanie w języku ${langName}, zrozumiałe nawet dla 12-latka (patrz sekcja PROSTOTA wyżej) — dlaczego to zasługuje na tę nazwę, konkretnie odnosząc się do treści cytatu.
   - tip: jeden malutki, natychmiast wykonalny krok weryfikacji w języku ${langName} (patrz sekcje PROSTOTA, MIKRO-KROK, "TWOJA PODPOWIEDŹ TO NIE WYROK..." i "MY JUŻ PRZECZYTALIŚMY CAŁY TEKST..." wyżej) — NIGDY zadanie złożone z kilku czynności naraz. NIGDY nie pisz "ufaj", "nie ufaj", "to dobre", "to złe", "wiarygodne", "podejrzane" — ani "zamknij stronę", "przestań czytać", "zignoruj to", "zajmij się czymś innym" czy jakiekolwiek inne polecenie dotyczące dalszego zachowania czytelnika — ani "sprawdź w tekście/artykule..." czy jakiekolwiek inne odesłanie z powrotem DO TEGO SAMEGO analizowanego tekstu (to Twoja praca, nie czytelnika — jeśli jest tam coś ważnego, dodaj to jako osobny wzorzec, nie jako podpowiedź). Podpowiedź kieruje WYŁĄCZNIE na zewnątrz tego tekstu (patrz sekcja NEUTRALNOŚĆ wyżej). Dotyczy to również pattern_type "reasoning" — nawet tam podpowiedź ma zachęcać do dalszej weryfikacji, nie do rozluźnienia czujności.
   - stakes: jedno zdanie z konkretną, policzalną stawką w języku ${langName} (patrz sekcja KONKRETNA STAWKA wyżej) — oparte na liczbach/faktach z tekstu, nigdy na wymyślonych danych. Pusty tekst, jeśli tekst naprawdę nie zawiera nic, z czego dałoby się skonstruować konkretną stawkę.
-- summary: dwuzdaniowe podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek (patrz sekcja PROSTOTA wyżej) — konkretne, bez lania wody i bez żargonu.`
+- summary: dwuzdaniowe podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek (patrz sekcja PROSTOTA wyżej) — konkretne, bez lania wody i bez żargonu.
+- title: krótki tytuł treści w języku ${langName} (patrz sekcja TYTUŁ wyżej) — 3-8 słów, opisuje TEMAT treści, nigdy ocenę/wyrok.`
 }
 
 const RESPONSE_SCHEMA = {
@@ -721,8 +724,14 @@ const RESPONSE_SCHEMA = {
       },
     },
     summary: { type: 'string' },
+    // POPRAWKA 2026-08-28(h) — patrz sekcja TYTUŁ w buildSystemPrompt().
+    // Dla linku NADPISYWANE po sparsowaniu odpowiedzi prawdziwym tytułem
+    // strony (Readability, patrz fetchUrlAsText()), gdy jest dostępny —
+    // to pole to zapasowy/wyjściowy tytuł AI, używany zawsze dla tekstu i
+    // dla linku bez własnego pobrania (ścieżka awaryjna Gemini URL context).
+    title: { type: 'string' },
   },
-  required: ['q_score', 'patterns', 'summary'],
+  required: ['q_score', 'patterns', 'summary', 'title'],
 }
 
 // POPRAWKA 2026-08-20(c) — "Chain of Thought" (myślenie krok po kroku)
@@ -749,8 +758,9 @@ const DETECTION_RESPONSE_SCHEMA = {
     q_score: { type: 'integer' },
     patterns: RESPONSE_SCHEMA.properties.patterns,
     summary: { type: 'string' },
+    title: { type: 'string' },
   },
-  required: ['category_checklist', 'reasoning_steps', 'q_score', 'patterns', 'summary'],
+  required: ['category_checklist', 'reasoning_steps', 'q_score', 'patterns', 'summary', 'title'],
 }
 
 // POPRAWKA 2026-08-26 — sekcja "PRZEGLĄD KATEGORII" dopisana PRZED
@@ -1103,7 +1113,7 @@ async function translateResult(
 ): Promise<Record<string, unknown> | null> {
   const langName = LANGUAGE_NAMES[targetLangCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const prompt = `Przetłumacz poniższy JSON na język ${langName}. Zasady:
-- Przetłumacz WYŁĄCZNIE pola "name", "explanation", "tip", "stakes" i "summary" — prostym, codziennym językiem, zrozumiałym nawet dla 12-latka, bez żargonu, bez akademickiego stylu. Nie tłumacz dosłownie/sztywno, jeśli robi to zdanie trudniejszym — sparafrazuj tak, żeby było równie proste jak oryginał. Pole "tip" NIGDY nie może zawierać słów "ufaj"/"nie ufaj"/"dobre"/"złe"/"wiarygodne" — jeśli oryginał ich nie ma, tłumaczenie też nie może ich dodać. Pole "stakes" może być pustym tekstem — wtedy zostaje puste, nie wymyślaj treści. Liczby w polu "stakes" (jeśli występują) zostają dokładnie takie same jak w oryginale, tłumaczysz tylko otaczający tekst.
+- Przetłumacz WYŁĄCZNIE pola "name", "explanation", "tip", "stakes", "summary" i (jeśli obecne w JSON-ie) "title" — prostym, codziennym językiem, zrozumiałym nawet dla 12-latka, bez żargonu, bez akademickiego stylu. Nie tłumacz dosłownie/sztywno, jeśli robi to zdanie trudniejszym — sparafrazuj tak, żeby było równie proste jak oryginał. Pole "tip" NIGDY nie może zawierać słów "ufaj"/"nie ufaj"/"dobre"/"złe"/"wiarygodne" — jeśli oryginał ich nie ma, tłumaczenie też nie może ich dodać. Pole "stakes" może być pustym tekstem — wtedy zostaje puste, nie wymyślaj treści. Liczby w polu "stakes" (jeśli występują) zostają dokładnie takie same jak w oryginale, tłumaczysz tylko otaczający tekst. Pole "title" (jeśli obecne) zostaje krótkie (3-8 słów) i rzeczowe — opisuje temat, nie ocenę.
 - Pole "quote" NIE tłumacz — zostaje dokładnie w oryginalnym brzmieniu, bez żadnych zmian.
 - Pole "pattern_type" NIE tłumacz — zostaje dokładnie tą samą wartością co w oryginale ("manipulation" albo "reasoning").
 - Pole "q_score" zostaje dokładnie taką samą liczbą jak w oryginale.
@@ -1584,7 +1594,14 @@ function decodeNumericEntity(original: string, digits: string, radix: number): s
   }
 }
 
-async function fetchUrlAsText(url: string): Promise<string | null> {
+// POPRAWKA 2026-08-28(h) — zwraca teraz też prawdziwy tytuł strony
+// (`article.title` z Readability — INNY, dużo bardziej niezawodny
+// mechanizm niż zawodny `article.excerpt`, o którym rozmawialiśmy przy
+// POPRAWCE (e): tytuł Readability wyciąga z <title>/nagłówka strony, nie z
+// meta-opisu SEO). Używane, żeby listy analiz ("Twoje prywatne analizy",
+// wyszukiwarka publiczna) pokazywały prawdziwy tytuł artykułu zamiast
+// przypadkowego cytatu — patrz GAKORI_CONTEXT.md.
+async function fetchUrlAsText(url: string): Promise<{ text: string; title: string | null } | null> {
   try {
     const res = await fetchWithTimeout(
       url,
@@ -1628,11 +1645,19 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // nieudane pobranie — `null` uruchamia istniejącą ścieżkę awaryjną
     // (Gemini "URL context", patrz Deno.serve niżej), a nie twardy błąd.
     let articleContentHtml: string
+    let articleTitle: string | null = null
     try {
       const { document } = parseHTML(html)
       const article = new Readability(document).parse()
       if (!article || !article.content) return null
       articleContentHtml = article.content
+      // Tylko długość ograniczona (obrona przed absurdalnie długim
+      // <title>) — bez prób "obcinania" nazwy serwisu z końca (np. " -
+      // Interia.pl"), bo to zależy od strony i łatwo obciąć coś, co
+      // naprawdę należy do tytułu — patrz WIERNOŚĆ dla treści, ten sam duch
+      // dla tytułu.
+      const trimmedTitle = typeof article.title === 'string' ? article.title.trim() : ''
+      articleTitle = trimmedTitle ? trimmedTitle.slice(0, 200) : null
     } catch {
       return null
     }
@@ -1747,7 +1772,7 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // JavaScript") albo Readability, które nie znalazło sensownej głównej
     // treści — traktujemy to jak porażkę (fallback niżej w Deno.serve).
     if (text.length < 200) return null
-    return text.slice(0, 20000)
+    return { text: text.slice(0, 20000), title: articleTitle }
   } catch {
     return null
   }
@@ -2509,6 +2534,12 @@ Deno.serve(async (req: Request) => {
     // (uczciwy kompromis dla tej rzadkiej, awaryjnej ścieżki) — patrz
     // `computeExpectedCost()` i reguła 4 audytu bezpieczeństwa niżej.
     let preFetchedText: string | null = null
+    // POPRAWKA 2026-08-28(h) — prawdziwy tytuł strony (Readability), gdy
+    // własne pobranie się udało — patrz fetchUrlAsText()/sekcja TYTUŁ w
+    // buildSystemPrompt(). Preferowany nad tytułem wymyślonym przez AI,
+    // bo darmowy i dokładny (to nie jest domysł, tylko realny <title>
+    // strony).
+    let preFetchedTitle: string | null = null
     let urlFetchedCharCount: number | null = null
     // POPRAWKA 2026-08-26(t) — patrz pełne uzasadnienie przy scaleniu
     // wyników niżej (blisko zapisu do `scanRow`). Trzymane tu (nie lokalnie
@@ -2703,7 +2734,11 @@ Deno.serve(async (req: Request) => {
       // trzymamy w hoisted `preFetchedText`, żeby sekcja 5 (już po
       // potwierdzeniu) mogła użyć TEJ SAMEJ treści bez pobierania jej
       // drugi raz w obrębie tego samego zapytania.
-      preFetchedText = await fetchUrlAsText(source_url)
+      {
+        const fetched = await fetchUrlAsText(source_url)
+        preFetchedText = fetched?.text ?? null
+        preFetchedTitle = fetched?.title ?? null
+      }
       if (preFetchedText) {
         urlFetchedCharCount = preFetchedText.length
         const blocks = Math.ceil(urlFetchedCharCount / 1000)
@@ -3675,6 +3710,16 @@ ${compactExisting}`
         // mają trafić do zapisanego wyniku ani do użytkownika.
         delete (result as Record<string, unknown>).reasoning_steps
         delete (result as Record<string, unknown>).category_checklist
+
+        // POPRAWKA 2026-08-28(h) — dla linku z własnym, udanym pobraniem
+        // (`preFetchedTitle`), nadpisujemy tytuł WYMYŚLONY przez AI
+        // prawdziwym tytułem strony (Readability) — dokładniejszy i za
+        // darmo. Zostaje tytuł od AI WYŁĄCZNIE gdy własne pobranie nie
+        // dało tytułu (rzadkie — strona bez <title>) albo to ścieżka
+        // awaryjna (Gemini URL context, `preFetchedTitle` zawsze `null`).
+        if (input_type === 'url' && preFetchedTitle) {
+          (result as Record<string, unknown>).title = preFetchedTitle
+        }
 
         // ETAP 3 (POPRAWKA 2026-08-20(b)) — "druga runda szukania", tylko
         // gdy gałąź wyżej ustawiła secondPassText (tekst i link ze ścieżki

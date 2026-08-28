@@ -33,30 +33,38 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span id="creditBalanceValue" aria-live="polite">0</span>
     </div>
 
-    <div class="card" style="max-width:480px; width:100%;">
-        <a href="account.html" class="back-link" data-i18n="history_back">← Wróć do konta</a>
-        <h2 data-i18n="history_title">Twoje prywatne analizy</h2>
-        <p style="color:var(--ink-soft); font-size:13.5px; margin:0 0 14px 0;" data-i18n="history_intro">Tylko Ty widzisz tę listę — te analizy nie są publiczne.</p>
+    <div style="max-width:480px; width:100%; display:flex; flex-direction:column; gap:16px;">
 
-        <div id="historyLoading">
+        <div class="card" style="max-width:480px; width:100%;">
+            <a href="account.html" class="back-link" data-i18n="history_back">← Wróć do konta</a>
+            <h2 data-i18n="history_title">Twoje prywatne analizy</h2>
+            <p style="color:var(--ink-soft); font-size:13.5px; margin:0 0 14px 0;" data-i18n="history_intro">Tylko Ty widzisz tę listę — te analizy nie są publiczne.</p>
+            <input type="search" id="historySearch" data-i18n-placeholder="history_search_placeholder" placeholder="Szukaj we wszystkich swoich analizach..." style="display:none;">
+        </div>
+
+        <div id="historyLoading" class="card" style="max-width:480px; width:100%;">
             <p style="color:var(--ink-soft); margin:0;" data-i18n="loading">Ładowanie...</p>
         </div>
 
-        <div id="historyContent" style="display:none;">
-            <div id="historySectionPdf" style="display:none;">
-                <h3 class="history-section-title" data-i18n="history_section_pdf">PDF-y</h3>
-                <div id="historyListPdf"></div>
-            </div>
-            <div id="historySectionImage" style="display:none;">
-                <h3 class="history-section-title" data-i18n="history_section_image">Obrazy</h3>
-                <div id="historyListImage"></div>
-            </div>
-            <div id="historySectionText" style="display:none;">
-                <h3 class="history-section-title" data-i18n="history_section_text">Prywatne teksty</h3>
-                <div id="historyListText"></div>
-            </div>
+        <div id="historyCardPdf" class="card" style="max-width:480px; width:100%; display:none;">
+            <h3 class="history-section-title"><span data-i18n="history_section_pdf">PDF-y</span> <span id="historyCountPdf" class="history-count"></span></h3>
+            <div id="historyListPdf" class="scan-list-scroll"></div>
+            <p id="historyNoMatchPdf" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
         </div>
-        <p id="historyEmpty" style="display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych prywatnych analiz.</p>
+
+        <div id="historyCardImage" class="card" style="max-width:480px; width:100%; display:none;">
+            <h3 class="history-section-title"><span data-i18n="history_section_image">Obrazy</span> <span id="historyCountImage" class="history-count"></span></h3>
+            <div id="historyListImage" class="scan-list-scroll"></div>
+            <p id="historyNoMatchImage" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
+        </div>
+
+        <div id="historyCardText" class="card" style="max-width:480px; width:100%; display:none;">
+            <h3 class="history-section-title"><span data-i18n="history_section_text">Prywatne teksty</span> <span id="historyCountText" class="history-count"></span></h3>
+            <div id="historyListText" class="scan-list-scroll"></div>
+            <p id="historyNoMatchText" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
+        </div>
+
+        <p id="historyEmpty" class="card" style="max-width:480px; width:100%; display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych prywatnych analiz.</p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -74,6 +82,11 @@
         } catch (e) {
             console.error(e);
         }
+
+        // POPRAWKA 2026-08-28(h) — limit widocznych wyników NA TYP (zarówno
+        // bez wyszukiwania, jak i w trakcie), zgodnie z prośbą właściciela
+        // — ta sama zasada co lista publicznych analiz na stronie głównej.
+        const HISTORY_MAX_PER_TYPE = 20;
 
         if (!sb) {
             document.getElementById('historyLoading').innerHTML =
@@ -102,15 +115,18 @@
                 // więc to złączenie nie ujawnia nic więcej niż zapytanie samo
                 // w sobie już pozwala. POPRAWKA 2026-08-28(g) — `scan_access`
                 // trzyma teraz też obrazy (zawsze prywatne) i teksty oznaczone
-                // jako prywatne (`is_private`, patrz analyze/index.ts) — jedno
-                // zapytanie, rozdzielone niżej na trzy sekcje po
-                // `scans.input_type`.
+                // jako prywatne (`is_private`, patrz analyze/index.ts).
+                // POPRAWKA 2026-08-28(h) — limit podniesiony z 100 do 300:
+                // wspólna wyszukiwarka niżej filtruje WYŁĄCZNIE to, co już
+                // jest pobrane (bez kolejnego zapytania do bazy przy każdym
+                // wpisanym znaku), więc trzeba mieć zapas większy niż limit
+                // wyświetlania (20/typ), żeby wyszukiwanie miało w czym szukać.
                 const { data, error } = await sb
                     .from('scan_access')
                     .select('scan_id, source_filename, created_at, scans(result, input_type, text_content)')
                     .eq('user_id', session.user.id)
                     .order('created_at', { ascending: false })
-                    .limit(100);
+                    .limit(300);
 
                 document.getElementById('historyLoading').style.display = 'none';
 
@@ -121,8 +137,21 @@
 
                 const dateFmt = new Intl.DateTimeFormat(getCurrentLanguage(), { dateStyle: 'medium', timeStyle: 'short' });
 
-                // Buduje jeden wiersz listy (wspólny dla PDF/obrazu/tekstu) —
-                // różni się tylko ikoną i sposobem wyznaczenia etykiety.
+                // Etykieta danego wiersza — dla PDF/obrazu to nazwa pliku
+                // (`source_filename`), dla tekstu to tytuł wygenerowany przez
+                // AI (`result.title`, patrz analyze/index.ts) — z fallbackiem
+                // na fragment treści dla starszych analiz sprzed tej zmiany
+                // (nie mają jeszcze pola "title").
+                function labelFor(type, row) {
+                    if (type === 'pdf') return row.source_filename || t('history_unnamed_file');
+                    if (type === 'image') return row.source_filename || t('history_unnamed_image');
+                    const r = (row.scans && row.scans.result) || {};
+                    if (typeof r.title === 'string' && r.title.trim()) return r.title.trim();
+                    const raw = (row.scans && row.scans.text_content) || '';
+                    const snippet = raw.length > 60 ? raw.slice(0, 60).trim() + '…' : raw;
+                    return snippet || t('history_unnamed_text');
+                }
+
                 function buildRow(row, icon, labelText) {
                     const r = (row.scans && row.scans.result) || {};
                     const score = r.q_score;
@@ -146,7 +175,14 @@
 
                     const snippet = document.createElement('span');
                     snippet.className = 'scan-row-snippet';
-                    snippet.innerText = labelText + ' · ' + dateFmt.format(new Date(row.created_at));
+                    const titleEl = document.createElement('span');
+                    titleEl.className = 'scan-row-title';
+                    titleEl.innerText = labelText;
+                    snippet.appendChild(titleEl);
+                    const dateEl = document.createElement('span');
+                    dateEl.className = 'scan-row-date';
+                    dateEl.innerText = dateFmt.format(new Date(row.created_at));
+                    snippet.appendChild(dateEl);
                     link.appendChild(snippet);
 
                     const arrow = document.createElement('span');
@@ -163,38 +199,75 @@
                     if (byType[type]) byType[type].push(row);
                 });
 
-                if (byType.pdf.length > 0) {
-                    const listEl = document.getElementById('historyListPdf');
-                    byType.pdf.forEach((row) => {
-                        listEl.appendChild(buildRow(row, '📄', row.source_filename || t('history_unnamed_file')));
+                const TYPE_CONFIG = [
+                    { type: 'pdf', icon: '📄', card: 'historyCardPdf', list: 'historyListPdf', count: 'historyCountPdf', noMatch: 'historyNoMatchPdf' },
+                    { type: 'image', icon: '🖼️', card: 'historyCardImage', list: 'historyListImage', count: 'historyCountImage', noMatch: 'historyNoMatchImage' },
+                    { type: 'text', icon: '📝', card: 'historyCardText', list: 'historyListText', count: 'historyCountText', noMatch: 'historyNoMatchText' },
+                ];
+
+                // Przelicza etykietę RAZ na wiersz (nie przy każdym wpisanym
+                // znaku wyszukiwania) — reszta renderowania (filtrowanie,
+                // limit 20) działa już tylko na tej gotowej liście.
+                TYPE_CONFIG.forEach((cfg) => {
+                    byType[cfg.type] = byType[cfg.type].map((row) => ({
+                        row,
+                        label: labelFor(cfg.type, row),
+                    }));
+                });
+
+                // Renderuje (albo odświeża po wyszukiwaniu) wszystkie trzy
+                // karty naraz — wspólne query przefiltrowuje KAŻDY typ
+                // niezależnie, każdy dostaje własny limit 20.
+                function render(query) {
+                    const q = query.trim().toLowerCase();
+                    let anyTypeHasItems = false;
+
+                    TYPE_CONFIG.forEach((cfg) => {
+                        const cardEl = document.getElementById(cfg.card);
+                        const listEl = document.getElementById(cfg.list);
+                        const noMatchEl = document.getElementById(cfg.noMatch);
+                        const countEl = document.getElementById(cfg.count);
+                        listEl.innerHTML = '';
+
+                        const items = byType[cfg.type];
+                        if (items.length === 0) {
+                            cardEl.style.display = 'none';
+                            return;
+                        }
+                        anyTypeHasItems = true;
+                        cardEl.style.display = 'block';
+
+                        const matches = (q ? items.filter((it) => it.label.toLowerCase().includes(q)) : items)
+                            .slice(0, HISTORY_MAX_PER_TYPE);
+
+                        countEl.innerText = matches.length < items.length
+                            ? '(' + matches.length + '/' + items.length + ')'
+                            : '(' + items.length + ')';
+
+                        if (matches.length === 0) {
+                            noMatchEl.style.display = 'block';
+                            return;
+                        }
+                        noMatchEl.style.display = 'none';
+                        matches.forEach(({ row, label }) => {
+                            listEl.appendChild(buildRow(row, cfg.icon, label));
+                        });
                     });
-                    document.getElementById('historySectionPdf').style.display = 'block';
+
+                    return anyTypeHasItems;
                 }
 
-                if (byType.image.length > 0) {
-                    const listEl = document.getElementById('historyListImage');
-                    byType.image.forEach((row) => {
-                        listEl.appendChild(buildRow(row, '🖼️', row.source_filename || t('history_unnamed_image')));
-                    });
-                    document.getElementById('historySectionImage').style.display = 'block';
-                }
-
-                if (byType.text.length > 0) {
-                    const listEl = document.getElementById('historyListText');
-                    byType.text.forEach((row) => {
-                        // Nie ma tu "nazwy pliku" (to wklejony tekst) — pokazujemy
-                        // krótki fragment samej treści zamiast nazwy.
-                        const raw = (row.scans && row.scans.text_content) || '';
-                        const snippet = raw.length > 60 ? raw.slice(0, 60).trim() + '…' : raw;
-                        listEl.appendChild(buildRow(row, '📝', snippet || t('history_unnamed_text')));
-                    });
-                    document.getElementById('historySectionText').style.display = 'block';
-                }
-
-                if (byType.pdf.length === 0 && byType.image.length === 0 && byType.text.length === 0) {
+                const hasAnything = render('');
+                if (!hasAnything) {
                     document.getElementById('historyEmpty').style.display = 'block';
                 } else {
-                    document.getElementById('historyContent').style.display = 'block';
+                    const searchEl = document.getElementById('historySearch');
+                    searchEl.style.display = 'block';
+                    let debounceHandle = null;
+                    searchEl.addEventListener('input', () => {
+                        clearTimeout(debounceHandle);
+                        debounceHandle = setTimeout(() => render(searchEl.value), 150);
+                    });
                 }
             });
         }

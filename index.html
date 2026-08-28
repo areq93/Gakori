@@ -404,7 +404,14 @@
             // go ma — po prostu nie jest "odkrywalny".
             let request = sb.from('scans').select('id, content_hash, input_type, result, created_at').eq('language', currentLang).not('input_type', 'in', '(image,pdf)');
             if (query) {
-                request = request.or('result->>source_quote.ilike.%' + query + '%,result->>summary.ilike.%' + query + '%');
+                // POPRAWKA 2026-08-28(h) — dawniej szukało WYŁĄCZNIE w
+                // "source_quote"/"summary", ale to, co czytelnik faktycznie
+                // widzi jako tytuł na liście niżej, to najczęściej
+                // "result.title" (albo, dla starszych analiz sprzed tej
+                // zmiany, cytat pierwszego wzorca) — stąd wrażenie "słabego"
+                // wyszukiwania, zgłoszone przez właściciela: szukało w
+                // czymś innym niż pokazywało. Teraz szuka też w "title".
+                request = request.or('result->>title.ilike.%' + query + '%,result->>source_quote.ilike.%' + query + '%,result->>summary.ilike.%' + query + '%');
             }
 
             // POPRAWKA 2026-08-26(p) — pobieramy więcej niż 20 wierszy (bo
@@ -458,6 +465,8 @@
                 return;
             }
 
+            const scanDateFmt = new Intl.DateTimeFormat(getCurrentLanguage(), { dateStyle: 'medium', timeStyle: 'short' });
+
             // Wszystkie wartości z bazy wstawiamy przez innerText (nie innerHTML),
             // żeby treść analizowana przez innych użytkowników nie mogła wstrzyknąć
             // kodu HTML na stronie widocznej dla wszystkich odwiedzających.
@@ -484,9 +493,26 @@
 
                 const snippet = document.createElement('span');
                 snippet.className = 'scan-row-snippet';
-                const firstPatternQuote = Array.isArray(r.patterns) && r.patterns[0] ? r.patterns[0].quote : null;
-                const rawSnippet = firstPatternQuote || r.source_quote || r.summary || '';
-                snippet.innerText = rawSnippet.length > 60 ? rawSnippet.slice(0, 60) + '…' : rawSnippet;
+                // POPRAWKA 2026-08-28(h) — dawniej losowy cytat pierwszego
+                // wzorca (mylące jako "tytuł", zgłoszone przez właściciela
+                // jako chaotyczne) — teraz prawdziwy, krótki tytuł treści
+                // (patrz "title" w analyze/index.ts). Fallback na starą
+                // metodę TYLKO dla analiz sprzed tej zmiany, które nie mają
+                // jeszcze pola "title".
+                let titleText = typeof r.title === 'string' && r.title.trim() ? r.title.trim() : '';
+                if (!titleText) {
+                    const firstPatternQuote = Array.isArray(r.patterns) && r.patterns[0] ? r.patterns[0].quote : null;
+                    const rawSnippet = firstPatternQuote || r.source_quote || r.summary || '';
+                    titleText = rawSnippet.length > 60 ? rawSnippet.slice(0, 60) + '…' : rawSnippet;
+                }
+                const titleEl = document.createElement('span');
+                titleEl.className = 'scan-row-title';
+                titleEl.innerText = titleText;
+                snippet.appendChild(titleEl);
+                const dateEl = document.createElement('span');
+                dateEl.className = 'scan-row-date';
+                dateEl.innerText = scanDateFmt.format(new Date(scan.created_at));
+                snippet.appendChild(dateEl);
                 row.appendChild(snippet);
 
                 const arrow = document.createElement('span');

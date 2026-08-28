@@ -587,15 +587,28 @@ a { color: var(--accent); }
 .scan-row:hover { background: var(--paper); border-radius: var(--radius-sm); }
 .scan-row-icon { flex-shrink: 0; font-size: 15px; }
 .scan-row .result-badge { flex-shrink: 0; margin-bottom: 0; padding: 4px 10px; font-size: 12.5px; }
-.scan-row-snippet { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* POPRAWKA 2026-08-28(h) — dawniej jedna linia tekstu z `text-overflow:
+   ellipsis; white-space: nowrap`, więc tytuły (i doklejona do nich data)
+   zawsze się ucinały ("Polisa-400-0681903.pdf · 28 sie 2026, 1...") —
+   zgłoszone przez właściciela jako nieczytelne. Teraz tytuł zawija się w
+   pełni (żadna litera nie ginie), data osobną, mniejszą linią pod spodem.
+   `min-width: 0` jest konieczne — bez tego flex-item domyślnie nie
+   pozwala tekstowi się zawinąć, tylko wypycha wiersz w bok. */
+.scan-row-snippet { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.scan-row-title { font-size: 14px; overflow-wrap: break-word; word-break: break-word; }
+.scan-row-date { font-size: 12px; color: var(--ink-soft); }
 .scan-row-arrow { flex-shrink: 0; color: var(--ink-soft); }
 #publicScansList p.status-err, #publicScansList p.status-ok { text-align: center; }
 
-/* historia.html — sekcje "Twoje prywatne analizy" (PDF/Obrazy/Prywatne teksty) */
+/* historia.html — "Twoje prywatne analizy": trzy osobne karty (PDF-y /
+   Obrazy / Prywatne teksty), każda z własną, pionowo przewijaną listą
+   (POPRAWKA 2026-08-28(h) — dawniej jedna wspólna karta z sekcjami). */
 .history-section-title {
     font-size: 14px; font-weight: 600; color: var(--ink-soft);
-    margin: 18px 0 4px 0; text-transform: uppercase; letter-spacing: 0.02em;
+    margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.02em;
 }
+.history-count { font-weight: 400; text-transform: none; letter-spacing: normal; }
+.scan-list-scroll { max-height: 320px; overflow-y: auto; }
 
 /* Panel debugowania — tylko dla developera, patrz sekcja 1 w skrypcie (?debug=1) */
 #debug { display: none; margin-top: 20px; padding: 10px; background: var(--debug-bg); border-radius: 10px; font-size: 11px; width: 100%; max-width: 400px; white-space: pre-wrap; word-break: break-all; border: 1px dashed var(--debug-border); box-sizing: border-box; color: var(--ink-soft); }
