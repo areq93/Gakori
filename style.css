@@ -388,6 +388,20 @@ a { color: var(--accent); }
     width: 100%; max-width: 400px; margin-top: 16px; box-sizing: border-box; display: none;
     position: relative; z-index: 1;
 }
+/* Pionowy stos kilku kart pod sobą (patrz historia.html) — ta sama
+   szerokość co pojedyncza `.card`, żeby wszystko na stronie było
+   wyrównane do tej samej kolumny. */
+.card-stack { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 16px; }
+
+/* POPRAWKA 2026-08-28(i) — na dużym ekranie (PC/laptop) panel zostawał
+   wąski (400px, zaprojektowany pod telefon) z mnóstwem pustego miejsca po
+   bokach — zgłoszone przez właściciela jako słaba czytelność na PC.
+   Telefon (ekran poniżej progu) zostaje BEZ ŻADNYCH zmian. */
+@media (min-width: 700px) {
+    .card, .result-card, .card-stack {
+        max-width: 640px;
+    }
+}
 /* POPRAWKA 2026-08-18: odznaka wyniku i tagi wzorców (niżej) były płaskim,
    jednolitym kolorem — jedyny element w appce bez żadnej gry światła,
    więc wyglądały jak wklejone z wcześniejszej, "płaskiej" wersji stylu.

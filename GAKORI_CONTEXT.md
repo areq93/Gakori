@@ -5210,6 +5210,35 @@ inline z `index.html`/`historia.html` (i `i18n.js` wprost) — wszystko
 czyste. `tsc --noEmit --skipLibCheck` — te same znane błędy środowiskowe
 co zawsze, nic nowego.
 
+**POPRAWKA 2026-08-28(i) — responsywność na dużym ekranie (PC/laptop).**
+Właściciel zgłosił, że na telefonie aplikacja wygląda dobrze, ale na
+komputerze panel jest "bardzo wąski", co ogranicza czytelność. Przyczyna:
+`style.css` celowo nie miało ŻADNYCH `@media` (patrz notatka w sekcji
+"Zasady współpracy" niżej) — `.card`/`.result-card` mają sztywny
+`max-width: 400px`, zaprojektowany pod telefon, więc na szerokim ekranie
+zostaje wyśrodkowana, wąska kolumna z dużą ilością pustego miejsca po
+bokach. Właściciel poprosił na start WYŁĄCZNIE o poszerzenie panelu (nie
+pełny redesign na wielokolumnowy układ pulpitowy — to zostało nazwane
+jako możliwa, osobna, poważniejsza opcja na później).
+
+**Naprawa** (`style.css`): pierwszy w całym projekcie `@media (min-width:
+700px)` — podnosi `max-width` `.card`/`.result-card`/(nowej) `.card-stack`
+do 640px WYŁĄCZNIE na ekranach szerszych niż próg; telefon (poniżej
+progu) zostaje dosłownie bez jednej zmienionej linii. Nowa klasa
+`.card-stack` (pionowy stos kilku kart pod sobą, patrz `historia.html`) —
+wydzielona z inline'owego stylu, żeby też reagowała na tę samą regułę
+`@media`. Przy okazji usunięte inline'owe `style="max-width:400px"` /
+`"max-width:480px"` na głównych kartach w `scan.html`, `account.html` i
+`historia.html` — inline styl ZAWSZE wygrywa z regułą w arkuszu stylów
+(nawet wewnątrz `@media`), więc te nadpisania blokowałyby nową
+responsywność, gdyby zostały. Teraz wszystkie strony korzystają z tej
+samej, współdzielonej reguły szerokości.
+
+Weryfikacja: `node --check` dla wyciągniętych skryptów inline z
+`index.html`/`historia.html`/`account.html`/`scan.html` — bez błędów.
+Czysto wizualna zmiana CSS/HTML, bez zmian w backendzie — nic do wklejenia
+w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
@@ -5916,11 +5945,18 @@ zupełnie inna liczba, i to ta druga jest poprawna.
 - **Gakori to przede wszystkim aplikacja mobilna (PWA)** — przy KAŻDEJ
   zmianie wizualnej/UI pilnuj responsywności na telefonach, nie tylko na
   desktopie/tablecie (użytkownik świadomie o to poprosił). W praktyce:
-  `style.css` na razie nie ma żadnych `@media` (celowo — układ jest
-  płynny, jedna kolumna kart o ograniczonej `max-width`, co dotąd
+  `style.css` przez długi czas nie miało ŻADNYCH `@media` (celowo — układ
+  jest płynny, jedna kolumna kart o ograniczonej `max-width`, co długo
   wystarczało), ale przy dodawaniu nowych elementów, zwłaszcza
   `position: fixed` (jak `#userMenuBtn`/`.credit-balance` w prawym
   górnym rogu), sprawdź w myślach (albo realnie, w narzędziach
   deweloperskich przeglądarki, w trybie widoku mobilnego) wąski ekran
   (~320-360px szerokości) — czy elementy się nie nachodzą, nie wychodzą
-  poza ekran, tekst się nie przycina w nieczytelny sposób.
+  poza ekran, tekst się nie przycina w nieczytelny sposób. POPRAWKA
+  2026-08-28(i) dodała PIERWSZĄ regułę `@media (min-width: 700px)`
+  (właściciel zgłosił, że panel na PC jest za wąski) — próg 700px jest
+  świadomie WYŻSZY niż typowa szerokość telefonu w pionie, więc telefon
+  (nawet duży, w trybie poziomym rzadko używanym w tej appce) zostaje bez
+  zmian; jeśli w przyszłości dojdą kolejne `@media`, trzymaj się tego
+  samego progu dla spójności, chyba że właściciel wyraźnie poprosi
+  inaczej.

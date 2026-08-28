@@ -33,38 +33,38 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span id="creditBalanceValue" aria-live="polite">0</span>
     </div>
 
-    <div style="max-width:480px; width:100%; display:flex; flex-direction:column; gap:16px;">
+    <div class="card-stack">
 
-        <div class="card" style="max-width:480px; width:100%;">
+        <div class="card">
             <a href="account.html" class="back-link" data-i18n="history_back">← Wróć do konta</a>
             <h2 data-i18n="history_title">Twoje prywatne analizy</h2>
             <p style="color:var(--ink-soft); font-size:13.5px; margin:0 0 14px 0;" data-i18n="history_intro">Tylko Ty widzisz tę listę — te analizy nie są publiczne.</p>
             <input type="search" id="historySearch" data-i18n-placeholder="history_search_placeholder" placeholder="Szukaj we wszystkich swoich analizach..." style="display:none;">
         </div>
 
-        <div id="historyLoading" class="card" style="max-width:480px; width:100%;">
+        <div id="historyLoading" class="card">
             <p style="color:var(--ink-soft); margin:0;" data-i18n="loading">Ładowanie...</p>
         </div>
 
-        <div id="historyCardPdf" class="card" style="max-width:480px; width:100%; display:none;">
+        <div id="historyCardPdf" class="card" style="display:none;">
             <h3 class="history-section-title"><span data-i18n="history_section_pdf">PDF-y</span> <span id="historyCountPdf" class="history-count"></span></h3>
             <div id="historyListPdf" class="scan-list-scroll"></div>
             <p id="historyNoMatchPdf" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
         </div>
 
-        <div id="historyCardImage" class="card" style="max-width:480px; width:100%; display:none;">
+        <div id="historyCardImage" class="card" style="display:none;">
             <h3 class="history-section-title"><span data-i18n="history_section_image">Obrazy</span> <span id="historyCountImage" class="history-count"></span></h3>
             <div id="historyListImage" class="scan-list-scroll"></div>
             <p id="historyNoMatchImage" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
         </div>
 
-        <div id="historyCardText" class="card" style="max-width:480px; width:100%; display:none;">
+        <div id="historyCardText" class="card" style="display:none;">
             <h3 class="history-section-title"><span data-i18n="history_section_text">Prywatne teksty</span> <span id="historyCountText" class="history-count"></span></h3>
             <div id="historyListText" class="scan-list-scroll"></div>
             <p id="historyNoMatchText" style="display:none; color:var(--ink-soft); font-size:13px; margin:6px 0 0 0;" data-i18n="history_no_match">Brak wyników dla tego wyszukiwania.</p>
         </div>
 
-        <p id="historyEmpty" class="card" style="max-width:480px; width:100%; display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych prywatnych analiz.</p>
+        <p id="historyEmpty" class="card" style="display:none; text-align:center; color:var(--ink-soft);" data-i18n="history_empty">Nie masz jeszcze żadnych prywatnych analiz.</p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
