@@ -24,9 +24,12 @@
         </h1>
     </header>
 
-    <a id="userMenuBtn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
-    <div id="creditBalance" class="credit-balance" style="display:none;" data-i18n-aria-label="credit_balance_label" aria-label="Stan kredytów">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span id="creditBalanceValue" aria-live="polite">0</span>
+    <div class="top-icon-row">
+        <div id="creditBalance" class="credit-balance" style="display:none;" data-i18n-aria-label="credit_balance_label" aria-label="Stan kredytów">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span id="creditBalanceValue" aria-live="polite">0</span>
+        </div>
+        <a id="historyBtn" class="icon-btn" href="historia.html" data-i18n-aria-label="history_title" aria-label="Twoje prywatne analizy"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></a>
+        <a id="userMenuBtn" class="icon-btn" href="account.html" data-i18n-aria-label="account_aria_label" aria-label="Twoje konto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
     </div>
 
     <div id="appLoading" style="text-align:center; padding:60px 0; color:var(--ink-soft);">
@@ -70,15 +73,15 @@
         </div>
 
         <div class="mode-panel active" id="panel-url">
-            <p data-i18n="label_paste_link">Wklej link do analizy:</p>
+            <p class="field-label" data-i18n="label_paste_link">Wklej link do analizy:</p>
             <input type="url" id="urlInput" data-i18n-placeholder="placeholder_url" placeholder="https://...">
         </div>
 
         <div class="mode-panel" id="panel-text">
-            <p data-i18n="label_paste_text">Wklej tekst do analizy:</p>
+            <p class="field-label" data-i18n="label_paste_text">Wklej tekst do analizy:</p>
             <textarea id="textInput" data-i18n-placeholder="placeholder_text_content" placeholder="Wklej treść, którą chcesz przeanalizować..."></textarea>
             <p id="textCostEstimate" style="font-size:12px; color:var(--ink-soft); margin-top:4px;"></p>
-            <p data-i18n="label_text_source_url_optional">Opcjonalnie: link do źródła (doda się do wyniku):</p>
+            <p class="field-label" data-i18n="label_text_source_url_optional">Opcjonalnie: link do źródła (doda się do wyniku):</p>
             <input type="url" id="textSourceUrlInput" data-i18n-placeholder="placeholder_url" placeholder="https://...">
             <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; margin-top:10px; cursor:pointer;">
                 <input type="checkbox" id="textPrivateCheckbox">
@@ -87,7 +90,7 @@
         </div>
 
         <div class="mode-panel" id="panel-image">
-            <p data-i18n="label_choose_image">Wybierz zdjęcie do analizy:</p>
+            <p class="field-label" data-i18n="label_choose_image">Wybierz zdjęcie do analizy:</p>
             <input type="file" id="imageInput" accept="image/*" multiple style="display:none;">
             <button type="button" id="imageInputTrigger" data-i18n="btn_choose_image">Wybierz zdjęcie</button>
             <div id="imagePasteDivider" style="text-align:center; color:var(--ink-soft); font-size:12px; margin:10px 0;" data-i18n="divider_or">— lub —</div>
@@ -98,7 +101,7 @@
         </div>
 
         <div class="mode-panel" id="panel-pdf">
-            <p data-i18n="label_choose_pdf">Wybierz plik PDF do analizy:</p>
+            <p class="field-label" data-i18n="label_choose_pdf">Wybierz plik PDF do analizy:</p>
             <p style="font-size:12px; color:var(--ink-soft); margin-top:-4px;" data-i18n="label_pdf_page_limit">(maksymalnie 36 stron)</p>
             <input type="file" id="pdfInput" accept="application/pdf" style="display:none;">
             <button type="button" id="pdfInputTrigger" data-i18n="btn_choose_pdf">Wybierz PDF</button>
@@ -298,6 +301,7 @@
             const authCard = document.getElementById('authCard');
             const recovery = document.getElementById('authRecovery');
             const userMenuBtn = document.getElementById('userMenuBtn');
+            const historyBtn = document.getElementById('historyBtn');
             const creditBalance = document.getElementById('creditBalance');
             const analyzeCard = document.getElementById('analyzeCard');
             const publicScansCard = document.getElementById('publicScansCard');
@@ -305,12 +309,14 @@
             if (currentSession) {
                 authCard.style.display = 'none';
                 userMenuBtn.style.display = 'flex';
+                historyBtn.style.display = 'flex';
                 creditBalance.style.display = 'flex';
                 refreshCreditBalance(sb, currentSession.user.id);
                 analyzeCard.style.display = 'block';
             } else {
                 authCard.style.display = 'block';
                 userMenuBtn.style.display = 'none';
+                historyBtn.style.display = 'none';
                 creditBalance.style.display = 'none';
                 analyzeCard.style.display = 'none';
             }
@@ -323,6 +329,7 @@
         function showRecoveryForm() {
             document.getElementById('appLoading').style.display = 'none';
             document.getElementById('userMenuBtn').style.display = 'none';
+            document.getElementById('historyBtn').style.display = 'none';
             document.getElementById('publicScansCard').style.display = 'none';
             document.getElementById('authCard').style.display = 'block';
             document.getElementById('authLoggedOut').style.display = 'none';

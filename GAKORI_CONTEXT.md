@@ -5239,6 +5239,76 @@ Weryfikacja: `node --check` dla wyciągniętych skryptów inline z
 Czysto wizualna zmiana CSS/HTML, bez zmian w backendzie — nic do wklejenia
 w Supabase.
 
+**POPRAWKA 2026-08-28(j) — dokończenie estetyki po poszerzeniu panelu:
+mniejsze/wyśrodkowane przyciski, spójne etykiety pól, "Zmień hasło" jako
+przycisk, nowa ikona "Twoje prywatne analizy" w górnym pasku.** Po
+POPRAWCE (i) (szerszy panel na PC) właściciel zgłosił żywym zestawem
+zrzutów ekranu cztery kolejne, powiązane usterki estetyczne, które
+poszerzenie panelu uwidoczniło: (1) przyciski ("Analizuj", "Wybierz
+zdjęcie", "Wyloguj" itd.) rozciągnięte na pełną, teraz znacznie większą
+szerokość karty — wyglądają "strasznie"; (2) etykiety pól ("Wklej tekst do
+analizy:" itd.) to zwykły, "surowy" tekst akapitu, niespójny z resztą
+aplikacji, która gdzie indziej ma zaprojektowany styl małej etykiety; (3)
+link "Zmień hasło" — domyślny, czerwony, podkreślony `<a>` — "jakaś
+tragedia"; (4) "Twoje prywatne analizy" powinno być osobną ikoną w górnym
+pasku (obok konta/kredytów), nie linkiem wewnątrz panelu konta.
+
+**Zmiany w `style.css`:**
+1. W istniejącym `@media (min-width: 700px)` (patrz POPRAWKA (i)) nowa
+   reguła: `button:not(.tab-btn):not(.image-preview-remove) { width: auto;
+   min-width: 240px; display: block; margin: 0 auto; }` — WYŁĄCZNIE dla
+   dużych ekranów, telefon (pełna szerokość, `button { width: 100% }`
+   bazowe) zostaje bez zmian.
+2. Nowa klasa `.field-label` (`font-weight: 700; font-size: 12.5px; color:
+   var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em;`)
+   — dokładnie ten sam, JUŻ ISTNIEJĄCY wzorzec co `.summary-label`/
+   `.pattern-tip-label` (podsumowanie wyniku, "Co teraz zrobić:"), teraz
+   zastosowany też do etykiet pól formularzy — bez pełnego błyszczącego
+   gradientu `h2` (ten zostaje dla dużych nagłówków sekcji).
+3. Nowy wspólny kontener `.top-icon-row` (`position: fixed; top: 16px;
+   right: 16px; display: flex; align-items: center; gap: 8px;`) —
+   ZASTĘPUJE dawne, osobne `position: fixed` na `#userMenuBtn` (right:16)
+   i `.credit-balance` (right:68, ręcznie wyliczone "na oko"). Nowa
+   wspólna klasa `.icon-btn` (okrągła "pigułka" — ikona profilu I nowa
+   ikona historii dzielą jeden styl). Ciemny motyw: selektor
+   `:root[data-theme="dark"] #userMenuBtn` zamieniony na `.icon-btn`, żeby
+   objąć też nową ikonę.
+
+**Zmiany w HTML (`index.html`, `scan.html`, `account.html`,
+`historia.html` — wszędzie, gdzie pojawia się górny pasek):**
+1. `#userMenuBtn`/`#creditBalance` przeniesione do wspólnego
+   `<div class="top-icon-row">`.
+2. Nowa ikona `<a id="historyBtn" class="icon-btn" href="historia.html">`
+   (ikona kłódki — jednoznacznie kojarzy się z prywatnością, spójna z
+   resztą zestawu ikon w stylu "Feather") — MIĘDZY pigułką kredytów a
+   ikoną konta, czyli w tej samej, przyzwyczajonej pozycji co dziś ikona
+   konta (najbliżej prawej krawędzi) zostaje ikona konta, historia
+   wsunięta obok. Pokazywana/ukrywana DOKŁADNIE tymi samymi regułami co
+   `#userMenuBtn` (na `index.html`/`scan.html` przez JS, zależnie od
+   sesji; na `account.html`/`historia.html` zawsze widoczna inline —
+   strony wymagają zalogowania). Aria-label współdzieli istniejący klucz
+   i18n `history_title` ("Twoje prywatne analizy") — nie trzeba było
+   dodawać nowego.
+3. `account.html`: usunięty link "Twoje prywatne analizy →" z panelu
+   konta (przeniesiony do ikony wyżej). "Zmień hasło" zamienione z `<a
+   href="#">` na zwykły `<button type="button">` — dziedziczy teraz
+   standardowy styl przycisku (i nową regułę mniejszy+wyśrodkowany na PC)
+   zamiast domyślnego, czerwonego, podkreślonego linku. Etykiety pól
+   ("Język aplikacji", "Motyw", "Nazwa użytkownika") dostały
+   `class="field-label"` zamiast osobnych, ręcznych stylów inline.
+4. `index.html`: etykiety trybów tekst/link/obraz/PDF ("Wklej tekst do
+   analizy:" itd.) dostały `class="field-label"`.
+
+Nieużywany po tej zmianie klucz i18n `link_pdf_history` (dawny tekst linku
+w panelu konta) świadomie ZOSTAWIONY w `i18n.js` (10 języków) —
+nieszkodliwy, martwy wpis, a jego usunięcie w 10 miejscach naraz to
+niepotrzebne ryzyko dla czysto kosmetycznego sprzątania.
+
+Weryfikacja: `node --check` dla wyciągniętych skryptów inline z
+`index.html`/`historia.html`/`account.html`/`scan.html` — bez błędów.
+Czysto wizualna zmiana CSS/HTML, bez zmian w backendzie — nic do
+wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

@@ -258,6 +258,20 @@ textarea { resize: vertical; min-height: 100px; }
 input[type="checkbox"], input[type="radio"] {
     width: 16px; height: 16px; margin: 2px 0 0 0; flex-shrink: 0; accent-color: var(--primary);
 }
+/* POPRAWKA 2026-08-28(j) — etykiety pól ("Wklej tekst do analizy:",
+   "Język aplikacji" itd.) były zwykłym, "surowym" tekstem akapitu —
+   zgłoszone jako niespójne z resztą aplikacji, która gdzie indziej (np.
+   "Co teraz zrobić:", podsumowanie wyniku) ma świadomie zaprojektowany,
+   drukowany styl małej etykiety. Ten sam, już istniejący wzorzec
+   (`.summary-label`/`.pattern-tip-label`) zastosowany tu jako wspólna
+   klasa — bez pełnego błyszczącego gradientu z `h2` (ten zostaje dla
+   dużych nagłówków sekcji, żeby nie było przesady na każdej drobnej
+   etykiece). */
+.field-label {
+    display: block; font-weight: 700; font-size: 12.5px; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 6px 0;
+}
+.field-label:first-child { margin-top: 0; }
 /* Każdy przycisk w aplikacji (główny, drugoplanowy, aktywna zakładka,
    ikona konta) — JEDEN spójny, matowo-"perłowy" styl, bez wyjątków
    (POPRAWKA 2026-08-18(j): wcześniej tylko główny przycisk i aktywna
@@ -297,7 +311,7 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
    reguła po cichu nadpisałaby też wygląd nieaktywnych zakładek. */
 :root[data-theme="dark"] button:not(.tab-btn):not(.image-preview-remove),
 :root[data-theme="dark"] .tab-btn.active,
-:root[data-theme="dark"] #userMenuBtn {
+:root[data-theme="dark"] .icon-btn {
     background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 55%, var(--card) 100%);
     color: var(--ink);
     border: 1.5px solid var(--ink);
@@ -305,7 +319,7 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
 }
 :root[data-theme="dark"] button:not(.tab-btn):not(.image-preview-remove):hover,
 :root[data-theme="dark"] .tab-btn.active:hover,
-:root[data-theme="dark"] #userMenuBtn:hover {
+:root[data-theme="dark"] .icon-btn:hover {
     filter: none; background: var(--ink); color: var(--paper); box-shadow: var(--sculpt-shadow);
 }
 :root[data-theme="dark"] button:not(.tab-btn):not(.image-preview-remove):active {
@@ -400,6 +414,15 @@ a { color: var(--accent); }
 @media (min-width: 700px) {
     .card, .result-card, .card-stack {
         max-width: 640px;
+    }
+    /* POPRAWKA 2026-08-28(j) — na dużym ekranie pełna szerokość przycisku
+       (świetna na telefonie — patrz `button { width: 100% }` wyżej)
+       wyglądała na "strasznie rozciągniętą" (zgłoszenie właściciela z
+       konkretnym zrzutem ekranu, dotyczyło "Analizuj", trybu obrazu,
+       panelu konta — wszędzie). Telefon (poniżej progu) zostaje z pełną
+       szerokością bez zmian. */
+    button:not(.tab-btn):not(.image-preview-remove) {
+        width: auto; min-width: 240px; display: block; margin: 0 auto;
     }
 }
 /* POPRAWKA 2026-08-18: odznaka wyniku i tagi wzorców (niżej) były płaskim,
@@ -629,20 +652,33 @@ a { color: var(--accent); }
 .status-ok { color: var(--ok-text); font-weight: bold; }
 .status-err { color: var(--danger-text); font-weight: bold; }
 
-/* Ikona profilu (link do account.html) */
-#userMenuBtn {
-    display: none; position: fixed; top: 16px; right: 16px; z-index: 50;
-    width: 44px; height: 44px; padding: 0; border-radius: 50%;
+/* POPRAWKA 2026-08-28(j) — dawniej `#userMenuBtn`/`.credit-balance` były
+   KAŻDE osobno `position: fixed` z ręcznie wyliczonym `right` (16px/68px),
+   żeby "na oko" leżały jedno obok drugiego — kruche przy dodaniu
+   trzeciego elementu (nowa ikona "Twoje prywatne analizy" niżej), bo
+   trzeba by ręcznie przeliczać wszystkie odsunięcia. Teraz JEDEN
+   pływający kontener (`.top-icon-row`) trzyma je we WŁAŚCIWEJ kolejności
+   przez zwykły flex/gap — dowolna liczba elementów zawsze ładnie się
+   układa, bez liczenia pikseli. */
+.top-icon-row {
+    position: fixed; top: 16px; right: 16px; z-index: 50;
+    display: flex; align-items: center; gap: 8px;
+}
+/* Ikona profilu (link do account.html) — i, tą samą klasą, ikona "Twoje
+   prywatne analizy" (link do historia.html, patrz #historyBtn w HTML) —
+   ta sama okrągła "pigułka" co profil, inna ikonka w środku. */
+.icon-btn {
+    display: none; width: 44px; height: 44px; padding: 0; border-radius: 50%;
     background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 50%, var(--primary-dark) 100%);
     color: var(--btn-text); font-size: 20px; border: none;
     align-items: center; justify-content: center; text-decoration: none;
-    box-shadow: var(--sculpt-shadow-sm);
+    box-shadow: var(--sculpt-shadow-sm); flex-shrink: 0;
 }
 
-/* Stan kredytów — pigułka tuż obok ikony profilu, ten sam rytm wizualny co
-   inne odznaki w aplikacji (patrz .result-badge niżej) */
+/* Stan kredytów — pigułka w tym samym rzędzie co ikony wyżej, ten sam
+   rytm wizualny co inne odznaki w aplikacji (patrz .result-badge niżej) */
 .credit-balance {
-    position: fixed; top: 16px; right: 68px; z-index: 50; height: 44px;
+    height: 44px; flex-shrink: 0;
     padding: 0 14px; border-radius: 999px; box-sizing: border-box;
     background: var(--card); color: var(--ink); border: var(--border-w) solid var(--card-border);
     box-shadow: var(--sculpt-shadow-sm);
