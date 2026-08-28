@@ -1632,6 +1632,47 @@ function stripElementsByTag(html: string, tagNames: string, shouldRemove: (openT
   return result
 }
 
+// POPRAWKA 2026-08-28(d) — żywy przypadek: `articleMatch` niżej używał
+// prostego dopasowania "od PIERWSZEGO <article> do PIERWSZEGO </article>"
+// (`[\s\S]*?` — niechciwe, ale BEZ liczenia zagnieżdżenia) — jeśli strona
+// ma ZAGNIEŻDŻONE znaczniki `<article>` (np. każdy boks "Zobacz również"
+// sam w sobie oznaczony jako `<article>`, częste w nowoczesnym,
+// semantycznym HTML-u), dopasowanie kończyło się na zamknięciu tego
+// WEWNĘTRZNEGO boksu, a nie prawdziwego, głównego artykułu — reszta
+// treści (często większość!) w ogóle nie trafiała do dalszego
+// przetwarzania, niezależnie jak dobry był filtr szumu PO tym kroku
+// (patrz `linkTextDensity()` wyżej — nie miała już czego filtrować,
+// bo treść zniknęła wcześniej). Naprawa: ten sam mechanizm liczenia
+// zagnieżdżenia co `stripElementsByTag()` wyżej, tylko zwraca zawartość
+// PIERWSZEGO elementu (poprawnie dopasowaną do jego WŁASNEGO zamknięcia)
+// zamiast usuwać dopasowane elementy.
+function extractFirstElementContent(html: string, tagName: string): string | null {
+  const tagRe = new RegExp(`<(${tagName})\\b[^>]*>|<\\/(${tagName})>`, 'gi')
+  let match: RegExpExecArray | null
+  let startIndex = -1
+  let depth = 0
+  while ((match = tagRe.exec(html))) {
+    const isClosing = !!match[2]
+    if (startIndex === -1) {
+      if (!isClosing) {
+        depth = 1
+        startIndex = tagRe.lastIndex
+      }
+      continue
+    }
+    if (!isClosing) {
+      depth++
+    } else {
+      depth--
+      if (depth === 0) return html.slice(startIndex, match.index)
+    }
+  }
+  // Brak poprawnie zamkniętego elementu (np. niepoprawny HTML) —
+  // fail-open: wywołujący zostaje przy oryginalnym `html`, tak jak
+  // dotychczas gdy `articleMatch` był `null`.
+  return null
+}
+
 async function fetchUrlAsText(url: string): Promise<string | null> {
   try {
     const res = await fetchWithTimeout(
@@ -1698,8 +1739,18 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // (bardzo częste na dużych portalach, m.in. ze względów SEO) — bierzemy
     // TYLKO to, co jest w środku. Jednym ruchem wyrzuca to menu strony,
     // stopkę i panel boczny, bo one z definicji żyją POZA <article>.
-    const articleMatch = html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)
-    if (articleMatch) html = articleMatch[1]
+    // POPRAWKA 2026-08-28(d) — patrz `extractFirstElementContent()` wyżej:
+    // poprawnie liczy zagnieżdżenie, żeby zagnieżdżony `<article>` (np.
+    // boks "Zobacz również" oznaczony jako osobny `<article>`) nie ucinał
+    // dopasowania przedwcześnie.
+    const articleContent = extractFirstElementContent(html, 'article')
+    if (articleContent !== null) html = articleContent
+    // POPRAWKA 2026-08-28(c) — DIAGNOSTYKA TYMCZASOWA, patrz GAKORI_CONTEXT.md:
+    // widoczność, ile tekstu zostaje zaraz PO wycięciu <article>, PRZED
+    // resztą czyszczenia (filtr gęstości linków itd.) — pozwala odróżnić
+    // "problem jest tu, na samym starcie" od "problem jest w dalszym
+    // czyszczeniu".
+    console.log(`[refresh-debug] url=${url} po_wycieciu_article znaleziono=${articleContent !== null} dlugosc=${html.length}`)
 
     // Pasek "udostępnij"/nawigacja W OBRĘBIE treści — zawsze szum, nigdy
     // sama treść artykułu, więc usuwamy KAŻDE wystąpienie <nav>, bez

@@ -4604,6 +4604,53 @@ błędy typów, niezwiązane z tą zmianą) oraz `node --experimental-strip-type
 URL interia.pl, który spowodował zgłoszenie) wymaga ręcznego wdrożenia w
 Supabase Dashboard i ponownej analizy przez właściciela.
 
+**POPRAWKA 2026-08-28(c)/(d) — prawdziwa przyczyna dalej nieudanej próby
+naprawy z POPRAWKI (b): błąd był WCZEŚNIEJ, w wycinaniu `<article>`, nie
+w filtrze szumu.** Po wdrożeniu POPRAWKI (b) właściciel dalej dostawał
+"bez zmian" (i to dosłownie ten sam wynik — brak ekranu z ceną).
+Dodane logi diagnostyczne (`console.log`, tymczasowe, `[refresh-debug]`)
+pokazały: nowo pobrany tekst (2071 znaków) był PRAWIE identyczny jak stary
+(2088 znaków) — poprawka (b) w ogóle nie zdążyła zadziałać, bo problem
+leżał wcześniej w pipeline.
+
+**Prawdziwa przyczyna**: `fetchUrlAsText()` wycinał zawartość `<article>`
+prostym dopasowaniem regex "od PIERWSZEGO `<article>` do PIERWSZEGO
+napotkanego `</article>`" (`html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)`)
+— BEZ liczenia zagnieżdżenia. interia.pl (i zapewne wiele innych
+nowoczesnych portali) oznacza KAŻDY boks "Zobacz również" jako osobny,
+zagnieżdżony znacznik `<article>` (semantycznie poprawny HTML). Dopasowanie
+kończyło się więc na zamknięciu PIERWSZEGO takiego wewnętrznego boksu, nie
+prawdziwego, głównego artykułu — cała reszta wywiadu w ogóle nie trafiała
+do dalszego przetwarzania, ZANIM jakikolwiek filtr szumu (stary czy nowy
+z POPRAWKI (b)) dostał szansę zadziałać.
+
+**Naprawa**: nowa funkcja `extractFirstElementContent()` — ten sam
+mechanizm poprawnego liczenia zagnieżdżenia, którego już używa
+`stripElementsByTag()` w tym samym pliku (dla `<nav>`/`<div>` itd.), tylko
+zwraca zawartość PIERWSZEGO elementu (poprawnie dopasowaną do JEGO
+WŁASNEGO zamknięcia) zamiast usuwać dopasowane elementy. Fail-open: brak
+poprawnie zamkniętego `<article>` (niepoprawny HTML) zostawia oryginalny
+`html` nietknięty, tak jak dotychczas.
+
+**Testy przed wdrożeniem** (Node, scratchpad): syntetyczny HTML z
+zagnieżdżonymi `<article>` (dwa boksy powiązane W ŚRODKU głównego
+artykułu) — potwierdzone, że treść PO boksach jest teraz poprawnie
+zachowana, a `<nav>`/`<footer>` POZA głównym `<article>` dalej poprawnie
+odcięte.
+
+Dodany też DRUGI log diagnostyczny (`console.log`, tymczasowy) tuż po
+wycięciu `<article>` — długość tekstu na tym etapie, żeby przy
+ewentualnym KOLEJNYM nieudanym teście dało się od razu zobaczyć, czy
+problem jest tu, czy jeszcze dalej w pipeline, bez zgadywania. **Oba logi
+diagnostyczne (`[refresh-debug]`) są tymczasowe — do usunięcia, gdy
+temat zostanie ostatecznie potwierdzony jako zamknięty.**
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` (te same dwa przedawnione
+błędy typów, niezwiązane z tą zmianą) oraz `node --experimental-strip-types
+--check` — brak błędów. Ostateczne potwierdzenie wymaga ponownego testu
+na żywo (ten sam link interia.pl) po ręcznym wdrożeniu w Supabase
+Dashboard.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
