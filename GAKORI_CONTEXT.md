@@ -6229,6 +6229,21 @@ o dokładnie: "Problemy tego typu zdarzają się, kiedy mamy do czynienia z
 blokadą po stronie serwisu (np. ochrona antybotowa)" — wstawione
 dosłownie w miejsce pierwszej wersji.
 
+Kolejne doprecyzowanie (ten sam dzień): druga część komunikatu
+("skopiuj treść i wklej w trybie Tekst") rozszerzona o przypomnienie, że
+w trybie Tekst jest pole `label_text_source_url_optional` ("Opcjonalnie:
+link do źródła") — warto tam wkleić TEN SAM link, którego nie udało się
+pobrać automatycznie. To nie tylko kosmetyka: ten link trafia do
+`source_url` zapisanego wyniku, więc zasila mechanizm zaufania dla
+ręcznie wklejonych linków (`rescueExact`/`rescueOriginal`, patrz "Punkt 5:
+system zaufania dla ręcznie wklejonych linków" niżej) — kolejna osoba,
+która wklei TEN SAM link w trybie "Link", dostanie ten wynik od razu, za
+darmo, zamiast trafiać na ten sam błąd pobrania. Komunikat mówi to teraz
+wprost ("pomożesz też innym, którzy wkleją ten sam link"), we wszystkich
+10 językach. Backendowy `message` w `analyze/index.ts` (widoczny tylko w
+`?debug=1`) NIE dostał tej drugiej części (nigdy nie miał porady
+"skopiuj tekst" — to czysto techniczny komunikat debugowania).
+
 Weryfikacja: `node --check i18n.js` bez błędów, policzone wystąpienia
 klucza (10/10 języków). `node --experimental-strip-types --check` na
 `analyze/index.ts` bez nowych błędów.
