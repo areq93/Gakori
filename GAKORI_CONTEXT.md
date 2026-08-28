@@ -6502,6 +6502,31 @@ komunikat w języku użytkownika, włączenie z powrotem wyłącznie ręczne.
   tylko logika w kodzie) zostały zaktualizowane tak samo — sama zmiana
   zapytań `.eq()` w kodzie nie wystarczy, jeśli baza ma z tyłu starszą,
   węższą regułę.
+- **NAJPOWAŻNIEJSZA jak dotąd: POPRAWKA (za) zmieniła `UNIQUE
+  (content_hash, language)` na częściowy indeks (`WHERE is_private =
+  false`), a przeoczony został jeden konkretny fragment kodu w
+  `analyze/index.ts` (`.upsert(..., {onConflict: 'content_hash,
+  language'})`), który się na TYM DOKŁADNYM ograniczeniu opierał —
+  Postgres nie umie dopasować `ON CONFLICT` bez WHERE do częściowego
+  indeksu, więc zapis KAŻDEJ nowej analizy (nie tylko tekstu, którego
+  dotyczyła zmiana — też obrazu, PDF-a, linku) zaczął kończyć się błędem
+  "Nie udało się zapisać wyniku analizy". Wykryte dopiero na żywo przez
+  właściciela (3 nieudane próby analizy obrazu), nie przy wdrożeniu —
+  właściciel słusznie zwrócił uwagę, że to była zbyt pobieżna
+  weryfikacja przed wysłaniem zmiany. **Twarda zasada na przyszłość, bez
+  wyjątków**: zanim zmienisz JAKIKOLWIEK constraint/indeks/regułę RLS, na
+  której może się opierać istniejący kod (nie tylko ta jego część, którą
+  świadomie zmieniasz) — `grep` całego repo (wszystkich funkcji Supabase
+  I frontendu) pod kątem KAŻDEGO użycia tej tabeli/kolumny/ograniczenia
+  (`.upsert`, `onConflict`, `ON CONFLICT`, nazwy kolumn objętych
+  ograniczeniem), nie tylko fragmentu, który akurat modyfikujesz. Brak
+  lokalnego środowiska Supabase (patrz "Proces wdrażania") oznacza, że
+  jedyna dostępna weryfikacja to STARANNE, RĘCZNE prześledzenie
+  wszystkich miejsc, które mogą być dotknięte — nie tylko odruchowe
+  sprawdzenie składni. Zmiana reguły współdzielonej przez cały system
+  (constraint, RLS, indeks) to zawsze ryzyko regresji w miejscach
+  pozornie niezwiązanych z bieżącym zadaniem — traktować z tą samą
+  ostrożnością co zmianę w płatnym, kosztowym rdzeniu `analyze`.
 - **Natywny `<input type="file">`** pokazuje swój przycisk/placeholder
   ("Wybierz plik" / "Nie wybrano pliku") w języku przeglądarki/systemu
   użytkownika — atrybut `lang` na stronie na to nie wpływa, więc zwykły
