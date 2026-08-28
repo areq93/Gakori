@@ -5387,6 +5387,29 @@ Weryfikacja: `node --check` dla wyciągniętego skryptu inline z
 `account.html` — bez błędów. Czysto wizualna zmiana HTML +
 podbicie wersji cache PWA — nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(m) — jeden spójny odstęp (16px) między WSZYSTKIMI
+kartami na każdej stronie, nie tylko w `historia.html`.** Właściciel
+pochwalił odstęp między kartami w przebudowanej `historia.html`
+(`.card-stack`, `gap: 16px`) i poprosił o zastosowanie DOKŁADNIE tego
+samego wszędzie — m.in. na stronie głównej, gdzie karta "Analizuj" i karta
+"Wyszukaj analizę" stykały się ze sobą bez żadnego odstępu (`.card`/
+`.result-card` same w sobie nie miały marginesu, `body` nie miało `gap`).
+
+**Naprawa** (`style.css`): `body` (już `display:flex; flex-direction:
+column`) dostał `gap: 16px` — jeden wspólny mechanizm odstępów między
+WSZYSTKIMI elementami na najwyższym poziomie każdej z 4 stron (nagłówek
+marki, karty, wynik analizy), zamiast osobnych, niespójnych marginesów na
+pojedynczych elementach. Usunięte dwa marginesy, które teraz
+DUBLOWAŁYBY się z nowym `gap` (marginesy i `gap` we flexboksie NIE
+zwijają się nawzajem, w przeciwieństwie do zwykłych marginesów blokowych):
+`.gakori-brand` (dawny `margin: 4px 0 22px 0` → `4px 0 0 0`) i
+`.result-card` (dawny `margin-top: 16px` → usunięty całkiem). Elementy
+`position: fixed` (`.top-icon-row`, `.modal-overlay`) są wyjęte z
+normalnego przepływu, więc nowy `gap` ich nie dotyczy — bez zmian.
+
+Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css` (126/126) —
+czysta zmiana CSS, żadnych zmian HTML/JS, nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
