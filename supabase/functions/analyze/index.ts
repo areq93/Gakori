@@ -3370,7 +3370,7 @@ Deno.serve(async (req: Request) => {
               return new Response(
                 JSON.stringify({
                   error: 'url_fetch_failed',
-                  message: 'Nie udało się pobrać treści tej strony — sprawdź, czy link jest poprawny i publicznie dostępny.',
+                  message: 'Nie udało się pobrać treści tej strony — to może być spowodowane blokadą po stronie tego serwisu (np. jego ochroną antybotową), a nie problemem po naszej stronie. Sprawdź, czy link jest poprawny i publicznie dostępny.',
                   details: { retrievalStatus, fallback: 'failed' },
                 }),
                 { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

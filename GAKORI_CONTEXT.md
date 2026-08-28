@@ -6207,6 +6207,24 @@ sprawdza teraz wszystkie 4 tryby:
 Weryfikacja: `node --check` na wyekstrahowanym `<script>` z `index.html`
 bez błędów.
 
+**POPRAWKA 2026-08-28(zh) — komunikat "nie udało się pobrać treści
+strony" mówi teraz wprost, że przyczyną może być blokada po stronie
+danego serwisu (np. ochrona antybotowa), nie problem po naszej
+stronie.** Właściciel zauważył realny przypadek (sport.tvp.pl) —
+zdiagnozowaliśmy razem, że i własne pobieranie, i niezależna próba
+Gemini ("URL context") zawiodły dla tej samej strony, co jest silnym
+sygnałem blokady bota, nie błędu Gakori. Poprosił, żeby użytkownik od
+razu widział to wyjaśnienie, zamiast się zastanawiać, czy to "nasza
+wina". Zmienione oba miejsca z tym samym tekstem błędu:
+- `err_url_fetch_failed` w `i18n.js` (10 języków) — to jest komunikat,
+  który realnie widzi użytkownik na `index.html`.
+- Analogiczny `message` w `analyze/index.ts` (widoczny tylko w panelu
+  `?debug=1`, dla spójności z i18n).
+
+Weryfikacja: `node --check i18n.js` bez błędów, policzone wystąpienia
+klucza (10/10 języków). `node --experimental-strip-types --check` na
+`analyze/index.ts` bez nowych błędów.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
