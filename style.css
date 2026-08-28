@@ -329,7 +329,8 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
    reguła po cichu nadpisałaby też wygląd nieaktywnych zakładek. */
 :root[data-theme="dark"] button:not(.tab-btn):not(.image-preview-remove),
 :root[data-theme="dark"] .tab-btn.active,
-:root[data-theme="dark"] .icon-btn {
+:root[data-theme="dark"] .icon-btn,
+:root[data-theme="dark"] .back-icon-btn {
     background: linear-gradient(160deg, var(--card-2) 0%, var(--card) 55%, var(--card) 100%);
     color: var(--ink);
     border: 1.5px solid var(--ink);
@@ -337,7 +338,8 @@ button:disabled { background: #8c887e; color: #f2efe7; filter: none; box-shadow:
 }
 :root[data-theme="dark"] button:not(.tab-btn):not(.image-preview-remove):hover,
 :root[data-theme="dark"] .tab-btn.active:hover,
-:root[data-theme="dark"] .icon-btn:hover {
+:root[data-theme="dark"] .icon-btn:hover,
+:root[data-theme="dark"] .back-icon-btn:hover {
     filter: none; background: var(--ink); color: var(--paper); box-shadow: var(--sculpt-shadow);
 }
 :root[data-theme="dark"] button:not(.tab-btn):not(.image-preview-remove):active {
@@ -703,6 +705,22 @@ a { color: var(--accent); }
     box-shadow: var(--sculpt-shadow-sm); flex-shrink: 0;
 }
 
+/* POPRAWKA 2026-08-28(n) — link powrotny ("← Wstecz", zwykły podkreślony
+   tekst wewnątrz karty) zamieniony, na wyraźną prośbę właściciela, na
+   okrągły przycisk-ikonę w LEWYM górnym rogu — ta sama zasada co ikony
+   konta/prywatnych analiz w prawym górnym rogu (`.icon-btn` wyżej), tylko
+   lustrzane odbicie pozycji i ZAWSZE widoczny (bez logowania też, więc
+   NIE dziedziczy `display: none` z `.icon-btn` — tamto jest specjalnie
+   dla ikon wymagających sesji, przełączanych przez JS). */
+.back-icon-btn {
+    position: fixed; top: 16px; left: 16px; z-index: 50;
+    display: flex; width: 44px; height: 44px; padding: 0; border-radius: 50%;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 50%, var(--primary-dark) 100%);
+    color: var(--btn-text); font-size: 20px; border: none;
+    align-items: center; justify-content: center; text-decoration: none;
+    box-shadow: var(--sculpt-shadow-sm);
+}
+
 /* Stan kredytów — pigułka w tym samym rzędzie co ikony wyżej, ten sam
    rytm wizualny co inne odznaki w aplikacji (patrz .result-badge niżej) */
 .credit-balance {
@@ -724,9 +742,3 @@ a { color: var(--accent); }
     padding: 20px; box-sizing: border-box;
 }
 
-/* Link powrotny na dedykowanych podstronach (np. account.html) */
-.back-link {
-    display: inline-block; margin-bottom: 14px; font-size: 14px; font-weight: 600;
-    color: var(--ink-soft); text-decoration: none;
-}
-.back-link:hover { color: var(--accent); }

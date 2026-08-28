@@ -5410,6 +5410,38 @@ normalnego przepływu, więc nowy `gap` ich nie dotyczy — bez zmian.
 Weryfikacja: sprawdzone parami nawiasy klamrowe w `style.css` (126/126) —
 czysta zmiana CSS, żadnych zmian HTML/JS, nic do wklejenia w Supabase.
 
+**POPRAWKA 2026-08-28(n) — link "Wstecz" zamieniony na okrągły przycisk-
+ikonę w LEWYM górnym rogu (symetrycznie do ikon konta/prywatnych analiz w
+prawym rogu) + zmieniony na ikonę domku.** Właściciel poprosił, żeby
+koncept "wstecz" był zawsze przyciskiem w lewym górnym rogu, na tej samej
+zasadzie co przyciski konta/prywatnych analiz — a chwilę później sam
+zaproponował lepszą ikonę: zamiast strzałki "wstecz", domek/coś
+kojarzącego się z "głównym menu" (bo przycisk i tak zawsze prowadzi na
+`index.html`, nie jest to prawdziwe "wstecz" w historii przeglądarki).
+
+**Zmiany**: nowa klasa `style.css` — `.back-icon-btn` (ta sama okrągła
+"pigułka" co `.icon-btn`, ale ZAWSZE widoczna — `display:flex` na sztywno,
+nie `display:none` jak `.icon-btn`, bo tamto jest dla ikon wymagających
+sesji, przełączanych przez JS; ten przycisk pokazuje się zawsze,
+niezależnie od zalogowania) z `position: fixed; top:16px; left:16px` —
+lustrzane odbicie `.top-icon-row` (prawy górny róg). Ikona domku (SVG,
+ten sam "Feather" styl co reszta ikon w appce). Podmienione w
+`account.html`/`scan.html`/`historia.html` (jedyne trzy miejsca z linkiem
+powrotnym) — usunięty stary `<a class="back-link">` z wnętrza karty. Klasa
+CSS `.back-link` (już niepotrzebna, zero pozostałych użyć) usunięta
+całkiem.
+
+Klucze i18n `account_back`/`history_back` (dawniej "← Wstecz" z ręcznie
+doklejoną strzałką w tekście) przycięte do samego słowa ("Wstecz" itp., 10
+języków) — strzałka jest teraz częścią SVG ikony, nie tekstu, a tekst
+klucza służy już tylko jako `aria-label` (czytnik ekranu), nie widoczny
+napis.
+
+Weryfikacja: `node --check` dla wyciągniętych skryptów inline ze
+wszystkich 4 stron oraz `i18n.js` wprost — bez błędów. Sprawdzone parami
+nawiasy klamrowe w `style.css`. Czysto wizualna zmiana CSS/HTML/i18n, bez
+zmian w backendzie — nic do wklejenia w Supabase.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
