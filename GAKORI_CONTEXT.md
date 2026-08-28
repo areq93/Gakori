@@ -4761,6 +4761,45 @@ tym stanie — będzie dalej testował na innych stronach, a przy kolejnym
 podobnym żywym przypadku (z konkretnym "Pokaż pełny tekst źródłowy" do
 analizy) wrócimy do tego z realnymi danymi zamiast zgadywania.
 
+**Drugi żywy przypadek tego samego dnia — polsatnews.pl, ZAMKNIĘTY jako
+znane ograniczenie, ŚWIADOMIE nie łatany.** Artykuł "Trump zmienia nazwę
+jeziora Ontario..." — wyciągnięty tekst (2142 znaków) zaczynał się od
+akapitu tła ("Jezioro Ontario znajduje się na pograniczu...") z
+pominięciem prawdziwego leadu widocznego na żywej stronie ("Donald Trump
+podpisał rozporządzenie..."). Zbadana hipoteza: Readability czasem
+wydziela wyróżniony pierwszy akapit do osobnego pola `excerpt` zamiast
+zostawiać go w `content` — syntetyczny test z typowym podziałem
+lead/treść NIE potwierdził tego dla TEJ struktury (oba fragmenty zostały
+poprawnie w `content`), więc prawdziwa przyczyna dla polsatnews.pl
+pozostaje nieznana (strona zablokowana dla `curl`/`WebFetch` z tego
+środowiska, tak jak interia.pl wcześniej).
+
+**Właściciel słusznie zakwestionował** proponowaną "bezpieczną" łatkę
+(dopisywanie `article.excerpt` na początek, gdy brakuje go w `content`):
+"a ja zacznę wklejać nie to co trzeba?" — sprawdzenie ŹRÓDŁA
+`Readability.js` (nie dokumentacji, prawdziwego kodu z paczki npm)
+potwierdziło, że `excerpt` w WIĘKSZOŚCI przypadków pochodzi z
+meta-opisu SEO (`<meta name="description">`) albo JSON-LD — tekstu
+redakcyjnego, NIE dosłownego fragmentu artykułu — i tylko gdy strona nie
+ma żadnych takich metadanych, Readability sięga po prawdziwy pierwszy
+akapit jako zapasowe źródło `excerpt`. Wstawienie tego do "pełnego tekstu
+źródłowego" złamałoby zasadę WIERNOŚĆ CYTATU (tekst pokazywany
+użytkownikowi i wysyłany do Gemini musi być dosłowny, możliwy do
+zweryfikowania na żywej stronie) — **pomysł WYCOFANY, nie wdrożony**.
+
+**Decyzja strategiczna właściciela, która zamyka ten wątek na razie**:
+"liczę na globalność, więc w każdym języku ludzie będą posługiwali się
+innymi stronami — musimy być skuteczni, a na chwilę obecną nie jesteśmy w
+stanie korygować i robić mapy każdej strony." To POTWIERDZA (nie
+podważa) decyzję o przejściu na Readability z POPRAWKI (e) — inwestycja w
+mechanizm ogólny, działający z założenia na każdej stronie/w każdym
+języku, była właściwym kierunkiem właśnie DLATEGO, że mapowanie
+pojedynczych witryn nie skaluje się przy globalnym zasięgu produktu.
+Pojedyncze, resztkowe niedoskonałości (jak ten przypadek) są świadomie
+akceptowane jako koszt tego podejścia, do punktowego doprecyzowania
+TYLKO gdy pojawią się z realnymi danymi (żywy przykład + "Pokaż pełny
+tekst źródłowy"), nigdy przez zgadywanie na ślepo.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
