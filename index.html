@@ -382,6 +382,17 @@
                 renderImagePreviewList()
                 selectedPdfFile = null
                 renderPdfSelectionInfo()
+                // POPRAWKA 2026-08-28(zj) — renderImagePreviewList()/
+                // renderPdfSelectionInfo() wywyżej same odświeżają stan
+                // przycisku "Analizuj" (patrz updateAnalyzeBtnDisabledState()),
+                // ale czyszczenie textInput/urlInput TUTAJ tego nie robiło —
+                // bfcache przywracał DOM z przyciskiem w stanie sprzed
+                // opuszczenia strony (często aktywnym, bo pole było wtedy
+                // wypełnione), a wyczyszczenie pola JS-em nie przeliczało
+                // stanu `disabled` na nowo. Zgłoszone na żywo: po powrocie
+                // (przyciskiem Wstecz) do trybu Link, pole puste, a
+                // "Analizuj" mimo to klikalny.
+                updateAnalyzeBtnDisabledState();
             }
         });
 

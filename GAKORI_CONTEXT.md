@@ -6254,6 +6254,83 @@ Weryfikacja: `node --check i18n.js` bez błędów, policzone wystąpienia
 klucza (10/10 języków). `node --experimental-strip-types --check` na
 `analyze/index.ts` bez nowych błędów.
 
+**POPRAWKA 2026-08-28(zi) — "Sugerowane działania" rozszerzone z PDF-a na
+tekst/link i obraz, bez żadnego dodatkowego zapytania/kosztu.**
+Właściciel zauważył, że szablon wyniku PDF-a (wzorce z "Konkretnie"/"Co
+teraz zrobić" przy każdym, "Podsumowanie" i "Sugerowane działania" na
+dole) wygląda dobrze i chciał tego samego wszędzie. Sprawdzenie w
+kodzie pokazało dokładniejszy obraz: "Konkretnie" (`stakes`) i "Co teraz
+zrobić" (`tip`) przy każdym wzorcu ORAZ "Podsumowanie" (`summary`) już
+działały identycznie we wszystkich czterech typach — jedynym brakującym
+elementem było `suggested_actions` (2-3 CAŁOŚCIOWE, świeżo
+zsyntetyzowane sugestie, patrzące na WSZYSTKIE wzorce razem — nie kopia
+pojedynczej porady z `tip`), które miał WYŁĄCZNIE PDF (dodane w
+POPRAWCE 2026-08-27(b)) — nawet obraz tego nie miał.
+
+**Tekst/link**: dodane do TEJ SAMEJ odpowiedzi, którą Gemini i tak już
+zwraca (`DETECTION_RESPONSE_SCHEMA`, nowe pole `suggested_actions` +
+nowa instrukcja `SUGGESTED_ACTIONS_INSTRUCTION`, dopisywana TYLKO do
+promptów tekstu/linku — nie do współdzielonego `CHAIN_OF_THOUGHT_
+INSTRUCTION`, żeby nie mylić obrazu/PDF-a instrukcją o polu, którego ich
+schemat w ogóle nie ma). Zero nowych zapytań — ten sam mechanizm co
+wcześniejsze dodanie `category_checklist` (POPRAWKA 2026-08-26(x)):
+większy schemat odpowiedzi, ta sama liczba wywołań Gemini.
+
+**Obraz**: `composeImageSummary()` (Etap 2b, już i tak dziś wykonywane
+zapytanie na skróconej liście wzorców) przepisane z prostego tekstu na
+strukturalny JSON (`IMAGE_SUMMARY_SCHEMA`, DOKŁADNIE ten sam wzorzec co
+`PDF_SUMMARY_SCHEMA`/`composePdfSummary()`) — teraz zwraca `{summary,
+suggested_actions}` zamiast samego tekstu podsumowania, plus ten sam
+mechanizm jednego ponowienia przy pustej/nieudanej odpowiedzi co PDF.
+Też zero nowych zapytań — to była już istniejąca, osobna funkcja, tylko
+rozszerzona o drugie zadanie w TYM SAMYM wywołaniu.
+
+**Znaleziony przy okazji, prawdziwy, ukryty błąd**: `PDF_RESPONSE_SCHEMA`
+(schemat używany przez `translateResult()` do tłumaczenia GOTOWEGO
+wyniku PDF-a na inny język) NIGDY nie miał pola `suggested_actions` —
+mimo że sam wynik PDF-a je ma od tygodnia. Gemini ze strukturalnym
+JSON-em fizycznie nie zwróci pola spoza zadeklarowanego schematu, więc
+KAŻDE dotychczasowe tłumaczenie wyniku PDF-a na inny język po cichu
+GUBIŁO listę "Sugerowane działania" (blok po prostu się chował na
+`scan.html`, bez żadnego błędu). Naprawione przy tej samej okazji —
+dodane do `PDF_RESPONSE_SCHEMA`. `RESPONSE_SCHEMA` (tekst/link) i
+`IMAGE_RESPONSE_SCHEMA` (obraz) dostały to samo pole od razu, żeby nie
+powtórzyć tego samego błędu dla nowych typów. `translateResult()`
+zaktualizowany też o instrukcję tłumaczenia elementów tablicy
+`suggested_actions` (ten sam prosty, 12-latkowy język co `tip`), z
+zachowaniem dokładnej liczby elementów.
+
+Zero zmian frontendowych — `scan.html` renderuje `summary`/
+`suggested_actions` już od POPRAWKI (68) GENERYCZNIE (bez sprawdzania
+`input_type`), więc blok "Sugerowane działania" po prostu przestaje być
+ukryty, gdy pole jest niepuste. Zero zmian w `i18n.js` — klucze
+`suggested_actions_label`/`summary_label`/`tip_label`/`stakes_label` już
+istniały dla wszystkich typów.
+
+Weryfikacja: `node --experimental-strip-types --check` i `tsc --noEmit
+--skipLibCheck` na `analyze/index.ts` bez nowych błędów (te same 19
+znanych linii). Pełny test na żywo (czy tekst/link/obraz faktycznie
+pokazują teraz sensowne "Sugerowane działania") pozostaje po stronie
+właściciela po wdrożeniu.
+
+**POPRAWKA 2026-08-28(zj) — przycisk "Analizuj" w trybie Link wracał
+aktywny (nie wyszarzony) po powrocie na stronę przez bfcache, mimo
+pustego pola.** To ten sam mechanizm co znany pułapkowy przypadek
+"bfcache" opisany w "Pułapki, w które już raz wpadliśmy" niżej —
+`pageshow` z `event.persisted === true` już czyścił pola `textInput`/
+`urlInput`/wybrane obrazy/PDF, ale samo czyszczenie `urlInput.value`/
+`textInput.value` przez JS NIE przeliczało stanu przycisku (tylko
+`renderImagePreviewList()`/`renderPdfSelectionInfo()` robiły to same,
+przy okazji własnego renderowania — patrz POPRAWKA (zg) wyżej). Skutek:
+bfcache przywracał DOM z przyciskiem w stanie sprzed opuszczenia strony
+(często aktywnym, bo pole było wtedy wypełnione), a wyczyszczenie go
+później niczego nie odświeżało. Naprawione jednym dopisanym wywołaniem
+`updateAnalyzeBtnDisabledState()` na końcu handlera `pageshow`, zaraz po
+wyczyszczeniu wszystkich pól.
+
+Weryfikacja: `node --check` na wyekstrahowanym `<script>` z `index.html`
+bez błędów. Zmiana czysto frontendowa.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia

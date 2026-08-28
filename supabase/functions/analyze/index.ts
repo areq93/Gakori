@@ -829,8 +829,13 @@ const RESPONSE_SCHEMA = {
     // to pole to zapasowy/wyjściowy tytuł AI, używany zawsze dla tekstu i
     // dla linku bez własnego pobrania (ścieżka awaryjna Gemini URL context).
     title: { type: 'string' },
+    // POPRAWKA 2026-08-28(zi) — "Sugerowane działania", ten sam duch co
+    // PDF_SUMMARY_SCHEMA/composePdfSummary() niżej — patrz GAKORI_CONTEXT.md.
+    // Dla tekstu/linku BEZ osobnego zapytania (jedna, ta sama odpowiedź co
+    // "patterns"), bo tu model i tak widzi całą treść w jednym wywołaniu.
+    suggested_actions: { type: 'array', items: { type: 'string' } },
   },
-  required: ['q_score', 'patterns', 'summary', 'title'],
+  required: ['q_score', 'patterns', 'summary', 'title', 'suggested_actions'],
 }
 
 // POPRAWKA 2026-08-20(c) — "Chain of Thought" (myślenie krok po kroku)
@@ -858,8 +863,9 @@ const DETECTION_RESPONSE_SCHEMA = {
     patterns: RESPONSE_SCHEMA.properties.patterns,
     summary: { type: 'string' },
     title: { type: 'string' },
+    suggested_actions: RESPONSE_SCHEMA.properties.suggested_actions,
   },
-  required: ['category_checklist', 'reasoning_steps', 'q_score', 'patterns', 'summary', 'title'],
+  required: ['category_checklist', 'reasoning_steps', 'q_score', 'patterns', 'summary', 'title', 'suggested_actions'],
 }
 
 // POPRAWKA 2026-08-26 — sekcja "PRZEGLĄD KATEGORII" dopisana PRZED
@@ -881,6 +887,15 @@ const DETECTION_RESPONSE_SCHEMA = {
 const CHAIN_OF_THOUGHT_INSTRUCTION = `\n\nPRZEGLĄD KATEGORII (KRYTYCZNIE WAŻNE, RÓB TO ZAWSZE JAKO PIERWSZY KROK): Zanim zaczniesz analizować tekst akapit po akapicie, wypełnij pole "category_checklist" — dla KAŻDEJ z 15 kategorii biblioteki ustaw wartość "pasuje" albo "nie pasuje", w zależności od tego, czy cokolwiek w analizowanej treści pasuje do JAKIEGOKOLWIEK modelu z tej kategorii. Rób to nawet wtedy, gdy odpowiedź wydaje się oczywista — to wymusza świadome sprawdzenie każdej kategorii, zamiast pominięcia którejś przez przeoczenie. Dopiero PO wypełnieniu tego pola przejdź do szczegółowego przeglądu tekstu.
 
 MYŚLENIE KROK PO KROKU (CHAIN OF THOUGHT, KRYTYCZNIE WAŻNE): Po przeglądzie kategorii wyżej, w polu "reasoning_steps" rozpisz krótkimi notatkami, akapit po akapicie / twierdzenie po twierdzeniu, swój tok myślenia: co zauważasz w tym fragmencie, czy pasuje do jakiegoś modelu z biblioteki (do którego dokładnie), i czy to dopasowanie jest pewne czy wątpliwe (jakie jest ryzyko pomyłki/naciągania). Dopiero NA PODSTAWIE "category_checklist" i "reasoning_steps" wypełnij ostateczne pole "patterns" — tylko tymi wzorcami, które po tym namyśle uznajesz za trafne. Pole "reasoning_steps" to Twój wewnętrzny brudnopis, nikt go nie zobaczy — pisz w nim swobodnie, nie musi być "ładne", ma być systematyczne.`
+
+// POPRAWKA 2026-08-28(zi) — "Sugerowane działania" dla tekstu/linku (patrz
+// GAKORI_CONTEXT.md). Ten sam duch co PDF_SUMMARY_SCHEMA/composePdfSummary()
+// niżej, ale BEZ osobnego zapytania — dopisywane TYLKO do promptów, które
+// używają DETECTION_RESPONSE_SCHEMA (tekst/link), nigdy do CHAIN_OF_THOUGHT_
+// INSTRUCTION samego w sobie, bo ten jest współdzielony też z obrazem/PDF-em
+// (IMAGE_CHUNK_SCHEMA/PDF_DETECTION_RESPONSE_SCHEMA), które NIE mają tego
+// pola w swoim schemacie.
+const SUGGESTED_ACTIONS_INSTRUCTION = `\n\nSUGEROWANE DZIAŁANIA (pole "suggested_actions", KRYTYCZNIE WAŻNE): po ustaleniu ostatecznej listy "patterns" wyżej, wypełnij pole "suggested_actions" listą 2-3 KRÓTKICH, całościowych sugerowanych działań — spójrz na CAŁOŚĆ znalezionych wzorców razem (nie na pojedynczy) i wyciągnij z nich ogólny wniosek, co czytelnik powinien zrobić dalej. To NIE MOŻE być kopia ani przeróbka pojedynczej porady z pola "tip" jakiegokolwiek wzorca — ma to być coś widoczne dopiero patrząc na całość, np. powtarzający się mechanizm w kilku miejscach treści. Jeśli lista "patterns" jest pusta, zwróć pustą listę w "suggested_actions".`
 
 // Kategorie niedozwolonej treści na obrazie — patrz moderacja niżej
 // (Deno.serve, gałąź "image"). Trzymane jako lista stałych wartości (nie
@@ -925,8 +940,13 @@ const IMAGE_RESPONSE_SCHEMA = {
       },
     },
     summary: { type: 'string' },
+    // POPRAWKA 2026-08-28(zi) — patrz RESPONSE_SCHEMA/PDF_RESPONSE_SCHEMA
+    // wyżej/niżej i GAKORI_CONTEXT.md. Wypełniane przez composeImageSummary()
+    // (Etap 2b, osobne zapytanie, ten sam koszt co dotychczasowe samo
+    // podsumowanie).
+    suggested_actions: { type: 'array', items: { type: 'string' } },
   },
-  required: ['unsafe_content', 'unsafe_content_category', 'q_score', 'patterns', 'summary'],
+  required: ['unsafe_content', 'unsafe_content_category', 'q_score', 'patterns', 'summary', 'suggested_actions'],
 }
 
 // Schemat dla ETAPU 1 (jeden obraz na zapytanie, patrz analyzeImageChunk()
@@ -996,8 +1016,19 @@ const PDF_RESPONSE_SCHEMA = {
       },
     },
     summary: { type: 'string' },
+    // POPRAWKA 2026-08-28(zi) — NAPRAWA UKRYTEGO BŁĘDU: to pole istniało od
+    // dawna w zapisanym wyniku PDF-a (composePdfSummary(), patrz niżej), ale
+    // NIGDY nie było częścią TEGO schematu — a to właśnie ten schemat
+    // ogranicza, co translateResult() (tłumaczenie na inny język) w ogóle
+    // MOŻE zwrócić (Gemini ze strukturalnym JSON-em fizycznie nie zwróci
+    // pola spoza deklarowanego schematu). Skutek: KAŻDE tłumaczenie
+    // istniejącego wyniku PDF-a na inny język po cichu GUBIŁO listę
+    // "Sugerowane działania" — mimo że oryginał (w pierwszym języku) ją
+    // miał. Znalezione przy okazji dopisywania tego samego pola do
+    // tekstu/linku/obrazu, patrz GAKORI_CONTEXT.md.
+    suggested_actions: { type: 'array', items: { type: 'string' } },
   },
-  required: ['q_score', 'patterns', 'summary'],
+  required: ['q_score', 'patterns', 'summary', 'suggested_actions'],
 }
 
 // POPRAWKA 2026-08-20(c) — "reasoning_steps" (Chain of Thought, patrz
@@ -1212,7 +1243,7 @@ async function translateResult(
 ): Promise<Record<string, unknown> | null> {
   const langName = LANGUAGE_NAMES[targetLangCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const prompt = `Przetłumacz poniższy JSON na język ${langName}. Zasady:
-- Przetłumacz WYŁĄCZNIE pola "name", "explanation", "tip", "stakes", "summary" i (jeśli obecne w JSON-ie) "title" — prostym, codziennym językiem, zrozumiałym nawet dla 12-latka, bez żargonu, bez akademickiego stylu. Nie tłumacz dosłownie/sztywno, jeśli robi to zdanie trudniejszym — sparafrazuj tak, żeby było równie proste jak oryginał. Pole "tip" NIGDY nie może zawierać słów "ufaj"/"nie ufaj"/"dobre"/"złe"/"wiarygodne" — jeśli oryginał ich nie ma, tłumaczenie też nie może ich dodać. Pole "stakes" może być pustym tekstem — wtedy zostaje puste, nie wymyślaj treści. Liczby w polu "stakes" (jeśli występują) zostają dokładnie takie same jak w oryginale, tłumaczysz tylko otaczający tekst. Pole "title" (jeśli obecne) zostaje krótkie (3-8 słów) i rzeczowe — opisuje temat, nie ocenę.
+- Przetłumacz WYŁĄCZNIE pola "name", "explanation", "tip", "stakes", "summary", każdy element tablicy "suggested_actions" (jeśli obecna) i (jeśli obecne w JSON-ie) "title" — prostym, codziennym językiem, zrozumiałym nawet dla 12-latka, bez żargonu, bez akademickiego stylu. Nie tłumacz dosłownie/sztywno, jeśli robi to zdanie trudniejszym — sparafrazuj tak, żeby było równie proste jak oryginał. Pole "tip" NIGDY nie może zawierać słów "ufaj"/"nie ufaj"/"dobre"/"złe"/"wiarygodne" — jeśli oryginał ich nie ma, tłumaczenie też nie może ich dodać. Pole "stakes" może być pustym tekstem — wtedy zostaje puste, nie wymyślaj treści. Liczby w polu "stakes" (jeśli występują) zostają dokładnie takie same jak w oryginale, tłumaczysz tylko otaczający tekst. Pole "title" (jeśli obecne) zostaje krótkie (3-8 słów) i rzeczowe — opisuje temat, nie ocenę. Pole "suggested_actions" (jeśli obecne) zachowuje dokładnie tę samą liczbę elementów co w oryginale — tłumaczysz każdy element osobno, nie dodajesz ani nie usuwasz żadnego.
 - Pole "quote" NIE tłumacz — zostaje dokładnie w oryginalnym brzmieniu, bez żadnych zmian.
 - Pole "pattern_type" NIE tłumacz — zostaje dokładnie tą samą wartością co w oryginale ("manipulation" albo "reasoning").
 - Pole "q_score" zostaje dokładnie taką samą liczbą jak w oryginale.
@@ -1594,34 +1625,69 @@ ${JSON.stringify(patterns)}`
   }
 }
 
+// POPRAWKA 2026-08-28(zi) — schemat odpowiedzi dla composeImageSummary()
+// rozszerzony o "suggested_actions", DOKŁADNIE ten sam wzorzec co
+// PDF_SUMMARY_SCHEMA/composePdfSummary() wyżej — patrz GAKORI_CONTEXT.md.
+// Nadal JEDNO zapytanie do Gemini, ten sam koszt co dotychczasowe samo
+// podsumowanie.
+const IMAGE_SUMMARY_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string' },
+    suggested_actions: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['summary', 'suggested_actions'],
+}
+
 // Odpowiednik composePdfSummary() dla obrazu — tanie zapytanie na samej
-// skróconej liście (typ + nazwa), bez ponownego wysyłania obrazów.
+// skróconej liście (typ + nazwa + porada), bez ponownego wysyłania obrazów.
 async function composeImageSummary(
-  patterns: Array<{ pattern_type: string; name: string }>,
+  patterns: Array<{ pattern_type: string; name: string; tip?: string }>,
   qScore: number,
   langCode: string,
   geminiKey: string,
   costTracker?: CostTracker
-): Promise<string> {
+): Promise<{ summary: string; suggested_actions: string[] }> {
   const langName = LANGUAGE_NAMES[langCode] || LANGUAGE_NAMES[DEFAULT_LANGUAGE]
   const compactList =
     patterns.length > 0
-      ? patterns.map((p) => `- [${p.pattern_type}] ${p.name}`).join('\n')
+      ? patterns.map((p) => `- [${p.pattern_type}] ${p.name}${p.tip ? ` — porada: ${p.tip}` : ''}`).join('\n')
       : '(brak wykrytych wzorców)'
-  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych na przesłanych obrazach, oraz ogólny wynik rzetelności (q_score, 0-100, gdzie 100 = brak manipulacji). Napisz DWUZDANIOWE podsumowanie całości w języku ${langName}, tak proste, żeby zrozumiał je nawet 12-latek — konkretne, bez lania wody, bez żargonu. NIGDY nie pisz "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko neutralny opis tego, co znaleziono (patrz zasada NEUTRALNOŚĆ). Zwróć WYŁĄCZNIE sam tekst podsumowania, bez cudzysłowów i bez dodatkowego komentarza.
+  const prompt = `Poniżej jest lista wzorców (manipulacji i/lub trafnego rozumowania) wykrytych na przesłanych obrazach, wraz z poradą przypisaną do każdego z nich, oraz ogólny wynik rzetelności (q_score, 0-100, gdzie 100 = brak manipulacji). Masz dwa zadania, oba w języku ${langName}:
+1. Napisz DWUZDANIOWE podsumowanie całości w polu "summary", tak proste, żeby zrozumiał je nawet 12-latek — konkretne, bez lania wody, bez żargonu. NIGDY nie pisz "ufaj"/"nie ufaj"/"wiarygodne"/"podejrzane" — tylko neutralny opis tego, co znaleziono (patrz zasada NEUTRALNOŚĆ).
+2. W polu "suggested_actions" podaj listę 2-3 KRÓTKICH, całościowych sugerowanych działań — spójrz na CAŁĄ analizę razem (wszystkie wzorce i ich porady) i wyciągnij z niej ogólny wniosek, co czytelnik powinien zrobić dalej. To NIE MOŻE być kopia ani przeróbka pojedynczej porady z listy niżej — to ma być coś, co widać dopiero patrząc na całość. Jeśli lista wzorców jest pusta, zwróć pustą listę w "suggested_actions".
 
 q_score: ${qScore}
 Wykryte wzorce:
 ${compactList}`
 
-  const data = await callGemini(
-    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } },
-    geminiKey,
-    GEMINI_TIMEOUT_MS,
-    costTracker
-  )
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  return typeof text === 'string' && text.trim() ? text.trim() : ''
+  // Ten sam mechanizm ponowienia co composePdfSummary() — jedna dodatkowa
+  // próba przy pustej/nieudanej odpowiedzi, koszt pomijalny.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const data = await callGemini(
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: IMAGE_SUMMARY_SCHEMA },
+      },
+      geminiKey,
+      GEMINI_TIMEOUT_MS,
+      costTracker
+    )
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+    if (typeof text === 'string' && text.trim()) {
+      try {
+        const parsed = JSON.parse(text)
+        const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : ''
+        const suggestedActions = Array.isArray(parsed.suggested_actions)
+          ? parsed.suggested_actions.filter((a: unknown): a is string => typeof a === 'string' && a.trim().length > 0)
+          : []
+        if (summary) return { summary, suggested_actions: suggestedActions }
+      } catch {
+        // nieudany parsing traktujemy tak samo jak pustą odpowiedź — ponów
+      }
+    }
+  }
+  return { summary: '', suggested_actions: [] }
 }
 
 // Awaryjne pobranie strony, gdy wbudowany pobieracz Gemini (URL Context)
@@ -3305,7 +3371,7 @@ Deno.serve(async (req: Request) => {
                 {
                   parts: [
                     {
-                      text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nTEKST DO ANALIZY:\n${preFetchedText}`,
+                      text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}${SUGGESTED_ACTIONS_INSTRUCTION}\n\nTEKST DO ANALIZY:\n${preFetchedText}`,
                     },
                   ],
                 },
@@ -3346,7 +3412,7 @@ Deno.serve(async (req: Request) => {
                   {
                     parts: [
                       {
-                        text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}`,
+                        text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}${SUGGESTED_ACTIONS_INSTRUCTION}\n\nPrzeanalizuj treść strony pod adresem:\n${source_url}`,
                       },
                     ],
                   },
@@ -3491,8 +3557,8 @@ Deno.serve(async (req: Request) => {
           imageResults.reduce((sum, r) => sum + r!.q_score, 0) / imageResults.length
         )
         const verifiedImagePatterns = await verifyAndRefineImagePatterns(allImagePatterns, outputLanguage, geminiKey!, buildMentalModelsLibrary(), costTracker)
-        const imageSummary = await composeImageSummary(
-          verifiedImagePatterns as Array<{ pattern_type: string; name: string }>,
+        const { summary: imageSummary, suggested_actions: imageSuggestedActions } = await composeImageSummary(
+          verifiedImagePatterns as Array<{ pattern_type: string; name: string; tip?: string }>,
           imageQScore,
           outputLanguage,
           geminiKey!,
@@ -3501,7 +3567,9 @@ Deno.serve(async (req: Request) => {
         // Ustawiamy `result` BEZPOŚREDNIO (z pominięciem współdzielonego
         // `geminiData` niżej) — tak samo jak PDF, obraz ma teraz inną
         // architekturę (wiele zapytań + scalanie), patrz `if (!result)` niżej.
-        result = { q_score: imageQScore, patterns: verifiedImagePatterns, summary: imageSummary }
+        // POPRAWKA 2026-08-28(zi) — "suggested_actions" dopisane, ten sam
+        // duch co PDF, patrz GAKORI_CONTEXT.md.
+        result = { q_score: imageQScore, patterns: verifiedImagePatterns, summary: imageSummary, suggested_actions: imageSuggestedActions }
       } else if (input_type === 'pdf') {
         // POPRAWKA 2026-08-19(c) — realny dowód od użytkownika (dwa różne
         // ~40-stronicowe raporty finansowe, oba dostały tylko 2-3 wykryte
@@ -3873,7 +3941,7 @@ ${compactExisting}`
         const systemPrompt = buildSystemPrompt(outputLanguage, buildMentalModelsLibrary())
         geminiData = await callGemini(
           {
-            contents: [{ parts: [{ text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}\n\nTEKST DO ANALIZY:\n${text_content}` }] }],
+            contents: [{ parts: [{ text: `${systemPrompt}${CHAIN_OF_THOUGHT_INSTRUCTION}${SUGGESTED_ACTIONS_INSTRUCTION}\n\nTEKST DO ANALIZY:\n${text_content}` }] }],
             generationConfig: {
               temperature: 0, // POPRAWKA 2026-08-25 — determinizm, patrz GAKORI_CONTEXT.md
               responseMimeType: 'application/json',
