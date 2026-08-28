@@ -6224,6 +6224,11 @@ samym tekstem błędu:
 - Analogiczny `message` w `analyze/index.ts` (widoczny tylko w panelu
   `?debug=1`, dla spójności z i18n).
 
+Drobna korekta polskiego sformułowania zaraz potem — właściciel poprosił
+o dokładnie: "Problemy tego typu zdarzają się, kiedy mamy do czynienia z
+blokadą po stronie serwisu (np. ochrona antybotowa)" — wstawione
+dosłownie w miejsce pierwszej wersji.
+
 Weryfikacja: `node --check i18n.js` bez błędów, policzone wystąpienia
 klucza (10/10 języków). `node --experimental-strip-types --check` na
 `analyze/index.ts` bez nowych błędów.

@@ -82,7 +82,7 @@ const TRANSLATIONS = {
         badge_info: "Info", result_generic_error: "Coś poszło nie tak. Spróbuj ponownie za chwilę.",
         err_signup_required: "Załóż konto, aby kontynuować.",
         err_insufficient_credits: "Nie masz wystarczająco kredytów na to.",
-        err_url_fetch_failed: "Nie udało się pobrać treści tej strony — problemy zdarzają się, kiedy mamy do czynienia z blokadą po stronie tego serwisu (np. jego ochroną antybotową). Sprawdź, czy link jest poprawny i publicznie dostępny. Możesz też skopiować treść artykułu i wkleić ją w trybie „Tekst” — zadziała niezależnie od tego problemu.",
+        err_url_fetch_failed: "Nie udało się pobrać treści tej strony — problemy tego typu zdarzają się, kiedy mamy do czynienia z blokadą po stronie serwisu (np. ochrona antybotowa). Sprawdź, czy link jest poprawny i publicznie dostępny. Możesz też skopiować treść artykułu i wkleić ją w trybie „Tekst” — zadziała niezależnie od tego problemu.",
         err_system_paused: "Gakori jest teraz chwilowo wstrzymane — nasz zespół już o tym wie i pracuje nad tym. Spróbuj ponownie za jakiś czas.",
         err_login_required: "Ta treść jest prywatna — zaloguj się, żeby ją zobaczyć.",
         notice_privatize_denied: "Ta treść była już publiczna wcześniej, więc nie da się jej teraz zrobić prywatną — oto publiczny wynik.",
