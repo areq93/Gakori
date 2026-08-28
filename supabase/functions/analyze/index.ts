@@ -1736,33 +1736,66 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
       .replace(/<\/(p|div|li|h[1-6]|tr|blockquote)>/gi, '\n\n')
       .replace(/<br\s*\/?>/gi, '\n')
 
-    const paragraphsWithNoise = html
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      // POPRAWKA 2026-08-25(f) — dekodowanie NUMERYCZNYCH encji HTML
-      // (`&#321;`/`&#x141;` → "Ł" itd.) — dawniej dekodowaliśmy tylko kilka
-      // nazwanych encji, więc polskie znaki specjalne zapisane w ten
-      // sposób (częste na starszych/nietypowych stronach) wychodziły jako
-      // zniekształcone "M#321;ODZIE#379;" zamiast "MŁODZIEŻ". Ten sam
-      // wzór obejmuje też `&#39;` (apostrof), więc osobna reguła dla niego
-      // nie jest już potrzebna. `decodeNumericEntity()` fail-open na
-      // pojedynczym błędnym dopasowaniu (nieprawidłowy punkt kodowy) —
-      // zostawia ten jeden fragment nietknięty zamiast wywalać całe
-      // pobranie strony.
-      .replace(/&#x([0-9a-fA-F]+);/g, (m, hex) => decodeNumericEntity(m, hex, 16))
-      .replace(/&#(\d+);/g, (m, dec) => decodeNumericEntity(m, dec, 10))
-      // Nazwane encje (patrz HTML_NAMED_ENTITIES wyżej) — fail-open: nazwa
-      // spoza tabeli zostaje nietknięta (np. rzadka encja, na którą nie
-      // trafiliśmy jeszcze na żywo).
-      .replace(/&([a-zA-Z]+);/g, (m, name) => HTML_NAMED_ENTITIES[name] ?? m)
-      .replace(/[ \t]+/g, ' ')
-      .replace(/ *\n */g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
+    // Czyści JEDEN fragment surowego HTML-a (akapit) do zwykłego tekstu —
+    // te same kroki (encje, białe znaki), które dawniej robiliśmy raz na
+    // CAŁYM dokumencie naraz, tylko teraz per akapit, żeby dało się je
+    // połączyć z gęstością linków (patrz `linkTextDensity()` niżej) tego
+    // SAMEGO fragmentu, zanim jego tagi znikną.
+    function cleanFragmentText(fragmentHtml: string): string {
+      return fragmentHtml
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        // POPRAWKA 2026-08-25(f) — dekodowanie NUMERYCZNYCH encji HTML
+        // (`&#321;`/`&#x141;` → "Ł" itd.) — dawniej dekodowaliśmy tylko kilka
+        // nazwanych encji, więc polskie znaki specjalne zapisane w ten
+        // sposób (częste na starszych/nietypowych stronach) wychodziły jako
+        // zniekształcone "M#321;ODZIE#379;" zamiast "MŁODZIEŻ". Ten sam
+        // wzór obejmuje też `&#39;` (apostrof), więc osobna reguła dla niego
+        // nie jest już potrzebna. `decodeNumericEntity()` fail-open na
+        // pojedynczym błędnym dopasowaniu (nieprawidłowy punkt kodowy) —
+        // zostawia ten jeden fragment nietknięty zamiast wywalać całe
+        // pobranie strony.
+        .replace(/&#x([0-9a-fA-F]+);/g, (m, hex) => decodeNumericEntity(m, hex, 16))
+        .replace(/&#(\d+);/g, (m, dec) => decodeNumericEntity(m, dec, 10))
+        // Nazwane encje (patrz HTML_NAMED_ENTITIES wyżej) — fail-open: nazwa
+        // spoza tabeli zostaje nietknięta (np. rzadka encja, na którą nie
+        // trafiliśmy jeszcze na żywo).
+        .replace(/&([a-zA-Z]+);/g, (m, name) => HTML_NAMED_ENTITIES[name] ?? m)
+        .replace(/[ \t]+/g, ' ')
+        .replace(/ *\n */g, '\n')
+        .trim()
+    }
+
+    // POPRAWKA 2026-08-28(b) — patrz GAKORI_CONTEXT.md po pełne uzasadnienie
+    // i żywy przypadek (interia.pl, artykuł ucięty na pierwszym z trzech
+    // śródartykułowych boksów "Zobacz również"). Zastępuje dawny
+    // TRAILING_LIST_DATE_RE (rozpoznawanie PO WZORZE konkretnej daty,
+    // zakładające JEDNĄ taką listę, zawsze na samym końcu strony) —
+    // ogólniejszy, niezależny od języka/formatu daty sygnał: prawdziwy
+    // akapit artykułu to głównie zwykły tekst z rzadkimi linkami, a boks
+    // "zobacz również"/lista powiązanych to niemal WYŁĄCZNIE linki
+    // (nagłówek = link). Liczone na SUROWYM HTML-u fragmentu (przed
+    // usunięciem tagów w `cleanFragmentText()` wyżej), żeby widzieć
+    // dokładnie, ile tekstu leży wewnątrz `<a>...</a>`.
+    function linkTextDensity(rawFragmentHtml: string): number {
+      const totalText = rawFragmentHtml.replace(/<[^>]+>/g, '').trim()
+      if (!totalText) return 0
+      let linkText = ''
+      for (const m of rawFragmentHtml.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)) {
+        linkText += m[1].replace(/<[^>]+>/g, '')
+      }
+      return linkText.length / totalText.length
+    }
+    // Progi celowo ostrożne (krótki akapit ORAZ zdecydowana większość jego
+    // tekstu w linku, obie warunki naraz) — na razie najlepsze oszacowanie
+    // właściciela i asystenta, świadomie otwarte na dostrojenie po
+    // zobaczeniu więcej żywych przypadków (patrz GAKORI_CONTEXT.md).
+    const LINK_DENSITY_NOISE_THRESHOLD = 0.6
+    const LINK_DENSITY_MAX_NOISE_TEXT_LENGTH = 220
 
     // POPRAWKA 2026-08-25(g) — żywy przykład, powtórzony na DWÓCH różnych
     // artykułach: śródartykułowe zapowiedzi zupełnie INNEGO tekstu
@@ -1774,7 +1807,7 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // specyficzna dla języka polskiego, nie pomoże na stronach w innych
     // językach.
     const TEASER_LINE_PREFIXES = [
-      'zobacz:', 'zobacz też:', 'czytaj także:', 'czytaj też:',
+      'zobacz:', 'zobacz też:', 'zobacz również:', 'czytaj także:', 'czytaj też:',
       'przeczytaj także:', 'przeczytaj też:', 'polecamy:',
     ]
     // POPRAWKA 2026-08-26(i) — "WIDEO:" świadomie NIE było na liście wyżej
@@ -1795,35 +1828,21 @@ async function fetchUrlAsText(url: string): Promise<string | null> {
     // końcu tuż przed podpisem autora).
     const TEASER_LINE_PREFIXES_UNLESS_FIRST_PARAGRAPH = ['wideo:']
     const EXACT_NOISE_LINES = new Set(['czytaj więcej', 'czytaj dalej', 'zobacz więcej'])
-    let paragraphs = paragraphsWithNoise.split('\n\n')
 
-    // POPRAWKA 2026-08-26(l) — żywy przypadek, prawie DWUKROTNIE wydłużający
-    // tekst: sekcja "Najpopularniejsze w [nazwa portalu]" na samym końcu
-    // strony — dziesiątki niepowiązanych nagłówków, każdy z osobną datą i
-    // podpisem autora, bez rozpoznawalnej klasy HTML (portal właściciela nie
-    // pasował do żadnego tokenu w NOISE_CLASS_TOKENS). Właściciel porównał
-    // analizę linku (10818 znaków) z ręcznym tekstem tego samego artykułu
-    // (5502 znaków) — prawie DWA RAZY więcej, bo cała ta lista trafiała do
-    // analizy jako część "treści artykułu", rozwadniając uwagę modelu i
-    // dając WYRAŹNIE gorszy wynik (mniej wykrytych wzorców) niż ta sama
-    // treść bez szumu. Rozpoznajemy to PO WZORCU, nie po klasie: taka lista
-    // to zawsze wiele (3+) samodzielnych akapitów będących WYŁĄCZNIE datą/
-    // znacznikiem czasu ("dzisiaj 06:05", "wczoraj 16:06", "19.08.2026") —
-    // rzecz, która w prawdziwej prozie artykułu praktycznie się nie
-    // zdarza (prawdziwa data publikacji na górze artykułu ma inny,
-    // pełniejszy format, np. "26 sierpnia 2026, 6:14"). Znajdujemy
-    // NAJWCZEŚNIEJSZY taki akapit i ucinamy WSZYSTKO od dwóch akapitów
-    // przed nim (żeby złapać też nagłówek tej konkretnej pozycji listy) do
-    // końca tekstu — ta sekcja zawsze jest na samym końcu strony, nigdy w
-    // środku prawdziwej treści.
-    const TRAILING_LIST_DATE_RE = /^(?:dzisiaj|wczoraj|poniedziałek|wtorek|środa|czwartek|piątek|sobota|niedziela),?\s*\d{1,2}[:.]\d{2}$|^\d{1,2}\.\d{2}\.\d{4}$/i
-    const dateParagraphIndices = paragraphs
-      .map((p, i) => (TRAILING_LIST_DATE_RE.test(p.trim()) ? i : -1))
-      .filter((i) => i !== -1)
-    if (dateParagraphIndices.length >= 3) {
-      const cutAt = Math.max(0, dateParagraphIndices[0] - 2)
-      paragraphs = paragraphs.slice(0, cutAt)
-    }
+    // Dzielimy SUROWY (jeszcze z tagami w środku, np. <a>) html na akapity —
+    // ten sam podział co dawniej (dwa lub więcej znaków nowej linii,
+    // wstawionych przy zamykających tagach akapitowych wyżej), tylko TERAZ
+    // wykonywany PRZED usunięciem tagów, żeby `linkTextDensity()` miała co
+    // zmierzyć.
+    const rawBlocks = html.split(/\n{2,}/)
+    const paragraphs = rawBlocks
+      .map((raw) => ({ text: cleanFragmentText(raw), density: linkTextDensity(raw) }))
+      .filter(({ text, density }) => {
+        if (!text) return false
+        if (text.length <= LINK_DENSITY_MAX_NOISE_TEXT_LENGTH && density >= LINK_DENSITY_NOISE_THRESHOLD) return false
+        return true
+      })
+      .map(({ text }) => text)
 
     const text = paragraphs
       .filter((para, index) => {

@@ -4528,6 +4528,82 @@ same dwa przedawnione błędy typów, niezwiązane z tą zmianą) oraz `node
 wymaga żywych testów na prawdziwych dokumentach po ręcznym wdrożeniu w
 Supabase Dashboard.
 
+**POPRAWKA 2026-08-28(b) — `fetchUrlAsText()`: filtr szumu po GĘSTOŚCI
+LINKÓW zamiast rozpoznawania po wzorze daty. Żywy przypadek: artykuł
+interia.pl (wywiad z szefem NRA o Giertychu/Kralu), zapisany jako
+zaledwie 2088 znaków, mimo że pełna treść to kilka razy więcej.**
+Właściciel dostarczył dokładny, byte-dokładny dowód: „Pokaż pełny tekst
+źródłowy" pokazywał tekst URYWAJĄCY SIĘ dosłownie w połowie zdania „nie
+przysługuje mu uposażenie poselskie", tuż PO pierwszym z trzech
+śródartykułowych boksów „Zobacz również" — cała reszta wywiadu (kilkanaście
+kolejnych odpowiedzi eksperta) w ogóle nie trafiła do analizy.
+
+**Diagnoza** (uczciwie: nie dało się w 100% potwierdzić przez bezpośrednie
+pobranie strony z tego środowiska — `wydarzenia.interia.pl` jest
+zablokowane przez politykę sieciową sesji, sprawdzone przez
+`curl`/`WebFetch`, oba zwróciły `EGRESS_BLOCKED`/403; diagnoza oparta o
+analizę kodu + porównanie dokładnego miejsca urwania tekstu, które
+przysłał właściciel): mechanizm `TRAILING_LIST_DATE_RE`
+(POPRAWKA 2026-08-26(l)) szukał 3+ samodzielnych akapitów będących
+WYŁĄCZNIE datą GDZIEKOLWIEK w dokumencie i ucinał WSZYSTKO od
+NAJWCZEŚNIEJSZEGO takiego akapitu do końca strony — zaprojektowany pod
+stronę z JEDNĄ taką listą na samym końcu. interia.pl wstawia TRZY osobne
+boksy „Zobacz również" ROZSIANE w środku artykułu — licznik „3 daty
+gdziekolwiek" spełniał się już przy pierwszym z nich, blisko początku
+tekstu, więc mechanizm kasował całą resztę prawdziwej treści razem z nim.
+
+**Właściciel zapytał wprost: "a nie da się po prostu podążać za logiką
+głównej treści i w ten sposób ustalić klamry treści?"** — zamiast łatać
+kolejnym punktowym regexem, zrobiliśmy to, co przeglądarki robią w
+"trybie czytania" (algorytm typu Mozilla Readability): **gęstość tekstu
+względem linków**. Prawdziwy akapit artykułu to głównie zwykły tekst z
+rzadkimi linkami. Boks "zobacz również"/lista powiązanych to niemal
+WYŁĄCZNIE linki (nagłówek = link, autor = link). Nowa logika w
+`fetchUrlAsText()`:
+1. `cleanFragmentText()` — wydzielona z dawnego jednorazowego czyszczenia
+   całego dokumentu na raz, teraz uruchamiana PER AKAPIT.
+2. `linkTextDensity()` — liczy, jaki procent tekstu SUROWEGO fragmentu
+   HTML (przed usunięciem tagów) leży wewnątrz `<a>...</a>`.
+3. Akapit KRÓTKI (≤220 znaków) ORAZ z gęstością linku ≥60% —
+   wyrzucany. Oba progi (`LINK_DENSITY_NOISE_THRESHOLD`,
+   `LINK_DENSITY_MAX_NOISE_TEXT_LENGTH`) to na razie najlepsze,
+   wspólnie ustalone oszacowanie — **świadomie otwarte na dostrojenie w
+   miarę pojawiania się kolejnych żywych przypadków** (właściciel: "będziemy
+   korygować w trakcie jak będą dalej problemy z odnalezieniem kluczowego
+   tekstu").
+4. **Usunięty** dawny mechanizm `TRAILING_LIST_DATE_RE`/`dateParagraphIndices`
+   (rozpoznawanie po konkretnym wzorze daty + "ucinanie od pierwszego
+   znaleziska do końca") — w pełni zastąpiony powyższym, bardziej ogólnym
+   podejściem. Kluczowa różnica: filtrowanie PER AKAPIT, nie "jeden punkt
+   cięcia do końca dokumentu" — pojedynczy śródartykułowy boks znika, a
+   prawdziwa treść PO NIM zostaje nietknięta.
+5. Dorzucona też etykieta "zobacz również:" do `TEASER_LINE_PREFIXES`
+   (sama etykieta boksu nie jest linkiem, więc gęstość linków jej nie
+   złapie — to osobny, tani filtr po treści, tak jak reszta tej listy).
+
+**Zaakceptowane ryzyko**: rzadki przypadek, gdzie krótkie, PRAWDZIWE
+zdanie artykułu składa się w większości z linkowanego terminu, mógłby
+zostać przypadkiem usunięty — świadomie zaakceptowane jako dużo mniejsza
+szkoda niż dotychczasowy błąd (utrata nawet 80% artykułu).
+
+**Testy przed wdrożeniem** (Node, poza repo, w scratchpadzie — logika
+skopiowana 1:1 z ostatecznego kodu): (1) syntetyczny HTML odwzorowujący
+dokładnie żywy przypadek interia.pl (akapit realnej treści → boks "Zobacz
+również" → WIĘCEJ realnej treści) — boks zniknął, treść PRZED i PO nim
+przetrwała nietknięta; (2) regresja wobec oryginalnego przypadku z
+POPRAWKI (l) — prawdziwa lista "Najpopularniejsze" (4 kolejne, wyłącznie
+linkowe pozycje) na końcu strony — cała lista poprawnie usunięta, ostatni
+prawdziwy akapit przetrwał; (3) normalny akapit z JEDNYM krótkim linkiem
+w środku dłuższego zdania (gęstość 0,12, długość 138 znaków) — poprawnie
+NIE usunięty (fałszywy alarm by tu zaszkodził, test potwierdza że się nie
+zdarza).
+
+Weryfikacja: `tsc --noEmit --skipLibCheck` (te same dwa przedawnione
+błędy typów, niezwiązane z tą zmianą) oraz `node --experimental-strip-types
+--check` — brak błędów. Pełne potwierdzenie na żywym artykule (ten sam
+URL interia.pl, który spowodował zgłoszenie) wymaga ręcznego wdrożenia w
+Supabase Dashboard i ponownej analizy przez właściciela.
+
 ## Audyt systemowy — główny wyłącznik ("organizm") — dodane 2026-08-21
 
 Po pełnym audycie MVP wg inżynierii systemowej (stocki, przepływy, sprzężenia
